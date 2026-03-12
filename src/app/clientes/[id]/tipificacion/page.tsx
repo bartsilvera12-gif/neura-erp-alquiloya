@@ -79,10 +79,10 @@ export default function TipificacionPage() {
   const [error, setError] = useState<string | null>(null);
 
   function cargar() {
-    const c = getCliente(id);
+    const c = getCliente(String(id));
     if (!c) { setNotFound(true); return; }
     setCliente(c);
-    const tips = getTipificaciones(id);
+    const tips = getTipificaciones(String(id));
     // Ordenar más recientes primero
     setTipificaciones([...tips].sort((a, b) => b.fecha.localeCompare(a.fecha)));
   }
