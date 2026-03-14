@@ -59,8 +59,7 @@ export default function EditProspectoPage() {
     contacto:              "",
     email:                 "",
     telefono:              "",
-    servicio:              "",
-    valor_estimado:        "",
+    planIds:               [] as string[],
     proxima_accion:        "",
     fecha_proxima_accion:  "",
     creado_por:            "",
@@ -83,22 +82,30 @@ export default function EditProspectoPage() {
       .finally(() => setCargandoPlanes(false));
   }, []);
 
+  useEffect(() => {
+    if (!prospecto || planes.length === 0) return;
+    const nombres = prospecto.servicio.split(",").map((s) => s.trim()).filter(Boolean);
+    const ids = nombres
+      .map((n) => planes.find((p) => p.nombre === n)?.id)
+      .filter((id): id is string => Boolean(id));
+    setForm((prev) => ({ ...prev, planIds: ids }));
+  }, [prospecto?.id, prospecto?.servicio, planes]);
+
   async function cargar() {
     const p = await getProspecto(id);
     if (!p) { setNotFound(true); return; }
     setProspecto(p);
-    setForm({
+    setForm((prev) => ({
+      ...prev,
       empresa:              p.empresa,
       contacto:             p.contacto,
       email:                p.email                 ?? "",
       telefono:             p.telefono              ?? "",
-      servicio:             p.servicio,
-      valor_estimado:       String(p.valor_estimado),
       proxima_accion:       p.proxima_accion        ?? "",
       fecha_proxima_accion: p.fecha_proxima_accion  ?? "",
       creado_por:           p.creado_por            ?? "",
       responsable:          p.responsable           ?? "",
-    });
+    }));
   }
 
   useEffect(() => {
@@ -120,19 +127,44 @@ export default function EditProspectoPage() {
     }));
   }
 
+  function togglePlan(planId: string) {
+    setForm((prev) => ({
+      ...prev,
+      planIds: prev.planIds.includes(planId)
+        ? prev.planIds.filter((id) => id !== planId)
+        : [...prev.planIds, planId],
+    }));
+  }
+
+  const planesActivos = planes.filter((p) => p.estado === "activo");
+  const valorEstimado = form.planIds.reduce(
+    (sum, pid) => sum + (planesActivos.find((p) => p.id === pid)?.precio ?? 0),
+    0
+  );
+
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault();
     setErrorForm(null);
     if (!form.empresa.trim())  return setErrorForm("La empresa es obligatoria.");
     if (!form.contacto.trim()) return setErrorForm("El contacto es obligatorio.");
 
+    const planesActivos = planes.filter((p) => p.estado === "activo");
+    const servicioTexto = form.planIds
+      .map((pid) => planesActivos.find((p) => p.id === pid)?.nombre)
+      .filter(Boolean)
+      .join(", ");
+    const valorEstimado = form.planIds.reduce(
+      (sum, pid) => sum + (planesActivos.find((p) => p.id === pid)?.precio ?? 0),
+      0
+    );
+
     const actualizado = await updateProspecto(id, {
       empresa:              form.empresa.trim().toUpperCase(),
       contacto:             form.contacto.trim().toUpperCase(),
       email:                form.email.trim()    || undefined,
       telefono:             form.telefono.trim() || undefined,
-      servicio:             form.servicio.trim(),
-      valor_estimado:       parseFloat(form.valor_estimado) || 0,
+      servicio:             servicioTexto,
+      valor_estimado:       valorEstimado,
       proxima_accion:       form.proxima_accion.trim()       || undefined,
       fecha_proxima_accion: form.fecha_proxima_accion        || undefined,
       creado_por:           form.creado_por.trim().toUpperCase()  || undefined,
@@ -329,7 +361,7 @@ export default function EditProspectoPage() {
 
           {/* Servicio */}
           <div>
-            <label className={labelClass}>Servicio / Producto de interés</label>
+            <label className={labelClass}>Servicios / Productos de interés</label>
             {cargandoPlanes ? (
               <p className="text-sm text-gray-400 py-2">Cargando planes…</p>
             ) : planes.length === 0 ? (
@@ -343,22 +375,25 @@ export default function EditProspectoPage() {
                 </Link>
               </div>
             ) : (
-              <select
-                name="servicio"
-                value={form.servicio}
-                onChange={handleChange}
-                className={inputClass}
-              >
-                <option value="">Seleccioná un plan</option>
-                {planes.filter((p) => p.estado === "activo").map((plan) => (
-                  <option key={plan.id} value={plan.nombre}>
-                    {plan.nombre} {plan.codigo_plan ? `(${plan.codigo_plan})` : ""}
-                  </option>
+              <div className="space-y-2 rounded-lg border border-slate-200 p-3 bg-slate-50/50 max-h-48 overflow-y-auto">
+                {planesActivos.map((plan) => (
+                  <label
+                    key={plan.id}
+                    className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-white transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.planIds.includes(plan.id)}
+                      onChange={() => togglePlan(plan.id)}
+                      className="rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                    />
+                    <span className="text-sm text-gray-800 flex-1">{plan.nombre}</span>
+                    <span className="text-xs text-gray-500 font-mono">
+                      {plan.precio.toLocaleString("es-PY")} ₲
+                    </span>
+                  </label>
                 ))}
-                {form.servicio && !planes.some((p) => p.nombre === form.servicio) && (
-                  <option value={form.servicio}>{form.servicio} (valor anterior)</option>
-                )}
-              </select>
+              </div>
             )}
           </div>
 
@@ -366,14 +401,15 @@ export default function EditProspectoPage() {
           <div>
             <label className={labelClass}>Valor estimado (Gs.)</label>
             <input
-              type="number"
-              name="valor_estimado"
-              value={form.valor_estimado}
-              onChange={handleChange}
-              className={inputClass}
-              min={0}
-              step={1}
+              type="text"
+              readOnly
+              value={valorEstimado > 0 ? valorEstimado.toLocaleString("es-PY") : ""}
+              placeholder="Se calcula automáticamente"
+              className={`${inputClass} bg-slate-50 cursor-not-allowed`}
             />
+            {valorEstimado > 0 && (
+              <p className="text-xs text-gray-500 mt-1">Suma de los planes seleccionados</p>
+            )}
           </div>
 
           {/* Próxima acción */}

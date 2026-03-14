@@ -38,8 +38,7 @@ export default function NuevoProspectoPage() {
     contacto:              "",
     email:                 "",
     telefono:              "",
-    servicio:              "",
-    valor_estimado:        "",
+    planIds:               [] as string[],
     etapa:                 "LEAD" as EtapaFunnel,
     proxima_accion:        "",
     fecha_proxima_accion:  "",
@@ -70,23 +69,40 @@ export default function NuevoProspectoPage() {
     }));
   }
 
+  function togglePlan(planId: string) {
+    setForm((prev) => ({
+      ...prev,
+      planIds: prev.planIds.includes(planId)
+        ? prev.planIds.filter((id) => id !== planId)
+        : [...prev.planIds, planId],
+    }));
+  }
+
+  const planesActivos = planes.filter((p) => p.estado === "activo");
+  const servicioTexto = form.planIds
+    .map((id) => planesActivos.find((p) => p.id === id)?.nombre)
+    .filter(Boolean)
+    .join(", ");
+  const valorEstimado = form.planIds.reduce(
+    (sum, id) => sum + (planesActivos.find((p) => p.id === id)?.precio ?? 0),
+    0
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
     if (!form.empresa.trim())   return setError("La empresa es obligatoria.");
     if (!form.contacto.trim())  return setError("El contacto es obligatorio.");
-    if (!form.servicio.trim())  return setError("El servicio o interés es obligatorio.");
-
-    const valorNum = parseFloat(form.valor_estimado) || 0;
+    if (form.planIds.length === 0) return setError("Seleccioná al menos un servicio/plan.");
 
     const guardado = await saveProspecto({
       empresa:              form.empresa.trim().toUpperCase(),
       contacto:             form.contacto.trim().toUpperCase(),
       email:                form.email.trim()    || undefined,
       telefono:             form.telefono.trim() || undefined,
-      servicio:             form.servicio.trim(),
-      valor_estimado:       valorNum,
+      servicio:             servicioTexto,
+      valor_estimado:       valorEstimado,
       etapa:                form.etapa,
       proxima_accion:       form.proxima_accion.trim()       || undefined,
       fecha_proxima_accion: form.fecha_proxima_accion        || undefined,
@@ -174,7 +190,7 @@ export default function NuevoProspectoPage() {
 
             <div>
               <label className={labelClass}>
-                Servicio / Producto de interés <span className="text-red-500">*</span>
+                Servicios / Productos de interés <span className="text-red-500">*</span>
               </label>
               {cargandoPlanes ? (
                 <p className="text-sm text-gray-400 py-2">Cargando planes…</p>
@@ -192,20 +208,25 @@ export default function NuevoProspectoPage() {
                   </Link>
                 </div>
               ) : (
-                <select
-                  name="servicio"
-                  value={form.servicio}
-                  onChange={handleChange}
-                  className={inputClass}
-                  required
-                >
-                  <option value="">Seleccioná un plan</option>
-                  {planes.filter((p) => p.estado === "activo").map((plan) => (
-                    <option key={plan.id} value={plan.nombre}>
-                      {plan.nombre} {plan.codigo_plan ? `(${plan.codigo_plan})` : ""}
-                    </option>
+                <div className="space-y-2 rounded-lg border border-slate-200 p-3 bg-slate-50/50 max-h-48 overflow-y-auto">
+                  {planesActivos.map((plan) => (
+                    <label
+                      key={plan.id}
+                      className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-white transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.planIds.includes(plan.id)}
+                        onChange={() => togglePlan(plan.id)}
+                        className="rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                      />
+                      <span className="text-sm text-gray-800 flex-1">{plan.nombre}</span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        {plan.precio.toLocaleString("es-PY")} ₲
+                      </span>
+                    </label>
                   ))}
-                </select>
+                </div>
               )}
             </div>
 
@@ -213,15 +234,17 @@ export default function NuevoProspectoPage() {
               <div>
                 <label className={labelClass}>Valor estimado (Gs.)</label>
                 <input
-                  type="number"
-                  name="valor_estimado"
-                  value={form.valor_estimado}
-                  onChange={handleChange}
-                  placeholder="Ej: 15000000"
-                  className={inputClass}
-                  min={0}
-                  step={1}
+                  type="text"
+                  readOnly
+                  value={valorEstimado > 0 ? valorEstimado.toLocaleString("es-PY") : ""}
+                  placeholder="Se calcula automáticamente"
+                  className={`${inputClass} bg-slate-50 cursor-not-allowed`}
                 />
+                {valorEstimado > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Suma de los planes seleccionados
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelClass}>Etapa inicial</label>
