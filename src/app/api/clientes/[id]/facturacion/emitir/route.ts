@@ -1,0 +1,187 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { getUserAndEmpresa } from "@/lib/middleware/auth";
+import { successResponse, errorResponse } from "@/lib/api/response";
+import { API_ERRORS } from "@/lib/api/errors";
+import { emitEvent, EVENT_TYPES } from "@/lib/integrations/events";
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase no configurado");
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+/** Obtiene el siguiente número de factura para la empresa. */
+async function obtenerSiguienteNumero(supabase: ReturnType<typeof getSupabase>, empresaId: string): Promise<string> {
+  const prefijo = process.env.FACTURA_PREFIJO ?? "FAC-";
+  const { data } = await supabase
+    .from("facturas")
+    .select("numero_factura")
+    .eq("empresa_id", empresaId)
+    .order("numero_factura", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let next = 1;
+  if (data?.numero_factura) {
+    const match = String(data.numero_factura).match(/(\d+)$/);
+    if (match) next = parseInt(match[1], 10) + 1;
+  }
+  return `${prefijo}${String(next).padStart(6, "0")}`;
+}
+
+/**
+ * POST /api/clientes/:id/facturacion/emitir
+ * Emite factura manualmente para un mes de la suscripción.
+ * Body: { mes: "YYYY-MM" }
+ * - Si ya existe factura para ese mes → error
+ * - Si no existe → crea factura
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getUserAndEmpresa();
+    if (!auth) {
+      return NextResponse.json(errorResponse(API_ERRORS.UNAUTHORIZED), { status: 401 });
+    }
+
+    const { id: clienteId } = await params;
+    if (!clienteId) {
+      return NextResponse.json(errorResponse("cliente_id es obligatorio"), { status: 400 });
+    }
+
+    const body = await request.json();
+    const mes = body?.mes?.trim();
+    if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
+      return NextResponse.json(
+        errorResponse("mes es obligatorio en formato YYYY-MM"),
+        { status: 400 }
+      );
+    }
+
+    const supabase = getSupabase();
+
+    const { data: suscripcion, error: errSusc } = await supabase
+      .from("suscripciones")
+      .select("*")
+      .eq("cliente_id", clienteId)
+      .eq("empresa_id", auth.empresa_id)
+      .eq("estado", "activa")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (errSusc) {
+      return NextResponse.json(errorResponse(errSusc.message), { status: 400 });
+    }
+
+    if (!suscripcion) {
+      return NextResponse.json(
+        errorResponse("No hay suscripción activa para este cliente"),
+        { status: 404 }
+      );
+    }
+
+    const [year, month] = mes.split("-").map(Number);
+    const diaFact = Math.min(suscripcion.dia_facturacion ?? 1, 28);
+    const diaVenc = Math.min(suscripcion.dia_vencimiento ?? 10, 31);
+
+    const fecha = `${year}-${String(month).padStart(2, "0")}-${String(diaFact).padStart(2, "0")}`;
+    const venc = new Date(year, month, diaVenc);
+    const fechaVenc = venc.toISOString().slice(0, 10);
+
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const mesSiguiente = `${nextYear}-${String(nextMonth).padStart(2, "0")}`;
+
+    const { data: existentes } = await supabase
+      .from("facturas")
+      .select("id")
+      .eq("cliente_id", clienteId)
+      .eq("suscripcion_id", suscripcion.id)
+      .eq("empresa_id", auth.empresa_id)
+      .gte("fecha", `${mes}-01`)
+      .lt("fecha", `${mesSiguiente}-01`)
+      .limit(1);
+
+    if (existentes && existentes.length > 0) {
+      return NextResponse.json(
+        errorResponse("Ya existe una factura emitida para este mes"),
+        { status: 409 }
+      );
+    }
+
+    const numeroFactura = await obtenerSiguienteNumero(supabase, auth.empresa_id);
+    const monto = Number(suscripcion.precio);
+    const moneda = suscripcion.moneda === "USD" ? "USD" : "GS";
+
+    const { data: factura, error: errFact } = await supabase
+      .from("facturas")
+      .insert({
+        empresa_id: auth.empresa_id,
+        cliente_id: clienteId,
+        suscripcion_id: suscripcion.id,
+        numero_factura: numeroFactura,
+        fecha,
+        fecha_vencimiento: fechaVenc,
+        monto,
+        saldo: monto,
+        estado: "Pendiente",
+        tipo: "suscripcion",
+        moneda,
+      })
+      .select()
+      .single();
+
+    if (errFact) {
+      return NextResponse.json(errorResponse(errFact.message), { status: 400 });
+    }
+
+    let planNombre = "Suscripción";
+    if (suscripcion.plan_id) {
+      const { data: plan } = await supabase
+        .from("planes")
+        .select("nombre")
+        .eq("id", suscripcion.plan_id)
+        .single();
+      if (plan?.nombre) planNombre = plan.nombre;
+    }
+    const { error: errItem } = await supabase.from("factura_items").insert({
+      factura_id: factura.id,
+      empresa_id: auth.empresa_id,
+      descripcion: planNombre,
+      cantidad: 1,
+      precio_unitario: monto,
+      subtotal: monto,
+      iva: 0,
+      total: monto,
+    });
+
+    if (errItem) {
+      console.error("[facturacion] factura_items:", errItem.message);
+    }
+
+    await emitEvent(EVENT_TYPES.factura_creada, {
+      factura_id: factura.id,
+      cliente_id: clienteId,
+      monto: factura.monto,
+    });
+
+    return NextResponse.json(
+      successResponse({
+        factura: {
+          id: factura.id,
+          numero_factura: factura.numero_factura,
+          fecha: factura.fecha,
+          monto: factura.monto,
+        },
+      })
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(errorResponse(msg), { status: 500 });
+  }
+}
