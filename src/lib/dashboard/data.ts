@@ -127,12 +127,34 @@ function toDateStr(v: string | null | undefined): string {
   return isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
-/** Convierte cualquier valor a número seguro (evita NaN, strings concatenados, objetos). */
+/**
+ * Convierte cualquier valor a número seguro.
+ * Formato Paraguay: "450.000" = 450 mil, "450.000.000" = 450 millones.
+ * Evita que "450.000" se parsee como 450 (parseFloat corta en el primer punto).
+ */
 function toNum(v: unknown): number {
   if (v == null) return 0;
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
-    const n = parseFloat(v.replace(/\s/g, ""));
+    const s = v.replace(/\s/g, "").trim();
+    if (!s) return 0;
+    // Si tiene coma: decimal europeo (1.234,56)
+    if (s.includes(",")) {
+      const [intPart, decPart] = s.split(",");
+      const n = parseFloat((intPart || "").replace(/\./g, "") + "." + (decPart || "0"));
+      return Number.isFinite(n) ? n : 0;
+    }
+    // Si tiene punto: puede ser miles (450.000) o decimal (450.50)
+    const parts = s.split(".");
+    if (parts.length === 1) return parseFloat(parts[0]) || 0;
+    const last = parts[parts.length - 1] || "";
+    // Última parte 1-2 dígitos = decimales (450.50)
+    if (last.length <= 2 && /^\d+$/.test(last)) {
+      const n = parseFloat(parts.slice(0, -1).join("") + "." + last);
+      return Number.isFinite(n) ? n : 0;
+    }
+    // Última parte 3+ dígitos = separador de miles (450.000)
+    const n = parseFloat(parts.join(""));
     return Number.isFinite(n) ? n : 0;
   }
   const n = Number(v);

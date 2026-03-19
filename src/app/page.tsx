@@ -667,17 +667,26 @@ function DashFinanciero({
       const d = new Date(g.fecha);
       return d.getFullYear() === y && d.getMonth() === m;
     });
-    const ingresos = pagosMes.reduce((s, p) => s + (Number(p.monto) || 0), 0);
-    const gastosTotal = gastosMes.reduce((s, g) => s + (Number(g.monto) || 0), 0) + comprasMes.reduce((s, c) => s + (Number(c.total) || 0), 0);
+    const sumNum = (arr: { monto?: unknown; total?: unknown }[], key: "monto" | "total") =>
+      arr.reduce((acc, x) => {
+        const v = Number(key === "monto" ? x.monto : x.total);
+        return acc + (Number.isFinite(v) ? v : 0);
+      }, 0);
+    const ingresos = sumNum(pagosMes, "monto");
+    const gastosTotal = sumNum(gastosMes, "monto") + sumNum(comprasMes, "total");
     return { ingresos, gastos: gastosTotal, resultado: ingresos - gastosTotal };
   }, [pagos, compras, gastos]);
 
   // KPIs
   const facturasPeriodo = facturas.filter(f => enRango(f.fecha, desde, hasta));
-  const facturado       = facturasPeriodo.reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  const sumMonto = <T extends { monto?: unknown }>(arr: T[]) =>
+    arr.reduce((acc, x) => { const v = Number(x.monto); return acc + (Number.isFinite(v) ? v : 0); }, 0);
+  const sumSaldo = (arr: { saldo?: unknown }[]) =>
+    arr.reduce((acc, x) => { const v = Number(x.saldo); return acc + (Number.isFinite(v) ? v : 0); }, 0);
+  const facturado       = sumMonto(facturasPeriodo);
   const pagosPeriodo    = pagos.filter(p => enRango(p.fecha_pago, desde, hasta));
-  const cobrado         = pagosPeriodo.reduce((s, p) => s + (Number(p.monto) || 0), 0);
-  const saldoPendiente  = facturas.filter(f => (Number(f.saldo) || 0) > 0).reduce((s, f) => s + (Number(f.saldo) || 0), 0);
+  const cobrado         = sumMonto(pagosPeriodo);
+  const saldoPendiente  = sumSaldo(facturas.filter(f => (Number(f.saldo) || 0) > 0));
   const cntVencidas     = facturas.filter(f => estadoEfectivo(f, hoy) === "Vencido").length;
 
   // Facturación mensual (últimos 12 meses)
