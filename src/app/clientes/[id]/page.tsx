@@ -12,6 +12,8 @@ import {
 } from "@/lib/clientes/storage";
 import { apiDeleteCliente, apiGetBajaOperativaPreview, apiBajaOperativaCliente } from "@/lib/api/client";
 import { getFacturas, getSuscripciones } from "@/lib/facturacion/storage";
+import { getMarketingTasks, createMarketingTask, updateTaskStatus } from "@/lib/marketing/storage";
+import { getUsuariosActivosEmpresa } from "@/lib/usuarios/empresa";
 import { apiCreateFactura, apiCreatePago, apiCreateSuscripcion } from "@/lib/api/client";
 import { getConfig, saveConfig } from "@/lib/config/storage";
 import { getCurrentUser } from "@/lib/auth";
@@ -23,6 +25,8 @@ import { TIPOS_SERVICIO_CLIENTE } from "@/lib/clientes/types";
 import type { Factura } from "@/lib/gestion-clientes/types";
 import type { Suscripcion } from "@/lib/facturacion/types";
 import type { Plan } from "@/lib/planes/types";
+import type { MarketingTask } from "@/lib/marketing/types";
+import { TIPOS_CONTENIDO, ESTADOS_TASK } from "@/lib/marketing/types";
 
 // ── Estilos ────────────────────────────────────────────────────────────────────
 
@@ -40,12 +44,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Tipos de pestaña ──────────────────────────────────────────────────────────
 
-type TabId = "informacion" | "estado_cuenta" | "suscripciones" | "proyectos" | "actividad" | "notas";
+type TabId = "informacion" | "estado_cuenta" | "suscripciones" | "marketing" | "proyectos" | "actividad" | "notas";
 
-const TABS: { id: TabId; label: string }[] = [
+const TABS: { id: TabId; label: string; showWhen?: (c: Cliente) => boolean }[] = [
   { id: "informacion",   label: "Información"      },
   { id: "estado_cuenta", label: "Estado de cuenta" },
   { id: "suscripciones", label: "Suscripciones"    },
+  { id: "marketing",     label: "Marketing",        showWhen: (c) => c.tipo_servicio_cliente === "marketing" },
   { id: "proyectos",     label: "Proyectos"         },
   { id: "actividad",     label: "Actividad"         },
   { id: "notas",         label: "Notas"             },
@@ -153,6 +158,12 @@ export default function ClienteDetailPage() {
     plan_id: "", precio: "", fecha_inicio: "", duracion_meses: "12", dia_facturacion: "1", dia_vencimiento: "10", generar_factura_este_mes: false,
   });
   const [guardandoSusc, setGuardandoSusc] = useState(false);
+  const [marketingTasks, setMarketingTasks] = useState<MarketingTask[]>([]);
+  const [usuariosEmpresa, setUsuariosEmpresa] = useState<{ id: string; nombre: string | null; email: string }[]>([]);
+  const [modalNuevaTarea, setModalNuevaTarea] = useState(false);
+  const [formTarea, setFormTarea] = useState({ titulo: "", descripcion: "", tipo_contenido: "post" as const, fecha_entrega: "", responsable_user_id: "", prioridad: "" as "" | "baja" | "media" | "alta" | "urgente" });
+  const [guardandoTarea, setGuardandoTarea] = useState(false);
+  const [errorTarea, setErrorTarea] = useState<string | null>(null);
 
   // Estado de cuenta
   const [facturas, setFacturas] = useState<Factura[]>([]);
@@ -201,12 +212,15 @@ export default function ClienteDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (id && (activeTab === "suscripciones" || activeTab === "estado_cuenta")) {
+    if (id && (activeTab === "suscripciones" || activeTab === "estado_cuenta" || activeTab === "marketing")) {
       if (activeTab === "suscripciones") {
         getSuscripciones(id).then(setSuscripciones);
         getPlanes().then(setPlanes);
-      } else {
+      } else if (activeTab === "estado_cuenta") {
         getFacturas(id).then(setFacturas);
+      } else if (activeTab === "marketing") {
+        getMarketingTasks(id).then(setMarketingTasks);
+        getUsuariosActivosEmpresa().then(setUsuariosEmpresa);
       }
     }
   }, [id, activeTab]);
@@ -397,6 +411,40 @@ export default function ClienteDetailPage() {
     await cargar();
     setGuardandoNota(false);
     setTimeout(() => notaRef.current?.focus(), 0);
+  }
+
+  async function handleGuardarTarea(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorTarea(null);
+    if (!formTarea.titulo.trim()) return setErrorTarea("El título es obligatorio.");
+    if (!formTarea.fecha_entrega) return setErrorTarea("La fecha de entrega es obligatoria.");
+    setGuardandoTarea(true);
+    const tarea = await createMarketingTask({
+      cliente_id: id,
+      titulo: formTarea.titulo.trim(),
+      descripcion: formTarea.descripcion.trim() || undefined,
+      tipo_contenido: formTarea.tipo_contenido,
+      fecha_entrega: formTarea.fecha_entrega,
+      responsable_user_id: formTarea.responsable_user_id || undefined,
+      prioridad: formTarea.prioridad ? (formTarea.prioridad as "baja" | "media" | "alta" | "urgente") : undefined,
+    });
+    setGuardandoTarea(false);
+    if (tarea) {
+      setMarketingTasks((prev) => [...prev, tarea].sort((a, b) => a.fecha_entrega.localeCompare(b.fecha_entrega)));
+      setFormTarea({ titulo: "", descripcion: "", tipo_contenido: "post", fecha_entrega: "", responsable_user_id: "", prioridad: "" });
+      setModalNuevaTarea(false);
+    } else {
+      setErrorTarea("No se pudo crear la tarea.");
+    }
+  }
+
+  async function handleCambiarEstadoTask(taskId: string, nuevoEstado: MarketingTask["estado"]) {
+    const actualizada = await updateTaskStatus(taskId, nuevoEstado);
+    if (actualizada) {
+      setMarketingTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? actualizada : t))
+      );
+    }
   }
 
   if (notFound) {
@@ -613,7 +661,7 @@ export default function ClienteDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Tab nav */}
         <div className="border-b border-gray-200 flex overflow-x-auto">
-          {TABS.map((tab) => (
+          {TABS.filter((tab) => !tab.showWhen || tab.showWhen(cliente)).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -1110,6 +1158,73 @@ export default function ClienteDetailPage() {
             </div>
           )}
 
+          {/* ── MARKETING ───────────────────────────────────────────────── */}
+          {activeTab === "marketing" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionTitle>Tareas de marketing</SectionTitle>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormTarea({ titulo: "", descripcion: "", tipo_contenido: "post", fecha_entrega: new Date().toISOString().slice(0, 10), responsable_user_id: "", prioridad: "" });
+                    setErrorTarea(null);
+                    setModalNuevaTarea(true);
+                  }}
+                  className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  Nueva tarea
+                </button>
+              </div>
+              {marketingTasks.length === 0 ? (
+                <p className="text-sm text-gray-400 py-8 text-center">No hay tareas de marketing.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {["Título", "Tipo", "Estado", "Fecha entrega", "Responsable"].map((h) => (
+                          <th key={h} className="text-left text-xs font-semibold text-slate-600 px-4 py-3">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {marketingTasks.map((t) => {
+                        const hoy = new Date().toISOString().slice(0, 10);
+                        const atrasada = t.fecha_entrega < hoy && !["publicado", "aprobado"].includes(t.estado);
+                        return (
+                          <tr key={t.id} className={`hover:bg-slate-50 ${atrasada ? "bg-red-50/50" : ""}`}>
+                            <td className="px-4 py-3 font-medium text-slate-800">
+                              {t.titulo}
+                              {atrasada && <span className="ml-1.5 text-xs text-red-600 font-medium">(atrasada)</span>}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 capitalize">{t.tipo_contenido}</td>
+                            <td className="px-4 py-3">
+                              <select
+                                value={t.estado}
+                                onChange={(e) => handleCambiarEstadoTask(t.id, e.target.value as MarketingTask["estado"])}
+                                className="text-xs border border-slate-200 rounded px-2 py-1 bg-white"
+                              >
+                                {ESTADOS_TASK.map((est) => (
+                                  <option key={est} value={est}>{est.replace("_", " ")}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">{formatFecha(t.fecha_entrega)}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {t.responsable_user_id
+                                ? usuariosEmpresa.find((u) => u.id === t.responsable_user_id)?.nombre ?? "—"
+                                : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── PROYECTOS ────────────────────────────────────────────────── */}
           {activeTab === "proyectos" && (
             <PlaceholderTab
@@ -1246,6 +1361,84 @@ export default function ClienteDetailPage() {
                   Guardar
                 </button>
                 <button type="button" onClick={() => setModalSuscripcion(false)} className="border border-slate-200 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nueva tarea marketing */}
+      {modalNuevaTarea && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setModalNuevaTarea(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Nueva tarea de marketing</h3>
+            <form onSubmit={handleGuardarTarea} className="space-y-4">
+              <div>
+                <label className={labelClass}>Título *</label>
+                <input
+                  type="text"
+                  value={formTarea.titulo}
+                  onChange={(e) => setFormTarea((p) => ({ ...p, titulo: e.target.value }))}
+                  className={inputClass}
+                  placeholder="Ej: Post campaña navidad"
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Tipo de contenido</label>
+                <select
+                  value={formTarea.tipo_contenido}
+                  onChange={(e) => setFormTarea((p) => ({ ...p, tipo_contenido: e.target.value as typeof formTarea.tipo_contenido }))}
+                  className={inputClass}
+                >
+                  {TIPOS_CONTENIDO.map((tc) => (
+                    <option key={tc} value={tc}>{tc.charAt(0).toUpperCase() + tc.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Fecha de entrega *</label>
+                <input
+                  type="date"
+                  value={formTarea.fecha_entrega}
+                  onChange={(e) => setFormTarea((p) => ({ ...p, fecha_entrega: e.target.value }))}
+                  className={inputClass}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Responsable</label>
+                <select
+                  value={formTarea.responsable_user_id}
+                  onChange={(e) => setFormTarea((p) => ({ ...p, responsable_user_id: e.target.value }))}
+                  className={inputClass}
+                >
+                  <option value="">— Sin asignar —</option>
+                  {usuariosEmpresa.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nombre ?? u.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Descripción</label>
+                <textarea
+                  value={formTarea.descripcion}
+                  onChange={(e) => setFormTarea((p) => ({ ...p, descripcion: e.target.value }))}
+                  className={inputClass}
+                  rows={3}
+                  placeholder="Detalles opcionales..."
+                />
+              </div>
+              {errorTarea && (
+                <p className="text-sm text-red-600">{errorTarea}</p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={guardandoTarea} className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                  Guardar
+                </button>
+                <button type="button" onClick={() => setModalNuevaTarea(false)} className="border border-slate-200 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">
                   Cancelar
                 </button>
               </div>

@@ -22,6 +22,7 @@ import {
   PanelLeft,
   Receipt,
   Banknote,
+  Megaphone,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getMisModulos, getTodosModulos } from "@/lib/empresas/actions";
@@ -53,6 +54,7 @@ const MENU_STRUCTURE: MenuItem[] = [
   { slug: "planes", label: "Planes", href: "/planes", icon: FileText },
   { slug: "gestion-clientes", label: "Gestión Clientes", href: "/gestion-clientes", icon: Users },
   { slug: "crm", label: "CRM Funnel", href: "/crm", icon: Sparkles },
+  { slug: "marketing", label: "Marketing Ops", href: "/marketing", icon: Megaphone },
 ];
 
 function NavItem({
