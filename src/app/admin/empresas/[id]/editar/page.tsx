@@ -40,17 +40,17 @@ export default function EditarEmpresaPage() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [admin, setAdmin] = useState<UsuarioEmpresa | null>(null);
-  const [adminForm, setAdminForm] = useState({
+  const [usuarios, setUsuarios] = useState<UsuarioEmpresa[]>([]);
+  const [editandoUsuarioId, setEditandoUsuarioId] = useState<string | null>(null);
+  const [usuarioForm, setUsuarioForm] = useState({
     nombre: "",
     email: "",
     estado: "activo" as "activo" | "inactivo",
     modulo_ids: [] as string[],
   });
-  const [editandoAdmin, setEditandoAdmin] = useState(false);
-  const [guardandoAdmin, setGuardandoAdmin] = useState(false);
-  const [errorAdmin, setErrorAdmin] = useState<string | null>(null);
-  const [mostrarResetPassword, setMostrarResetPassword] = useState(false);
+  const [guardandoUsuario, setGuardandoUsuario] = useState(false);
+  const [errorUsuario, setErrorUsuario] = useState<string | null>(null);
+  const [mostrarResetPasswordId, setMostrarResetPasswordId] = useState<string | null>(null);
   const [nuevaPassword, setNuevaPassword] = useState("");
   const [guardandoPassword, setGuardandoPassword] = useState(false);
 
@@ -73,16 +73,7 @@ export default function EditarEmpresaPage() {
           estado: (detalle.empresa.estado as "activo" | "inactivo") ?? "activo",
           modulo_ids: detalle.modulos.map((m) => m.id),
         });
-        const adminUser = detalle.usuarios.find((u) => u.rol === "admin") ?? null;
-        setAdmin(adminUser);
-        if (adminUser) {
-          setAdminForm({
-            nombre: adminUser.nombre ?? "",
-            email: adminUser.email ?? "",
-            estado: (adminUser.estado as "activo" | "inactivo") ?? "activo",
-            modulo_ids: adminUser.modulo_ids ?? [],
-          });
-        }
+        setUsuarios(detalle.usuarios);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error"))
       .finally(() => {
@@ -134,41 +125,62 @@ export default function EditarEmpresaPage() {
     }
   }
 
-  async function handleGuardarAdmin(e: React.FormEvent) {
+  function abrirEdicion(u: UsuarioEmpresa) {
+    setEditandoUsuarioId(u.id);
+    setUsuarioForm({
+      nombre: u.nombre ?? "",
+      email: u.email ?? "",
+      estado: (u.estado as "activo" | "inactivo") ?? "activo",
+      modulo_ids: u.modulo_ids ?? [],
+    });
+    setErrorUsuario(null);
+  }
+
+  async function handleGuardarUsuario(e: React.FormEvent) {
     e.preventDefault();
-    if (!admin) return;
-    setErrorAdmin(null);
-    setGuardandoAdmin(true);
+    if (!editandoUsuarioId) return;
+    if (!usuarioForm.email.trim()) {
+      setErrorUsuario("El email es obligatorio.");
+      return;
+    }
+    setErrorUsuario(null);
+    setGuardandoUsuario(true);
     try {
-      await actualizarUsuario(admin.id, {
-        nombre: adminForm.nombre.trim(),
-        email: adminForm.email.trim() || undefined,
-        estado: adminForm.estado,
-        modulo_ids: adminForm.modulo_ids,
+      await actualizarUsuario(editandoUsuarioId, {
+        nombre: usuarioForm.nombre.trim(),
+        email: usuarioForm.email.trim() || undefined,
+        estado: usuarioForm.estado,
+        modulo_ids: usuarioForm.modulo_ids,
       });
-      setAdmin({ ...admin, ...adminForm });
-      setEditandoAdmin(false);
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === editandoUsuarioId
+            ? { ...u, ...usuarioForm, nombre: usuarioForm.nombre.trim(), email: usuarioForm.email.trim() }
+            : u
+        )
+      );
+      setEditandoUsuarioId(null);
     } catch (err: unknown) {
-      setErrorAdmin(err instanceof Error ? err.message : "Error");
+      setErrorUsuario(err instanceof Error ? err.message : "Error");
     } finally {
-      setGuardandoAdmin(false);
+      setGuardandoUsuario(false);
     }
   }
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
-    if (!admin || !nuevaPassword.trim() || nuevaPassword.length < 6) {
-      setErrorAdmin("La contraseña debe tener al menos 6 caracteres");
+    if (!mostrarResetPasswordId || !nuevaPassword.trim() || nuevaPassword.length < 6) {
+      setErrorUsuario("La contraseña debe tener al menos 6 caracteres");
       return;
     }
-    setErrorAdmin(null);
+    setErrorUsuario(null);
     setGuardandoPassword(true);
     try {
-      await resetearPasswordUsuario(admin.id, nuevaPassword);
+      await resetearPasswordUsuario(mostrarResetPasswordId, nuevaPassword);
       setNuevaPassword("");
-      setMostrarResetPassword(false);
+      setMostrarResetPasswordId(null);
     } catch (err: unknown) {
-      setErrorAdmin(err instanceof Error ? err.message : "Error");
+      setErrorUsuario(err instanceof Error ? err.message : "Error");
     } finally {
       setGuardandoPassword(false);
     }
@@ -301,227 +313,223 @@ export default function EditarEmpresaPage() {
           </div>
         </section>
 
-        {/* Administrador de la empresa */}
+        {/* Usuarios de la empresa */}
         <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-5 pb-2 border-b border-gray-100">
             <span className="text-base">👤</span>
             <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
-              Administrador de la empresa
+              Usuarios de la empresa
             </h3>
           </div>
-          {!admin ? (
-            <p className="text-sm text-gray-500">No hay administrador asociado a esta empresa.</p>
-          ) : editandoAdmin ? (
-            <form onSubmit={handleGuardarAdmin} className="space-y-4">
-              {errorAdmin && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-                  {errorAdmin}
-                </div>
-              )}
-              <div>
-                <label className={fLabel}>Nombre</label>
-                <input
-                  type="text"
-                  value={adminForm.nombre}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, nombre: e.target.value.toUpperCase() }))}
-                  className={`${fInput} uppercase`}
-                  placeholder="Nombre completo"
-                />
-              </div>
-              <div>
-                <label className={fLabel}>Email</label>
-                <input
-                  type="email"
-                  value={adminForm.email}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, email: e.target.value.toLowerCase() }))}
-                  className={fInput}
-                  placeholder="admin@empresa.com"
-                />
-              </div>
-              <div>
-                <label className={fLabel}>Estado</label>
-                <select
-                  value={adminForm.estado}
-                  onChange={(e) =>
-                    setAdminForm((p) => ({ ...p, estado: e.target.value as "activo" | "inactivo" }))
-                  }
-                  className={fInput}
-                >
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
-              </div>
-              <div>
-                <label className={fLabel}>Módulos visibles para este usuario</label>
-                <p className="text-xs text-slate-500 mb-2">
-                  Solo se muestran módulos habilitados para la empresa. Sin selección = ve todos los de la empresa.
-                </p>
-                {cargandoModulos ? (
-                  <p className="text-sm text-gray-400">Cargando…</p>
-                ) : (() => {
-                  const modulosEmpresa = modulos.filter((m) => form.modulo_ids.includes(m.id));
-                  return modulosEmpresa.length === 0 ? (
-                    <p className="text-sm text-gray-400">Habilitá módulos de la empresa primero.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {modulosEmpresa.map((m) => (
-                        <label
-                          key={m.id}
-                          className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={
-                              adminForm.modulo_ids.length === 0 || adminForm.modulo_ids.includes(m.id)
-                            }
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setAdminForm((p) => {
-                                const base = p.modulo_ids.length === 0 ? form.modulo_ids : p.modulo_ids;
-                                return {
-                                  ...p,
-                                  modulo_ids: checked
-                                    ? [...base.filter((id) => id !== m.id), m.id]
-                                    : base.filter((id) => id !== m.id),
-                                };
-                              });
-                            }}
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm">{(m as { nombre?: string; name?: string }).nombre ?? (m as { name?: string }).name ?? m.id}</span>
-                        </label>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={guardandoAdmin}
-                  className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {guardandoAdmin ? "Guardando…" : "Guardar"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditandoAdmin(false);
-                    setAdminForm({
-                      nombre: admin.nombre ?? "",
-                      email: admin.email ?? "",
-                      estado: (admin.estado as "activo" | "inactivo") ?? "activo",
-                      modulo_ids: admin.modulo_ids ?? [],
-                    });
-                  }}
-                  className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
+          {usuarios.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay usuarios asociados a esta empresa.</p>
           ) : (
             <div className="space-y-4">
-              {errorAdmin && (
+              {errorUsuario && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-                  {errorAdmin}
+                  {errorUsuario}
                 </div>
               )}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
-                    Nombre
-                  </p>
-                  <p className="text-sm font-medium text-gray-800">{admin.nombre}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
-                    Email
-                  </p>
-                  <p className="text-sm text-gray-700">{admin.email}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
-                    Rol
-                  </p>
-                  <p className="text-sm text-gray-700">{admin.rol}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
-                    Estado
-                  </p>
-                  <BadgeEstado estado={admin.estado ?? "activo"} />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setEditandoAdmin(true)}
-                  className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              {usuarios.map((u) => (
+                <div
+                  key={u.id}
+                  className="p-4 rounded-lg border border-slate-200 bg-slate-50/50"
                 >
-                  Editar nombre / email
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMostrarResetPassword(!mostrarResetPassword)}
-                  className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
-                >
-                  Resetear contraseña
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const nuevoEstado = admin.estado === "activo" ? "inactivo" : "activo";
-                    setErrorAdmin(null);
-                    try {
-                      await actualizarUsuario(admin.id, {
-                        estado: nuevoEstado as "activo" | "inactivo",
-                      });
-                      setAdmin({ ...admin, estado: nuevoEstado });
-                    } catch (err: unknown) {
-                      setErrorAdmin(err instanceof Error ? err.message : "Error");
-                    }
-                  }}
-                  className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
-                >
-                  {admin.estado === "activo" ? "Desactivar" : "Activar"} usuario
-                </button>
-              </div>
-              {mostrarResetPassword && (
-                <form
-                  onSubmit={handleResetPassword}
-                  className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200"
-                >
-                  <label className={fLabel}>Nueva contraseña (mín. 6 caracteres)</label>
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="password"
-                      value={nuevaPassword}
-                      onChange={(e) => setNuevaPassword(e.target.value)}
-                      className={fInput}
-                      placeholder="••••••••"
-                      minLength={6}
-                    />
-                    <button
-                      type="submit"
-                      disabled={guardandoPassword || nuevaPassword.length < 6}
-                      className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 shrink-0"
-                    >
-                      {guardandoPassword ? "Guardando…" : "Aplicar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMostrarResetPassword(false);
-                        setNuevaPassword("");
-                      }}
-                      className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              )}
+                  {editandoUsuarioId === u.id ? (
+                    <form onSubmit={handleGuardarUsuario} className="space-y-4">
+                      <div>
+                        <label className={fLabel}>Nombre</label>
+                        <input
+                          type="text"
+                          value={usuarioForm.nombre}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, nombre: e.target.value.toUpperCase() }))}
+                          className={`${fInput} uppercase`}
+                          placeholder="Nombre completo"
+                        />
+                      </div>
+                      <div>
+                        <label className={fLabel}>Email *</label>
+                        <input
+                          type="email"
+                          value={usuarioForm.email}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, email: e.target.value.toLowerCase() }))}
+                          className={fInput}
+                          placeholder="usuario@empresa.com"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className={fLabel}>Estado</label>
+                        <select
+                          value={usuarioForm.estado}
+                          onChange={(e) =>
+                            setUsuarioForm((p) => ({ ...p, estado: e.target.value as "activo" | "inactivo" }))
+                          }
+                          className={fInput}
+                        >
+                          <option value="activo">Activo</option>
+                          <option value="inactivo">Inactivo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={fLabel}>Módulos visibles</label>
+                        <p className="text-xs text-slate-500 mb-2">
+                          Sin selección = ve todos los de la empresa.
+                        </p>
+                        {cargandoModulos ? (
+                          <p className="text-sm text-gray-400">Cargando…</p>
+                        ) : (() => {
+                          const modulosEmpresa = modulos.filter((m) => form.modulo_ids.includes(m.id));
+                          return modulosEmpresa.length === 0 ? (
+                            <p className="text-sm text-gray-400">Habilitá módulos primero.</p>
+                          ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {modulosEmpresa.map((m) => (
+                                <label
+                                  key={m.id}
+                                  className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-white"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      usuarioForm.modulo_ids.length === 0 || usuarioForm.modulo_ids.includes(m.id)
+                                    }
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setUsuarioForm((p) => {
+                                        const base = p.modulo_ids.length === 0 ? form.modulo_ids : p.modulo_ids;
+                                        return {
+                                          ...p,
+                                          modulo_ids: checked
+                                            ? [...base.filter((id) => id !== m.id), m.id]
+                                            : base.filter((id) => id !== m.id),
+                                        };
+                                      });
+                                    }}
+                                    className="rounded border-gray-300"
+                                  />
+                                  <span className="text-sm">{(m as { nombre?: string; name?: string }).nombre ?? (m as { name?: string }).name ?? m.id}</span>
+                                </label>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={guardandoUsuario}
+                          className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {guardandoUsuario ? "Guardando…" : "Guardar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditandoUsuarioId(null);
+                            setErrorUsuario(null);
+                          }}
+                          className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Nombre</p>
+                          <p className="text-sm font-medium text-gray-800 truncate">{u.nombre || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Email</p>
+                          <p className="text-sm text-gray-700 truncate">{u.email}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Rol</p>
+                          <p className="text-sm text-gray-700">{u.rol ?? "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Estado</p>
+                          <BadgeEstado estado={u.estado ?? "activo"} />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicion(u)}
+                          className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMostrarResetPasswordId(mostrarResetPasswordId === u.id ? null : u.id)}
+                          className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+                        >
+                          Resetear contraseña
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nuevoEstado = u.estado === "activo" ? "inactivo" : "activo";
+                            setErrorUsuario(null);
+                            try {
+                              await actualizarUsuario(u.id, {
+                                estado: nuevoEstado as "activo" | "inactivo",
+                              });
+                              setUsuarios((prev) =>
+                                prev.map((us) => (us.id === u.id ? { ...us, estado: nuevoEstado } : us))
+                              );
+                            } catch (err: unknown) {
+                              setErrorUsuario(err instanceof Error ? err.message : "Error");
+                            }
+                          }}
+                          className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+                        >
+                          {u.estado === "activo" ? "Desactivar" : "Activar"}
+                        </button>
+                      </div>
+                      {mostrarResetPasswordId === u.id && (
+                        <form
+                          onSubmit={handleResetPassword}
+                          className="mt-4 w-full p-4 bg-white rounded-lg border border-slate-200"
+                        >
+                          <label className={fLabel}>Nueva contraseña (mín. 6 caracteres)</label>
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="password"
+                              value={nuevaPassword}
+                              onChange={(e) => setNuevaPassword(e.target.value)}
+                              className={fInput}
+                              placeholder="••••••••"
+                              minLength={6}
+                            />
+                            <button
+                              type="submit"
+                              disabled={guardandoPassword || nuevaPassword.length < 6}
+                              className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 shrink-0"
+                            >
+                              {guardandoPassword ? "Guardando…" : "Aplicar"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMostrarResetPasswordId(null);
+                                setNuevaPassword("");
+                              }}
+                              className="border border-slate-200 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </section>
