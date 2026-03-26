@@ -31,6 +31,16 @@ export async function POST(request: NextRequest) {
       body && typeof body === "object" && typeof (body as { message?: string }).message === "string"
         ? (body as { message: string }).message.trim()
         : "";
+    const senderTypeInput =
+      body && typeof body === "object" && typeof (body as { sender_type?: string }).sender_type === "string"
+        ? (body as { sender_type: string }).sender_type
+        : "human";
+    const automationSource =
+      body && typeof body === "object" && typeof (body as { automation_source?: string }).automation_source === "string"
+        ? (body as { automation_source: string }).automation_source.trim()
+        : "";
+    const senderType: "human" | "ai" | "system" =
+      senderTypeInput === "ai" || senderTypeInput === "system" ? senderTypeInput : "human";
 
     if (!conversationId || !message) {
       return NextResponse.json(
@@ -125,6 +135,10 @@ export async function POST(request: NextRequest) {
       conversation_id: conversationId,
       wa_message_id: sendResult.waMessageId,
       from_me: true,
+      sender_type: senderType,
+      sent_by_user_id: senderType === "human" ? auth.user.id : null,
+      sent_by_user_name: senderType === "human" ? auth.nombre ?? auth.user.email ?? null : null,
+      automation_source: automationSource || (senderType === "ai" ? "automation" : null),
       message_type: "text",
       content: message,
       raw_payload: (sendResult.raw ?? {}) as Record<string, unknown>,

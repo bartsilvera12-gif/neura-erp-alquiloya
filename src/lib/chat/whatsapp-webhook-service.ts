@@ -168,6 +168,7 @@ export async function processInboundWebhookValue(
           {
             empresa_id: empresaId,
             phone_number: from,
+            phone_normalized: from,
             name: displayName,
           },
           { onConflict: "empresa_id,phone_number" }
@@ -244,6 +245,7 @@ export async function processInboundWebhookValue(
         conversation_id: conversationId,
         wa_message_id: waMid,
         from_me: false,
+        sender_type: "contact",
         message_type,
         content,
         raw_payload: msg as unknown as Record<string, unknown>,

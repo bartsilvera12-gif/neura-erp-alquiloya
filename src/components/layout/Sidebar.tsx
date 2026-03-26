@@ -47,6 +47,11 @@ const MENU_STRUCTURE: MenuItem[] = [
     label: "Conversaciones",
     href: "/dashboard/conversaciones",
     icon: MessageCircle,
+    children: [
+      { label: "Inbox", href: "/dashboard/conversaciones" },
+      { label: "Historial", href: "/dashboard/historial" },
+      { label: "Configuración", href: "/dashboard/conversaciones/configuracion" },
+    ],
   },
   { slug: "ventas", label: "Ventas", href: "/ventas", icon: ShoppingCart },
   { slug: "inventario", label: "Inventario", href: "/inventario", icon: Package, children: [
@@ -193,6 +198,7 @@ export default function Sidebar() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    conversaciones: true,
     inventario: true,
     sorteos: true,
   });

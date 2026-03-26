@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchChatChannels,
   fetchChatConversations,
@@ -42,6 +43,7 @@ function mapRowToMessage(row: Record<string, unknown>): ChatMessage {
 }
 
 export default function ConversacionesPage() {
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -177,7 +179,7 @@ export default function ConversacionesPage() {
     el.scrollTop = el.scrollHeight;
   }, [messages, selectedId]);
 
-  async function handleSelect(id: string) {
+  const handleSelect = useCallback(async (id: string) => {
     stickBottomRef.current = true;
     lastMessageIdRef.current = null;
     setSelectedId(id);
@@ -190,7 +192,7 @@ export default function ConversacionesPage() {
     } catch {
       /* no bloquear UI */
     }
-  }
+  }, [loadMessages]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -230,6 +232,15 @@ export default function ConversacionesPage() {
   }
 
   const selected = conversations.find((c) => c.id === selectedId);
+  const requestedConversationId = searchParams?.get("conversationId") ?? null;
+
+  useEffect(() => {
+    if (!requestedConversationId || !conversations.length) return;
+    if (selectedId === requestedConversationId) return;
+    const exists = conversations.some((c) => c.id === requestedConversationId);
+    if (!exists) return;
+    void handleSelect(requestedConversationId);
+  }, [requestedConversationId, conversations, selectedId, handleSelect]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[480px] gap-4">

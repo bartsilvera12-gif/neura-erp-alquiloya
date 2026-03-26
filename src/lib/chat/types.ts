@@ -12,6 +12,7 @@ export type ChatContactRow = {
   id: string;
   empresa_id: string;
   phone_number: string;
+  phone_normalized: string | null;
   name: string | null;
   cliente_id: string | null;
   crm_prospecto_id: string | null;
@@ -34,6 +35,10 @@ export type ChatMessageRow = {
   conversation_id: string;
   wa_message_id: string | null;
   from_me: boolean;
+  sender_type: "contact" | "ai" | "human" | "system";
+  sent_by_user_id: string | null;
+  sent_by_user_name: string | null;
+  automation_source: string | null;
   message_type: string;
   content: string | null;
   raw_payload: Record<string, unknown>;
