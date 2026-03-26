@@ -58,7 +58,8 @@ export async function GET() {
       return NextResponse.json({ error: errEm.message }, { status: 400 });
     }
 
-    let moduloIds = (emData ?? []).map((r) => r.modulo_id).filter(Boolean);
+    const empresaModuloIds = (emData ?? []).map((r) => r.modulo_id).filter(Boolean);
+    let moduloIds = [...empresaModuloIds];
 
     const { data: umData, error: errUm } = await supabase
       .from("usuario_modulos")
@@ -68,6 +69,17 @@ export async function GET() {
     if (!errUm && umData && umData.length > 0) {
       const usuarioModuloIds = umData.map((r) => (r as { modulo_id: string }).modulo_id);
       moduloIds = moduloIds.filter((id) => usuarioModuloIds.includes(id));
+    }
+
+    const { data: modConv } = await supabase
+      .from("modulos")
+      .select("id")
+      .eq("slug", "conversaciones")
+      .maybeSingle();
+    const convId = modConv?.id;
+    const empresaTieneConversaciones = !!(convId && empresaModuloIds.includes(convId));
+    if (empresaTieneConversaciones && convId && !moduloIds.includes(convId)) {
+      moduloIds.push(convId);
     }
 
     if (moduloIds.length === 0) {

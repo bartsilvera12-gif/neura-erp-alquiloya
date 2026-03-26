@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST — eventos entrantes (mensajes, estados, etc.)
+ * No valida empresa_modulos: el canal (chat_channels) define la empresa; los mensajes se guardan siempre.
  */
 export async function POST(request: NextRequest) {
   try {

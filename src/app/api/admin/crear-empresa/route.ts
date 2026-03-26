@@ -79,10 +79,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: errUsuario.message }, { status: 400 });
     }
 
-    // 4 — Insertar módulos habilitados
-    const moduloIds = Array.isArray(modulo_ids) ? modulo_ids : [];
-    if (moduloIds.length > 0) {
-      const rows = moduloIds.map((modulo_id: string) => ({
+    // 4 — Módulos: el trigger en empresas ya insertó "conversaciones"; completar el resto sin duplicar
+    let moduloIds = [...new Set(Array.isArray(modulo_ids) ? modulo_ids : [])];
+    const { data: modConversaciones } = await supabase
+      .from("modulos")
+      .select("id")
+      .eq("slug", "conversaciones")
+      .maybeSingle();
+    if (modConversaciones?.id && !moduloIds.includes(modConversaciones.id)) {
+      moduloIds.push(modConversaciones.id);
+    }
+
+    const { data: emExistentes } = await supabase
+      .from("empresa_modulos")
+      .select("modulo_id")
+      .eq("empresa_id", empresaId);
+    const yaInsertados = new Set((emExistentes ?? []).map((r) => r.modulo_id as string));
+    const faltan = moduloIds.filter((id) => !yaInsertados.has(id));
+
+    if (faltan.length > 0) {
+      const rows = faltan.map((modulo_id: string) => ({
         empresa_id: empresaId,
         modulo_id,
         activo: true,
