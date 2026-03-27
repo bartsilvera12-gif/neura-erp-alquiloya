@@ -439,7 +439,17 @@ export default function FlowEditorPage() {
   }
 
   async function createOption(node: FlowNode) {
-    const label = "Nueva opción";
+    // sort_order: evitar duplicados si hubo borrados (max + 1)
+    const maxSort = node.options.reduce((m, o) => Math.max(m, o.sort_order ?? 0), 0);
+    const sortOrder = maxSort + 1;
+    // Cada opción debe tener meta_button_id único por nodo (UNIQUE node_id, meta_button_id en DB).
+    // Antes todas eran "nueva_opción" → el 2º insert fallaba sin feedback claro.
+    const label = sortOrder === 1 ? "Nueva opción" : `Nueva opción ${sortOrder}`;
+    const uniqueSuffix =
+      typeof globalThis.crypto !== "undefined" && globalThis.crypto.randomUUID
+        ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+        : `${Date.now().toString(36)}`;
+    const metaButtonId = `opt_${sortOrder}_${uniqueSuffix}`;
     const defaultNext = nodeCodes.find((code) => code !== node.node_code) ?? null;
     const res = await fetch(
       `/api/chat/flows/${encodeURIComponent(flowCode)}/nodes/${encodeURIComponent(node.node_code)}/options`,
@@ -449,9 +459,9 @@ export default function FlowEditorPage() {
         credentials: "same-origin",
         body: JSON.stringify({
           label,
-          meta_button_id: toMetaButtonId(label),
+          meta_button_id: metaButtonId,
           next_node_code: defaultNext,
-          sort_order: node.options.length + 1,
+          sort_order: sortOrder,
           option_payload: {},
         }),
       }

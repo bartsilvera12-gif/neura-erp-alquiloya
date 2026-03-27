@@ -52,12 +52,7 @@ export async function POST(
     const node = await resolveNodeId(supabase, auth.empresa_id, params.flowCode, params.nodeCode);
     if (!node) return NextResponse.json({ ok: false, error: "Nodo no encontrado" }, { status: 404 });
     const nextNodeCode = body.next_node_code?.trim() || null;
-    if ((node.node_type === "buttons" || node.node_type === "list") && !nextNodeCode) {
-      return NextResponse.json(
-        { ok: false, error: "Seleccioná 'Siguiente paso' para esta opción." },
-        { status: 400 }
-      );
-    }
+    // Alta: permitir sin siguiente paso; el PATCH al guardar desde el editor exige next_node_code.
     const optionPayload =
       typeof body.option_payload === "object" && body.option_payload
         ? body.option_payload
