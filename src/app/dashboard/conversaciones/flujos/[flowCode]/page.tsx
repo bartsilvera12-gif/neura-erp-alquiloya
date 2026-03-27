@@ -125,6 +125,7 @@ export default function FlowEditorPage() {
   const [creatingNode, setCreatingNode] = useState(false);
   const [savingNodeId, setSavingNodeId] = useState<string | null>(null);
   const [lastSavedNodeId, setLastSavedNodeId] = useState<string | null>(null);
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
 
   const nodeByCode = useMemo(
     () => new Map(nodes.map((n) => [n.node_code, n])),
@@ -185,7 +186,7 @@ export default function FlowEditorPage() {
     return friendlyNodeTitle(target);
   }
 
-  async function reload() {
+  async function reload(): Promise<FlowNode[]> {
     setLoading(true);
     try {
       const res = await fetch(`/api/chat/flows/${encodeURIComponent(flowCode)}/nodes`, {
@@ -198,10 +199,13 @@ export default function FlowEditorPage() {
         items?: FlowNode[];
       };
       if (!res.ok || !json.ok) throw new Error(json.error ?? "No se pudo cargar nodos");
-      setNodes(json.items ?? []);
+      const items = json.items ?? [];
+      setNodes(items);
       setError(null);
+      return items;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -239,7 +243,9 @@ export default function FlowEditorPage() {
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error ?? "No se pudo crear nodo");
       setNewNodeCode("");
-      await reload();
+      const reloaded = await reload();
+      const created = reloaded.find((n) => n.node_code === trimmedCode);
+      setExpandedNodeId(created?.id ?? null);
       setSuccess(`Paso ${prettifyCode(trimmedCode)} creado.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error creando nodo");
@@ -444,7 +450,9 @@ export default function FlowEditorPage() {
         <div className="p-6 text-sm text-slate-400 animate-pulse">Cargando nodos...</div>
       ) : (
         <div className="space-y-4">
-          {orderedNodes.map((node, idx) => (
+          {orderedNodes.map((node, idx) => {
+            const isExpanded = expandedNodeId === node.id;
+            return (
             <div key={node.id} className={`bg-white border border-slate-200 border-l-4 ${nodeAccent(node.node_type)} rounded-xl p-4 space-y-3 shadow-sm`}>
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -454,11 +462,40 @@ export default function FlowEditorPage() {
                     <div className="text-xs text-emerald-600 mt-1">Guardado correctamente.</div>
                   )}
                 </div>
-                <label className="text-sm text-slate-700 flex items-center gap-2">
-                  <input type="checkbox" checked={node.is_active} onChange={(e) => setNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, is_active: e.target.checked } : n))} />
-                  Activo
-                </label>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-slate-700 flex items-center gap-2">
+                    <input type="checkbox" checked={node.is_active} onChange={(e) => setNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, is_active: e.target.checked } : n))} />
+                    Activo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedNodeId((prev) => (prev === node.id ? null : node.id))}
+                    className="text-xs text-[#0EA5E9] hover:underline"
+                  >
+                    {isExpanded ? "Cerrar edición" : "Editar"}
+                  </button>
+                </div>
               </div>
+
+              {!isExpanded && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Nombre del paso</div>
+                    <div className="font-mono text-slate-800">{node.node_code}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Tipo</div>
+                    <div className="text-slate-800">{nodeTypeLabel(node.node_type)}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Siguiente paso</div>
+                    <div className="text-slate-800">{nextStepLabel(node.next_node_code)}</div>
+                  </div>
+                </div>
+              )}
+
+              {isExpanded && (
+              <>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
@@ -805,6 +842,7 @@ export default function FlowEditorPage() {
                     await reload();
                     setSuccess(`Paso ${prettifyCode(node.node_code)} guardado correctamente.`);
                     setLastSavedNodeId(node.id);
+                    setExpandedNodeId(null);
                   } catch (e) {
                     setError(e instanceof Error ? e.message : "Error al guardar nodo");
                   } finally {
@@ -889,8 +927,11 @@ export default function FlowEditorPage() {
                   </button>
                 </div>
               )}
+              </>
+              )}
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>
