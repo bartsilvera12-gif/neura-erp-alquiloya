@@ -1,9 +1,7 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getSorteoEntradas } from "@/lib/sorteos/actions";
-import type { SorteoEntrada } from "@/lib/sorteos/types";
+import { fetchSorteoEntradasServer } from "@/lib/sorteos/server-queries";
+
+export const dynamic = "force-dynamic";
 
 function formatGs(n: number) {
   return `${n.toLocaleString("es-PY")} ₲`;
@@ -32,16 +30,8 @@ function estadoPagoLabel(e: string) {
   return e;
 }
 
-export default function SorteoEntradasPage() {
-  const [rows, setRows] = useState<SorteoEntrada[]>([]);
-  const [cargando, setCargando] = useState(true);
-
-  useEffect(() => {
-    getSorteoEntradas()
-      .then(setRows)
-      .catch(() => setRows([]))
-      .finally(() => setCargando(false));
-  }, []);
+export default async function SorteoEntradasPage() {
+  const { data: rows, error: queryError } = await fetchSorteoEntradasServer();
 
   return (
     <div className="space-y-6">
@@ -60,12 +50,16 @@ export default function SorteoEntradasPage() {
         </Link>
       </nav>
 
+      {queryError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <strong>Error al cargar entradas:</strong> {queryError}
+        </div>
+      ) : null}
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {cargando ? (
-          <div className="py-16 text-center text-gray-400 text-sm animate-pulse">Cargando…</div>
-        ) : rows.length === 0 ? (
+        {rows.length === 0 && !queryError ? (
           <div className="py-16 text-center text-gray-400 text-sm">No hay entradas</div>
-        ) : (
+        ) : rows.length === 0 ? null : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px]">
               <thead>

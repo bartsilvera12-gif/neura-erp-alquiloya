@@ -1,9 +1,7 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getSorteoCuponesOrdenes } from "@/lib/sorteos/actions";
-import type { SorteoCuponOrdenRow } from "@/lib/sorteos/types";
+import { fetchSorteoCuponesOrdenesServer } from "@/lib/sorteos/server-queries";
+
+export const dynamic = "force-dynamic";
 
 function formatFecha(iso: string) {
   try {
@@ -27,16 +25,8 @@ function estadoLabel(e: string) {
   return e;
 }
 
-export default function SorteoCuponesPage() {
-  const [rows, setRows] = useState<SorteoCuponOrdenRow[]>([]);
-  const [cargando, setCargando] = useState(true);
-
-  useEffect(() => {
-    getSorteoCuponesOrdenes()
-      .then(setRows)
-      .catch(() => setRows([]))
-      .finally(() => setCargando(false));
-  }, []);
+export default async function SorteoCuponesPage() {
+  const { data: rows, error: queryError } = await fetchSorteoCuponesOrdenesServer();
 
   return (
     <div className="space-y-6">
@@ -55,12 +45,16 @@ export default function SorteoCuponesPage() {
         <span className="font-semibold text-[#0EA5E9]">Cupones</span>
       </nav>
 
+      {queryError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <strong>Error al cargar cupones:</strong> {queryError}
+        </div>
+      ) : null}
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {cargando ? (
-          <div className="py-16 text-center text-gray-400 text-sm animate-pulse">Cargando…</div>
-        ) : rows.length === 0 ? (
+        {rows.length === 0 && !queryError ? (
           <div className="py-16 text-center text-gray-400 text-sm">No hay órdenes con cupones</div>
-        ) : (
+        ) : rows.length === 0 ? null : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px]">
               <thead>
