@@ -1,11 +1,10 @@
 "use server";
 
-import { getEmpresaId } from "@/lib/db/empresa";
 import {
   SORTEO_COMPROBANTE_ESTADO_VALIDACION_FIELD,
   SORTEO_COMPROBANTE_MOTIVO_VALIDACION_FIELD,
 } from "@/lib/chat/comprobante-validation-types";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type InboxConversation = {
   id: string;
@@ -22,7 +21,35 @@ export type InboxConversation = {
   };
 };
 
+/** Sesión Supabase + empresa del usuario (cookies de la petición). Obligatorio en Server Actions. */
+async function requireSupabaseAndEmpresaId(): Promise<{
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  empresa_id: string;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) {
+    throw new Error("Usuario no autenticado o sin empresa");
+  }
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("empresa_id")
+    .eq("email", user.email)
+    .single();
+  if (error) {
+    throw new Error(error.message);
+  }
+  const empresa_id = data?.empresa_id;
+  if (!empresa_id || typeof empresa_id !== "string") {
+    throw new Error("Usuario no autenticado o sin empresa");
+  }
+  return { supabase, empresa_id };
+}
+
 export async function fetchChatConversations(): Promise<InboxConversation[]> {
+  const { supabase } = await requireSupabaseAndEmpresaId();
   const { data: convs, error } = await supabase
     .from("chat_conversations")
     .select(
@@ -70,6 +97,7 @@ export async function fetchChatConversations(): Promise<InboxConversation[]> {
 }
 
 export async function markConversationRead(conversationId: string): Promise<void> {
+  const { supabase } = await requireSupabaseAndEmpresaId();
   const { error } = await supabase
     .from("chat_conversations")
     .update({ unread_count: 0, updated_at: new Date().toISOString() })
@@ -93,6 +121,7 @@ export type ChatChannelRow = {
 };
 
 export async function fetchChatChannels(): Promise<ChatChannelRow[]> {
+  const { supabase } = await requireSupabaseAndEmpresaId();
   const { data, error } = await supabase
     .from("chat_channels")
     .select(
@@ -130,7 +159,7 @@ export type ChatChannelFormInput = {
 };
 
 export async function saveChatChannel(input: ChatChannelFormInput): Promise<void> {
-  const empresa_id = await getEmpresaId();
+  const { supabase, empresa_id } = await requireSupabaseAndEmpresaId();
   const pid = input.meta_phone_number_id.trim();
   if (!pid) throw new Error("Phone Number ID es obligatorio");
 
@@ -222,6 +251,7 @@ export type ComprobanteValidacionListRow = {
 export async function fetchComprobanteValidacionesForConversation(
   conversationId: string
 ): Promise<ComprobanteValidacionListRow[]> {
+  const { supabase } = await requireSupabaseAndEmpresaId();
   const { data, error } = await supabase
     .from("chat_comprobante_validaciones")
     .select(
@@ -235,7 +265,7 @@ export async function fetchComprobanteValidacionesForConversation(
 }
 
 export async function approveComprobanteValidacion(validacionId: string): Promise<void> {
-  const empresa_id = await getEmpresaId();
+  const { supabase, empresa_id } = await requireSupabaseAndEmpresaId();
   const id = validacionId.trim();
   if (!id) throw new Error("ID de validación inválido");
 
@@ -295,7 +325,7 @@ export async function approveComprobanteValidacion(validacionId: string): Promis
 }
 
 export async function deleteChatChannel(id: string): Promise<void> {
-  const empresa_id = await getEmpresaId();
+  const { supabase, empresa_id } = await requireSupabaseAndEmpresaId();
   const { error } = await supabase.from("chat_channels").delete().eq("id", id).eq("empresa_id", empresa_id);
   if (error) throw new Error(error.message);
 }
