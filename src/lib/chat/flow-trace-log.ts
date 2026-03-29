@@ -10,13 +10,6 @@ export function isFlowTraceVerbose(): boolean {
   return process.env.FLOW_TRACE_VERBOSE === "1" || process.env.FLOW_TRACE_VERBOSE === "true";
 }
 
-export function isFlowEventHydrationDisabled(): boolean {
-  return (
-    process.env.FLOW_DISABLE_EVENT_HYDRATION === "1" ||
-    process.env.FLOW_DISABLE_EVENT_HYDRATION === "true"
-  );
-}
-
 /** Claves que suelen explicar mezclas en sorteo (valores truncados si verbose). */
 const TRACE_VALUE_KEYS =
   /^(sorteo_|cantidad|monto|opcion|promo|precio|nombre|apellido|cedula|ciudad|comprobante|numeros_|numero_orden|cupon)/i;

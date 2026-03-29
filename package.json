@@ -16,7 +16,8 @@
     "db:verificar-rls": "tsx scripts/verificar-rls.ts",
     "verify:sorteo-rpc": "tsx scripts/verify-sorteo-order-rpc.ts",
     "db:apply-sorteo-migrations": "tsx scripts/apply-sorteo-supabase-migrations.ts",
-    "verify:sorteo-integridad": "tsx scripts/verify-sorteo-integridad-nombre-monto.ts"
+    "verify:sorteo-integridad": "tsx scripts/verify-sorteo-integridad-nombre-monto.ts",
+    "verify:flow-sessions": "tsx scripts/verify-flow-session-isolation.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

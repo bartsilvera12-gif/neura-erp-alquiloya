@@ -1,15 +1,10 @@
-import {
-  flowTrace,
-  isFlowEventHydrationDisabled,
-  summarizeFlowDataForTrace,
-} from "@/lib/chat/flow-trace-log";
+import { flowTrace, summarizeFlowDataForTrace } from "@/lib/chat/flow-trace-log";
 import {
   sendWhatsAppInteractiveButtons,
   sendWhatsAppImage,
   sendWhatsAppText,
 } from "@/lib/chat/whatsapp-send-service";
 import type { SupabaseAdmin } from "@/lib/chat/types";
-import { FLOW_POINTER_RESET_EVENT } from "@/lib/chat/resolve-whatsapp-active-flow";
 import { normalizeWaPhone } from "@/lib/chat/whatsapp-webhook-service";
 import { ensureActiveFlowSessionForConversation } from "@/lib/chat/flow-session-service";
 import {
@@ -324,14 +319,15 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     payload?: Record<string, unknown>;
     flowSessionId?: string | null;
   }) {
-    let sid = input.flowSessionId ?? null;
-    if (!sid && input.flowCode?.trim()) {
-      sid = await ensureActiveFlowSessionForConversation(
-        supabase,
-        input.empresaId,
-        input.conversationId,
-        input.flowCode
-      );
+    let sid = input.flowSessionId?.trim() || null;
+    if (!sid) {
+      const { data: crow } = await supabase
+        .from("chat_conversations")
+        .select("active_flow_session_id")
+        .eq("id", input.conversationId)
+        .eq("empresa_id", input.empresaId)
+        .maybeSingle();
+      sid = (crow as { active_flow_session_id?: string | null } | null)?.active_flow_session_id?.trim() || null;
     }
     const { error } = await supabase.from("chat_flow_events").insert({
       empresa_id: input.empresaId,
@@ -496,48 +492,24 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     flowSessionId: string | null | undefined
   ): Promise<boolean> {
     const sid = flowSessionId?.trim();
-    if (sid) {
-      const { data, error } = await supabase
-        .from("chat_flow_events")
-        .select("id")
-        .eq("conversation_id", conversationId)
-        .eq("flow_code", flowCode)
-        .eq("flow_session_id", sid)
-        .eq("node_code", nodeCode)
-        .eq("event_type", "node_sent")
-        .limit(1)
-        .maybeSingle();
-      if (error) {
-        console.error("[flow-engine] wasNodeSentForCurrentStep:", error.message);
-        return false;
-      }
-      return Boolean((data as { id?: string } | null)?.id);
+    if (!sid) {
+      console.warn("[flow-engine] wasNodeSentForCurrentStep: no flow_session_id, assume not sent", {
+        conversationId,
+        flowCode,
+        nodeCode,
+      });
+      return false;
     }
-    const { data: resetRow, error: resetErr } = await supabase
-      .from("chat_flow_events")
-      .select("created_at")
-      .eq("conversation_id", conversationId)
-      .eq("flow_code", flowCode)
-      .eq("event_type", FLOW_POINTER_RESET_EVENT)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (resetErr) {
-      console.error("[flow-engine] wasNodeSentForCurrentStep(reset):", resetErr.message);
-    }
-    const since = (resetRow as { created_at?: string } | null)?.created_at ?? null;
-
-    let q = supabase
+    const { data, error } = await supabase
       .from("chat_flow_events")
       .select("id")
       .eq("conversation_id", conversationId)
       .eq("flow_code", flowCode)
+      .eq("flow_session_id", sid)
       .eq("node_code", nodeCode)
-      .eq("event_type", "node_sent");
-    if (since) {
-      q = q.gt("created_at", since);
-    }
-    const { data, error } = await q.limit(1).maybeSingle();
+      .eq("event_type", "node_sent")
+      .limit(1)
+      .maybeSingle();
     if (error) {
       console.error("[flow-engine] wasNodeSentForCurrentStep:", error.message);
       return false;
@@ -613,6 +585,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
           conversationId: state.id,
           flowCode,
           nodeCode,
+          flowSessionId: state.active_flow_session_id,
           eventType: "automation_skipped_flow_inactive",
           payload: {},
         });
@@ -659,6 +632,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
           conversationId: state.id,
           flowCode,
           nodeCode,
+          flowSessionId: state.active_flow_session_id,
           eventType: "present_failed",
           payload: { error: sent.error ?? "unknown" },
         });
@@ -812,18 +786,6 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     const sid = flowSessionId?.trim();
     if (!fc || !sid) return base;
 
-    if (isFlowEventHydrationDisabled()) {
-      flowTrace("flow_event_hydration_skipped", {
-        conversation_id: conversationId,
-        flow_code: fc,
-        flow_session_id: sid,
-        reason: "FLOW_DISABLE_EVENT_HYDRATION",
-        base_field_count: Object.keys(base).length,
-        flow_data_keys: summarizeFlowDataForTrace(base).keys,
-      });
-      return base;
-    }
-
     const { data: rows, error } = await supabase
       .from("chat_flow_events")
       .select("event_type, payload, created_at")
@@ -838,6 +800,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     }
 
     const merged: Record<string, string> = { ...base };
+    const slotEmpty = (key: string) => !String(merged[key] ?? "").trim();
     for (const row of rows ?? []) {
       const et = String((row as { event_type?: string }).event_type ?? "");
       const payload = ((row as { payload?: Record<string, unknown> }).payload ?? {}) as Record<
@@ -847,7 +810,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       if (et === "text_captured") {
         const field = typeof payload.save_as_field === "string" ? payload.save_as_field.trim() : "";
         const tv = typeof payload.text_value === "string" ? payload.text_value.trim() : "";
-        if (field && tv) merged[field] = tv;
+        if (field && tv && slotEmpty(field)) merged[field] = tv;
       } else if (et === "button_selected") {
         const op = payload.option_payload;
         if (op && typeof op === "object" && !Array.isArray(op)) {
@@ -858,16 +821,16 @@ export function createFlowEngine(ctx: FlowEngineContext) {
               typeof v === "string" || typeof v === "number" || typeof v === "boolean"
                 ? String(v)
                 : "";
-            if (sv) merged[kn] = sv;
+            if (sv && slotEmpty(kn)) merged[kn] = sv;
           }
         }
         const ov = typeof payload.option_value === "string" ? payload.option_value.trim() : "";
-        if (ov) merged["option_value"] = ov;
+        if (ov && slotEmpty("option_value")) merged["option_value"] = ov;
         const ol =
           (typeof payload.option_label === "string" ? payload.option_label.trim() : "") ||
           opcionTitleFromRawMeta(payload) ||
           "";
-        if (ol) merged["opcion_label"] = ol;
+        if (ol && slotEmpty("opcion_label")) merged["opcion_label"] = ol;
       }
     }
     if ((rows?.length ?? 0) > 0) {
@@ -992,6 +955,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: node.next_node_code,
+      flowSessionId: state.active_flow_session_id,
       eventType: "node_advanced",
       payload: {
         from_node: node.node_code,
@@ -1017,6 +981,12 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     const state = ctxSend.conversation;
     if (!state.flow_code || !state.flow_current_node) {
       return { ok: false, error: "Conversación sin flow_code o flow_current_node" };
+    }
+    if (!state.active_flow_session_id?.trim()) {
+      return {
+        ok: false,
+        error: "Sesión de flujo no inicializada; escribí hola para reiniciar.",
+      };
     }
 
     const node = await getNode(state.empresa_id, state.flow_code, state.flow_current_node);
@@ -1145,6 +1115,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: node.node_code,
+        flowSessionId: state.active_flow_session_id,
         eventType: "node_sent",
         payload: { ...basePayload, legacy: true },
       });
@@ -1254,6 +1225,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: node.node_code,
+      flowSessionId: state.active_flow_session_id,
       eventType: "node_sent",
       payload: { ...basePayload, blocks: blocks.length },
     });
@@ -1286,6 +1258,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: state.flow_current_node,
+        flowSessionId: state.active_flow_session_id,
         eventType: "ignored_interactive_reply",
         metaButtonId: params.metaButtonId,
         payload: { reason: "conversation_not_in_bot_mode", raw: params.rawPayload },
@@ -1296,6 +1269,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       await insertFlowEvent({
         empresaId: state.empresa_id,
         conversationId: state.id,
+        flowSessionId: state.active_flow_session_id,
         eventType: "invalid_button",
         metaButtonId: params.metaButtonId,
         payload: { reason: "missing_flow_state", raw: params.rawPayload },
@@ -1319,6 +1293,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: state.flow_current_node,
+        flowSessionId: state.active_flow_session_id,
         eventType: "invalid_button",
         metaButtonId: params.metaButtonId,
         payload: { reason: "current_node_not_found", raw: params.rawPayload },
@@ -1334,6 +1309,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: currentNode.node_code,
+        flowSessionId: state.active_flow_session_id,
         eventType: "invalid_button",
         metaButtonId: params.metaButtonId,
         payload: { reason: "option_not_found_in_node", raw: params.rawPayload },
@@ -1341,11 +1317,21 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       return { ok: true, status: "invalid_button" };
     }
 
+    const flowSidInteractive = state.active_flow_session_id?.trim();
+    if (!flowSidInteractive) {
+      return {
+        ok: false,
+        status: "missing_flow_session",
+        error: "Sesión de flujo no inicializada; escribí hola para reiniciar.",
+      };
+    }
+
     await insertFlowEvent({
       empresaId: state.empresa_id,
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.node_code,
+      flowSessionId: flowSidInteractive,
       eventType: "button_selected",
       selectedOptionId: selected.id,
       metaButtonId: params.metaButtonId,
@@ -1356,15 +1342,6 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         raw: params.rawPayload,
       },
     });
-
-    const flowSidInteractive = state.active_flow_session_id?.trim();
-    if (!flowSidInteractive) {
-      return {
-        ok: false,
-        status: "missing_flow_session",
-        error: "Sesión de flujo no inicializada; escribí hola para reiniciar.",
-      };
-    }
 
     const optionPayload =
       selected.option_payload && typeof selected.option_payload === "object"
@@ -1419,6 +1396,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: currentNode.node_code,
+        flowSessionId: flowSidInteractive,
         eventType: "node_advanced",
         selectedOptionId: selected.id,
         metaButtonId: params.metaButtonId,
@@ -1452,6 +1430,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: selected.next_node_code,
+      flowSessionId: flowSidInteractive,
       eventType: "node_advanced",
       selectedOptionId: selected.id,
       metaButtonId: params.metaButtonId,
@@ -1524,6 +1503,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: currentNode.node_code,
+        flowSessionId: state.active_flow_session_id,
         eventType: "image_expected_text_received",
         payload: { text_value: textValue, raw: params.rawPayload },
       });
@@ -1596,6 +1576,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.node_code,
+      flowSessionId: textFlowSid,
       eventType: "text_captured",
       payload: {
         save_as_field: currentNode.save_as_field ?? null,
@@ -1634,6 +1615,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.next_node_code,
+      flowSessionId: textFlowSid,
       eventType: "node_advanced",
       payload: {
         from_node: currentNode.node_code,
@@ -1752,6 +1734,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         conversationId: state.id,
         flowCode: state.flow_code,
         nodeCode: currentNode.node_code,
+        flowSessionId: state.active_flow_session_id,
         eventType: "image_expected_non_image_received",
         payload: {
           mime_type: media.mimeType,
@@ -1858,6 +1841,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.node_code,
+      flowSessionId: imgFlowSid,
       eventType: "image_received",
       payload: {
         media_id: params.mediaId,
@@ -1978,6 +1962,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.node_code,
+      flowSessionId: imgFlowSid,
       eventType: "sorteo_order_ensured",
       payload: {
         idempotent: sorteoOrderResult.idempotent,
@@ -2012,6 +1997,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       conversationId: state.id,
       flowCode: state.flow_code,
       nodeCode: currentNode.next_node_code,
+      flowSessionId: imgFlowSid,
       eventType: "node_advanced",
       payload: {
         from_node: currentNode.node_code,
