@@ -173,7 +173,7 @@ export interface SifenFacturaPayloadBase {
   sifen: SifenPayloadMeta;
 }
 
-// ─── Documento interno previo a XML (GET .../sifen/documento) ───────────────
+// ─── Documento interno previo a XML (mapPayloadBaseToSifenDocumento; no es el GET API) ─
 
 /** Cabecera de identificación del DE (campos ERP + vínculo electrónico). */
 export interface SifenDocumentoIdentificacion {
