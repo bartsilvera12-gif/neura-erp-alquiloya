@@ -195,7 +195,11 @@ export async function POST(
     let nuevoError: string | null;
     let nuevoProt: string | null;
 
-    if (resp.loteRecibido) {
+    /** Misma condición que `loteRecibido` en el cliente + comprobación explícita por si el parseo de dCodRes varió. */
+    const codRecibe = String(resp.dCodRes ?? "").trim();
+    const loteAceptadoPorSet = resp.loteRecibido || codRecibe === "0300";
+
+    if (loteAceptadoPorSet) {
       nuevoEstado = "enviado";
       nuevoError = null;
       nuevoProt = resp.dProtConsLote == null ? null : String(resp.dProtConsLote).trim() || null;

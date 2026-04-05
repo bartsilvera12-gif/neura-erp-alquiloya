@@ -74,14 +74,42 @@ export async function GET(
         : "";
     const sifen_ambiente = ambienteRaw.length > 0 ? ambienteRaw : null;
 
+    let feOut = fe;
+    if (fe) {
+      const row = fe as Record<string, unknown>;
+      if (String(row.estado_sifen ?? "") === "error_envio") {
+        const ult = row.sifen_ultima_respuesta_recibe_lote;
+        const cod =
+          ult != null && typeof ult === "object" && "dCodRes" in ult
+            ? String((ult as Record<string, unknown>).dCodRes ?? "").trim()
+            : "";
+        const prot =
+          row.sifen_d_prot_cons_lote == null ? "" : String(row.sifen_d_prot_cons_lote).trim();
+        if (cod === "0300" && prot.length > 0) {
+          const { data: fixed } = await supabase
+            .from("factura_electronica")
+            .update({ estado_sifen: "enviado", error: null })
+            .eq("id", row.id)
+            .eq("empresa_id", auth.empresa_id)
+            .select()
+            .single();
+          if (fixed) feOut = fixed;
+        }
+      }
+    }
+
     const payload: FacturaSifenResumenData = {
       sifen_config_exists,
       sifen_config_activa,
       sifen_ambiente,
-      factura_electronica: fe ? toFacturaElectronicaDto(fe as Record<string, unknown>) : null,
+      factura_electronica: feOut ? toFacturaElectronicaDto(feOut as Record<string, unknown>) : null,
     };
 
-    return NextResponse.json(successResponse(payload));
+    return NextResponse.json(successResponse(payload), {
+      headers: {
+        "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error";
     return NextResponse.json(errorResponse(msg), { status: 500 });

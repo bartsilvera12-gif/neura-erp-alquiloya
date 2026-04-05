@@ -225,7 +225,9 @@ export function FacturaElectronicaPanel({
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/facturas/${facturaId}/sifen/resumen`);
+    const res = await fetch(`/api/facturas/${facturaId}/sifen/resumen`, {
+      cache: "no-store",
+    });
     const j = (await res.json()) as { success?: boolean; data?: Resumen };
     if (res.ok && j.success && j.data) onResumenLoaded(j.data);
   }, [facturaId, onResumenLoaded]);
@@ -267,9 +269,20 @@ export function FacturaElectronicaPanel({
     setAction("enviar-test");
     try {
       const res = await fetch(`/api/facturas/${facturaId}/sifen/enviar-test`, { method: "POST" });
-      if (!res.ok) {
-        setFlash({ kind: "err", text: await readApiError(res) });
+      const j = (await res.json()) as {
+        success?: boolean;
+        data?: { factura_electronica?: FacturaElectronicaDTO };
+        error?: string;
+      };
+      if (!res.ok || !j.success) {
+        setFlash({ kind: "err", text: j.error ?? `Error ${res.status}` });
         return;
+      }
+      if (resumen != null && j.data?.factura_electronica) {
+        onResumenLoaded({
+          ...resumen,
+          factura_electronica: j.data.factura_electronica,
+        });
       }
       setFlash({ kind: "ok", text: "Lote enviado correctamente a SET (TEST)" });
       await refresh();
@@ -339,6 +352,10 @@ export function FacturaElectronicaPanel({
     Boolean(fe?.sifen_d_prot_cons_lote?.trim());
 
   const ultimaConsulta = fe?.sifen_ultima_respuesta_consulta_lote ?? null;
+
+  /** El campo `error` solo aplica a fallos de envío/rechazo; no mostrar texto viejo si ya está enviado/aprobado/etc. */
+  const mostrarErrorPersistido =
+    Boolean(fe?.error?.trim()) && (estado === "error_envio" || estado === "rechazado");
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-5 space-y-4">
@@ -438,7 +455,7 @@ export function FacturaElectronicaPanel({
                     )}
                   </div>
                 )}
-                {fe.error && (
+                {mostrarErrorPersistido && (
                   <div className="rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-3 py-2 whitespace-pre-wrap">
                     <span className="font-semibold">Error: </span>
                     {fe.error}
