@@ -12,11 +12,15 @@
 import * as forge from "node-forge";
 import { SignedXml } from "xml-crypto";
 import { createPrivateKey } from "node:crypto";
+import {
+  buildSifenSiRecepDeV150SchemaLocation,
+  SIFEN_EKUATIA_TARGET_NS,
+} from "./sifen-xsi-schema-location";
 import { escapeXml } from "./xml";
 
-const SIFEN_NS = "http://ekuatia.set.gov.py/sifen/xsd";
+const SIFEN_NS = SIFEN_EKUATIA_TARGET_NS;
 const XMLNS_XSI = "http://www.w3.org/2001/XMLSchema-instance";
-const RDE_SCHEMA_LOCATION = `${SIFEN_NS} siRecepDE_v150.xsd`;
+const RDE_SCHEMA_LOCATION = buildSifenSiRecepDeV150SchemaLocation();
 
 /**
  * Garantiza xmlns:xsi + xsi:schemaLocation en la etiqueta de apertura de `rDE` (SET 0160 si faltan).

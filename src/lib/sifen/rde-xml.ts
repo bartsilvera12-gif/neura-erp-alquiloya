@@ -11,6 +11,7 @@ import {
   SIFEN_TEST_CSC_GENERICO,
   SIFEN_TEST_LITERAL_DOCUMENTO,
 } from "./sifen-ambiente-test";
+import { buildSifenSiRecepDeV150SchemaLocation, SIFEN_EKUATIA_TARGET_NS } from "./sifen-xsi-schema-location";
 import { escapeXml } from "./xml";
 import {
   fechaEmisionCdc,
@@ -22,9 +23,9 @@ import {
   splitRucParaXml,
 } from "./sifen-cdc";
 
-const NS = "http://ekuatia.set.gov.py/sifen/xsd";
+const NS = SIFEN_EKUATIA_TARGET_NS;
 const XMLNS_XSI = "http://www.w3.org/2001/XMLSchema-instance";
-const RDE_SCHEMA_LOCATION = `${NS} siRecepDE_v150.xsd`;
+const RDE_SCHEMA_LOCATION = buildSifenSiRecepDeV150SchemaLocation();
 
 /** Enumeraciones / literales exactos según DE_Types_v150.xsd (y catálogos referidos). */
 const XSD_DES_TI_DE_FACTURA = "Factura electrónica";

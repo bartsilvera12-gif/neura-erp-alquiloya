@@ -57,7 +57,7 @@ export async function POST(
     const { data: feRow, error: errFe } = await supabase
       .from("factura_electronica")
       .select(
-        "id, factura_id, estado_sifen, xml_firmado_path, error, sifen_d_prot_cons_lote, sifen_ultima_respuesta_recibe_lote"
+        "id, factura_id, estado_sifen, xml_firmado_path, error, sifen_d_prot_cons_lote, sifen_ultima_respuesta_recibe_lote, sifen_ultima_respuesta_consulta_lote"
       )
       .eq("factura_id", fid)
       .eq("empresa_id", auth.empresa_id)
@@ -190,6 +190,7 @@ export async function POST(
     const previousProt =
       feRow.sifen_d_prot_cons_lote == null ? null : String(feRow.sifen_d_prot_cons_lote);
     const previousUltima = feRow.sifen_ultima_respuesta_recibe_lote;
+    const previousConsultaLote = feRow.sifen_ultima_respuesta_consulta_lote;
 
     let nuevoEstado: "enviado" | "error_envio";
     let nuevoError: string | null;
@@ -234,6 +235,8 @@ export async function POST(
         error: nuevoError,
         sifen_d_prot_cons_lote: nuevoProt,
         sifen_ultima_respuesta_recibe_lote: respuestaJson,
+        /** Evita mostrar 0362/0160 de un lote anterior distinto al último envío. */
+        sifen_ultima_respuesta_consulta_lote: null,
       })
       .eq("id", feRow.id)
       .eq("empresa_id", auth.empresa_id)
@@ -274,6 +277,7 @@ export async function POST(
           error: previousError,
           sifen_d_prot_cons_lote: previousProt,
           sifen_ultima_respuesta_recibe_lote: previousUltima,
+          sifen_ultima_respuesta_consulta_lote: previousConsultaLote,
         })
         .eq("id", feRow.id)
         .eq("empresa_id", auth.empresa_id);

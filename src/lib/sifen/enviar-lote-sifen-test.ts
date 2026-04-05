@@ -11,6 +11,7 @@ import { URL } from "node:url";
 import JSZip from "jszip";
 import type { AmbienteSifen } from "./types";
 import { extractKeyAndCertFromP12 } from "./sign-xml";
+import { buildSifenSiRecepDeV150SchemaLocation, SIFEN_EKUATIA_TARGET_NS } from "./sifen-xsi-schema-location";
 import { escapeXml } from "./xml";
 
 /**
@@ -19,14 +20,11 @@ import { escapeXml } from "./xml";
  */
 const NOMBRE_XML_DENTRO_ZIP = "xml_file.xml";
 
-const SIFEN_NS = "http://ekuatia.set.gov.py/sifen/xsd";
+const SIFEN_NS = SIFEN_EKUATIA_TARGET_NS;
 const SOAP_ENV = "http://www.w3.org/2003/05/soap-envelope";
 const XMLNS_XSI = "http://www.w3.org/2001/XMLSchema-instance";
-/**
- * Raíz del `xml_file.xml` dentro del ZIP. SET valida este documento; sin xsi:schemaLocation suele devolver 0160
- * aunque el `rDE` interno sí lo tenga.
- */
-const RLOTE_DE_SCHEMA_LOCATION = `${SIFEN_NS} siRecepDE_v150.xsd`;
+/** Raíz `xml_file.xml` en el ZIP: mismo schemaLocation absoluto que el rDE interno. */
+const RLOTE_DE_SCHEMA_LOCATION = buildSifenSiRecepDeV150SchemaLocation();
 
 /**
  * URL del servicio TEST (misma que documentan DNIT / pysifen: `recibe-lote.wsdl`).
