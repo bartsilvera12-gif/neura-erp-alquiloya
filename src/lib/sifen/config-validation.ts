@@ -11,6 +11,35 @@ function trimStr(v: unknown): string {
   return String(v).trim();
 }
 
+/** Fecha inicio vigencia timbrado → columna `date` y XML `dFeIniT` (YYYY-MM-DD). */
+export function normalizeTimbradoFechaInicioVigencia(
+  raw: unknown
+): { ok: true; value: string } | { ok: false; error: string } {
+  const s = trimStr(raw);
+  if (!s) {
+    return {
+      ok: false,
+      error:
+        "timbrado_fecha_inicio_vigencia es obligatoria: use la «Fecha inicio vigencia» del timbrado en DNIT (formato YYYY-MM-DD, ej. 2026-03-18).",
+    };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return {
+      ok: false,
+      error: "timbrado_fecha_inicio_vigencia debe ser YYYY-MM-DD (ej. 2026-03-18).",
+    };
+  }
+  const [, mo, da] = s.split("-").map((x) => parseInt(x, 10));
+  if (mo < 1 || mo > 12 || da < 1 || da > 31) {
+    return { ok: false, error: "timbrado_fecha_inicio_vigencia tiene mes o día inválido." };
+  }
+  const dt = new Date(`${s}T12:00:00.000Z`);
+  if (Number.isNaN(dt.getTime())) {
+    return { ok: false, error: "timbrado_fecha_inicio_vigencia no es una fecha válida." };
+  }
+  return { ok: true, value: s };
+}
+
 export function parseAmbiente(v: unknown): AmbienteSifen | null {
   const s = trimStr(v);
   if (s === "test" || s === "produccion") return s;
@@ -61,6 +90,8 @@ export function validateCreateBody(raw: unknown): EmpresaSifenConfigCreateResult
   if (!ruc) return { ok: false, error: "ruc es obligatorio" };
   if (!razon_social) return { ok: false, error: "razon_social es obligatoria" };
   if (!timbrado_numero) return { ok: false, error: "timbrado_numero es obligatorio" };
+  const tin = normalizeTimbradoFechaInicioVigencia(b.timbrado_fecha_inicio_vigencia);
+  if (!tin.ok) return { ok: false, error: tin.error };
   if (!establecimiento) return { ok: false, error: "establecimiento es obligatorio" };
   if (!punto_expedicion) return { ok: false, error: "punto_expedicion es obligatorio" };
 
@@ -86,6 +117,7 @@ export function validateCreateBody(raw: unknown): EmpresaSifenConfigCreateResult
     razon_social,
     direccion_fiscal: optionalNullableString(b.direccion_fiscal),
     timbrado_numero,
+    timbrado_fecha_inicio_vigencia: tin.value,
     establecimiento,
     punto_expedicion,
     ambiente,
@@ -142,6 +174,11 @@ export function buildPatchUpdate(raw: unknown): EmpresaSifenConfigPatchResult {
     if (!v) return { ok: false, error: "timbrado_numero no puede quedar vacío" };
     patch.timbrado_numero = v;
   }
+  if ("timbrado_fecha_inicio_vigencia" in b) {
+    const tin = normalizeTimbradoFechaInicioVigencia(b.timbrado_fecha_inicio_vigencia);
+    if (!tin.ok) return { ok: false, error: tin.error };
+    patch.timbrado_fecha_inicio_vigencia = tin.value;
+  }
   if ("establecimiento" in b) {
     const v = trimStr(b.establecimiento);
     if (!v) return { ok: false, error: "establecimiento no puede quedar vacío" };
@@ -195,6 +232,7 @@ export function rowFromCreateBody(empresaId: string, body: EmpresaSifenConfigCre
     ruc: body.ruc,
     razon_social: body.razon_social,
     timbrado_numero: body.timbrado_numero,
+    timbrado_fecha_inicio_vigencia: body.timbrado_fecha_inicio_vigencia,
     establecimiento: body.establecimiento,
     punto_expedicion: body.punto_expedicion,
     csc: body.csc ?? null,

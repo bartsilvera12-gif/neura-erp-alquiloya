@@ -17,6 +17,8 @@ export interface EmpresaSifenConfigDTO {
   /** Calle/domicilio fiscal del emisor (SIFEN dDirEmi); no es la razón social. */
   direccion_fiscal: string | null;
   timbrado_numero: string;
+  /** Inicio vigencia timbrado YYYY-MM-DD (gTimb.dFeIniT); como figura en la documentación DNIT. */
+  timbrado_fecha_inicio_vigencia: string | null;
   establecimiento: string;
   punto_expedicion: string;
   csc: string | null;
@@ -34,6 +36,8 @@ export interface EmpresaSifenConfigCreateBody {
   razon_social: string;
   direccion_fiscal?: string | null;
   timbrado_numero: string;
+  /** Obligatorio: misma fecha que «Fecha Inicio Vigencia» del timbrado en DNIT. */
+  timbrado_fecha_inicio_vigencia: string;
   establecimiento: string;
   punto_expedicion: string;
   ambiente: AmbienteSifen;
@@ -50,6 +54,7 @@ export interface EmpresaSifenConfigPatchBody {
   razon_social?: string;
   direccion_fiscal?: string | null;
   timbrado_numero?: string;
+  timbrado_fecha_inicio_vigencia?: string;
   establecimiento?: string;
   punto_expedicion?: string;
   ambiente?: AmbienteSifen;
@@ -154,6 +159,8 @@ export interface SifenPayloadEmisor {
   /** Domicilio/calle para gEmis.dDirEmi (desde empresa_sifen_config.direccion_fiscal). */
   direccion_fiscal: string;
   timbrado_numero: string;
+  /** YYYY-MM-DD; debe coincidir con inicio de vigencia del timbrado en DNIT (dFeIniT). */
+  timbrado_fecha_inicio_vigencia: string;
   establecimiento: string;
   punto_expedicion: string;
   /** Código de seguridad del timbrado (SET); obligatorio para generar el DE oficial. */

@@ -28,6 +28,13 @@ function isoToDateInput(iso: string | null): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Valor para `<input type="date">` desde API (date o ISO). */
+function ymdToDateInput(v: string | null | undefined): string {
+  if (!v) return "";
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v).trim());
+  return m ? m[1]! : "";
+}
+
 /** Config “completa” según datos persistidos (no borrador en curso). */
 function isSifenConfigCompleta(c: EmpresaSifenConfigDTO): boolean {
   const datos =
@@ -35,6 +42,7 @@ function isSifenConfigCompleta(c: EmpresaSifenConfigDTO): boolean {
     Boolean(c.razon_social?.trim()) &&
     Boolean(c.direccion_fiscal?.trim()) &&
     Boolean(c.timbrado_numero?.trim()) &&
+    Boolean(c.timbrado_fecha_inicio_vigencia?.trim()) &&
     Boolean(c.establecimiento?.trim()) &&
     Boolean(c.punto_expedicion?.trim());
   return (
@@ -58,6 +66,7 @@ export default function FacturacionElectronicaSifenPage() {
   const [razonSocial, setRazonSocial] = useState("");
   const [direccionFiscal, setDireccionFiscal] = useState("");
   const [timbradoNumero, setTimbradoNumero] = useState("");
+  const [timbradoFechaIni, setTimbradoFechaIni] = useState("");
   const [establecimiento, setEstablecimiento] = useState("");
   const [puntoExpedicion, setPuntoExpedicion] = useState("");
   const [csc, setCsc] = useState("");
@@ -91,6 +100,7 @@ export default function FacturacionElectronicaSifenPage() {
         setRazonSocial(d.razon_social);
         setDireccionFiscal(d.direccion_fiscal ?? "");
         setTimbradoNumero(d.timbrado_numero);
+        setTimbradoFechaIni(ymdToDateInput(d.timbrado_fecha_inicio_vigencia));
         setEstablecimiento(d.establecimiento);
         setPuntoExpedicion(d.punto_expedicion);
         setCsc(d.csc ?? "");
@@ -159,6 +169,7 @@ export default function FacturacionElectronicaSifenPage() {
           razon_social: razonSocial.trim(),
           direccion_fiscal: direccionFiscal.trim() || null,
           timbrado_numero: timbradoNumero.trim(),
+          timbrado_fecha_inicio_vigencia: timbradoFechaIni.trim(),
           establecimiento: establecimiento.trim(),
           punto_expedicion: puntoExpedicion.trim(),
           csc: csc.trim() || null,
@@ -188,6 +199,7 @@ export default function FacturacionElectronicaSifenPage() {
           razon_social: razonSocial.trim(),
           direccion_fiscal: direccionFiscal.trim() || null,
           timbrado_numero: timbradoNumero.trim(),
+          timbrado_fecha_inicio_vigencia: timbradoFechaIni.trim(),
           establecimiento: establecimiento.trim(),
           punto_expedicion: puntoExpedicion.trim(),
           csc: csc.trim() || null,
@@ -263,6 +275,7 @@ export default function FacturacionElectronicaSifenPage() {
     Boolean(razonSocial.trim()) &&
     Boolean(direccionFiscal.trim()) &&
     Boolean(timbradoNumero.trim()) &&
+    Boolean(timbradoFechaIni.trim()) &&
     Boolean(establecimiento.trim()) &&
     Boolean(puntoExpedicion.trim());
 
@@ -329,6 +342,10 @@ export default function FacturacionElectronicaSifenPage() {
               <li>
                 <span className="text-slate-500">Dirección fiscal (SIFEN):</span>{" "}
                 <span className="font-medium">{cfg.direccion_fiscal ?? "—"}</span>
+              </li>
+              <li>
+                <span className="text-slate-500">Inicio vigencia timbrado (dFeIniT):</span>{" "}
+                <span className="font-mono font-medium">{cfg.timbrado_fecha_inicio_vigencia ?? "—"}</span>
               </li>
               <li>
                 <span className="text-slate-500">Certificado .p12:</span>{" "}
@@ -445,6 +462,20 @@ export default function FacturacionElectronicaSifenPage() {
             <div>
               <label className={fLabel}>Timbrado (número)</label>
               <input className={fInput} value={timbradoNumero} onChange={(e) => setTimbradoNumero(e.target.value)} required />
+            </div>
+            <div>
+              <label className={fLabel}>Inicio vigencia del timbrado</label>
+              <input
+                type="date"
+                className={fInput}
+                value={timbradoFechaIni}
+                onChange={(e) => setTimbradoFechaIni(e.target.value)}
+                required
+              />
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Misma fecha que <span className="font-medium">«Fecha Inicio Vigencia»</span> en la resolución DNIT del timbrado. Va al XML como{" "}
+                <span className="font-mono">dFeIniT</span>. Si no coincide, SET devuelve error 1107.
+              </p>
             </div>
             <div>
               <label className={fLabel}>Establecimiento</label>
@@ -573,6 +604,7 @@ export default function FacturacionElectronicaSifenPage() {
                   setRazonSocial(cfg.razon_social);
                   setDireccionFiscal(cfg.direccion_fiscal ?? "");
                   setTimbradoNumero(cfg.timbrado_numero);
+                  setTimbradoFechaIni(ymdToDateInput(cfg.timbrado_fecha_inicio_vigencia));
                   setEstablecimiento(cfg.establecimiento);
                   setPuntoExpedicion(cfg.punto_expedicion);
                   setCsc(cfg.csc ?? "");

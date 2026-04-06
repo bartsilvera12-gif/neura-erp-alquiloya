@@ -7,6 +7,7 @@ import type {
   SifenPayloadMeta,
   SifenPayloadReceptor,
 } from "./types";
+import { normalizeTimbradoFechaInicioVigencia } from "./config-validation";
 
 function trimStr(v: unknown): string {
   if (v == null) return "";
@@ -60,6 +61,7 @@ export interface SifenBuildConfigRow {
   razon_social: string;
   direccion_fiscal: string | null;
   timbrado_numero: string;
+  timbrado_fecha_inicio_vigencia?: string | null;
   establecimiento: string;
   punto_expedicion: string;
   csc: string | null;
@@ -129,6 +131,13 @@ function validateEmisor(config: SifenBuildConfigRow | null): { ok: true; emisor:
     };
   }
   const cscRaw = config.csc == null ? "" : trimStr(config.csc);
+  const tin = normalizeTimbradoFechaInicioVigencia(config.timbrado_fecha_inicio_vigencia);
+  if (!tin.ok) {
+    return {
+      ok: false,
+      error: `Configuración SIFEN: ${tin.error} Configuración → Facturación electrónica.`,
+    };
+  }
   return {
     ok: true,
     emisor: {
@@ -136,6 +145,7 @@ function validateEmisor(config: SifenBuildConfigRow | null): { ok: true; emisor:
       razon_social,
       direccion_fiscal,
       timbrado_numero,
+      timbrado_fecha_inicio_vigencia: tin.value,
       establecimiento,
       punto_expedicion,
       csc: cscRaw === "" ? null : cscRaw,

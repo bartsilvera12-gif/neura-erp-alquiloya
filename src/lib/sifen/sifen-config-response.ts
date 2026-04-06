@@ -27,6 +27,10 @@ export function toEmpresaSifenConfigPublicDto(
         ? null
         : String(row.direccion_fiscal).trim(),
     timbrado_numero: String(row.timbrado_numero ?? ""),
+    timbrado_fecha_inicio_vigencia:
+      row.timbrado_fecha_inicio_vigencia == null || String(row.timbrado_fecha_inicio_vigencia).trim() === ""
+        ? null
+        : String(row.timbrado_fecha_inicio_vigencia).trim().slice(0, 10),
     establecimiento: String(row.establecimiento ?? ""),
     punto_expedicion: String(row.punto_expedicion ?? ""),
     csc: row.csc == null ? null : String(row.csc),
