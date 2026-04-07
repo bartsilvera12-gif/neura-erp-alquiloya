@@ -17,6 +17,7 @@ import type {
   VentaRaw,
   CompraRaw,
   GastoRaw,
+  SuscripcionDashRow,
 } from "@/lib/dashboard/data";
 import { enRangoCalendario, enMesCalendarioActual } from "@/lib/fechas/calendario";
 
@@ -130,23 +131,27 @@ const ETAPA_LABELS: Record<string, string> = {
 
 function PipelineBar({
   data,
-}: { data: { etapa: string; count: number; valor: number }[] }) {
+  tone = "light",
+}: { data: { etapa: string; count: number; valor: number }[]; tone?: "light" | "zentra" }) {
   const maxC = Math.max(...data.map(d => d.count), 1);
+  const z = tone === "zentra";
   return (
     <div className="space-y-3">
       {data.map((d) => (
         <div key={d.etapa}>
-          <div className="flex items-center justify-between mb-1">
+          <div className="mb-1 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${ETAPA_COLORS[d.etapa] ?? "bg-gray-400"}`} />
-              <span className="text-xs font-medium text-gray-700">{ETAPA_LABELS[d.etapa] ?? d.etapa}</span>
+              <div className={`h-2 w-2 rounded-full ${ETAPA_COLORS[d.etapa] ?? "bg-gray-400"}`} />
+              <span className={`text-xs font-medium ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>
+                {ETAPA_LABELS[d.etapa] ?? d.etapa}
+              </span>
             </div>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="tabular-nums font-semibold text-gray-700">{d.count}</span>
-              <span className="tabular-nums w-20 text-right">Gs. {formatGsM(d.valor)}</span>
+            <div className={`flex items-center gap-4 text-xs ${z ? "" : "text-gray-500"}`} style={z ? { color: Z.muted } : undefined}>
+              <span className={`tabular-nums font-semibold ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>{d.count}</span>
+              <span className="w-20 text-right tabular-nums">Gs. {formatGsM(d.valor)}</span>
             </div>
           </div>
-          <div className="h-5 bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-5 overflow-hidden rounded-full ${z ? "" : "bg-gray-100"}`} style={z ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}>
             <div
               className={`h-full rounded-full transition-all ${ETAPA_COLORS[d.etapa] ?? "bg-gray-400"}`}
               style={{ width: `${d.count > 0 ? Math.max((d.count / maxC) * 100, 4) : 0}%` }}
@@ -159,24 +164,35 @@ function PipelineBar({
 }
 
 function HBarChart({
-  data, color = "bg-blue-400",
-}: { data: { label: string; value: number }[]; color?: string }) {
+  data,
+  color = "bg-blue-400",
+  tone = "light",
+}: { data: { label: string; value: number }[]; color?: string; tone?: "light" | "zentra" }) {
   const max = Math.max(...data.map(d => d.value), 1);
+  const z = tone === "zentra";
   return (
     <div className="space-y-2">
       {data.slice(0, 8).map((d, i) => (
         <div key={i} className="flex items-center gap-3">
-          <span className="text-xs text-gray-600 w-28 truncate shrink-0" title={d.label}>{d.label}</span>
-          <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+          <span className={`w-28 shrink-0 truncate text-xs ${z ? "" : "text-gray-600"}`} style={z ? { color: Z.muted } : undefined} title={d.label}>
+            {d.label}
+          </span>
+          <div className={`h-5 flex-1 overflow-hidden rounded-full ${z ? "" : "bg-gray-100"}`} style={z ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}>
             <div
               className={`h-full rounded-full ${color} transition-all`}
               style={{ width: `${d.value > 0 ? Math.max((d.value / max) * 100, 3) : 0}%` }}
             />
           </div>
-          <span className="text-xs font-semibold text-gray-700 w-8 text-right tabular-nums shrink-0">{d.value}</span>
+          <span className={`w-8 shrink-0 text-right text-xs font-semibold tabular-nums ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>
+            {d.value}
+          </span>
         </div>
       ))}
-      {data.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">Sin datos</p>}
+      {data.length === 0 && (
+        <p className={`py-4 text-center text-xs ${z ? "" : "text-gray-400"}`} style={z ? { color: Z.muted } : undefined}>
+          Sin datos
+        </p>
+      )}
     </div>
   );
 }
@@ -377,49 +393,63 @@ function ProgressBar({
   );
 }
 
-/** Gauge semicircular tipo Power BI: valor actual, meta, porcentaje alcanzado */
-function GaugeChart({ label, value, meta, format = "number" }: {
-  label: string; value: number; meta: number; format?: "number" | "gs" | "pct";
-}) {
-  const pct = meta > 0 ? Math.min((value / meta) * 100, 100) : 0;
-  const fmt = (n: number) =>
-    format === "gs"  ? `Gs. ${formatGsM(n)}` :
-    format === "pct" ? `${n.toFixed(1)}%`    : String(n);
-  const strokeColor = pct >= 100 ? "#22c55e" : pct >= 70 ? "#f59e0b" : "#0EA5E9";
-  const W = 180, H = 110, CX = W / 2, CY = H - 12, R = 65;
-  const pathSemi = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
-
-  return (
-    <div className="flex flex-col items-center">
-      <span className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">{label}</span>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[180px]" style={{ height: 110 }}>
-        <path d={pathSemi} fill="none" stroke="#e5e7eb" strokeWidth="14" strokeLinecap="round" pathLength={100} />
-        <path
-          d={pathSemi}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="14"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray={`${pct} 100`}
-        />
-        <text x={CX} y={CY - 14} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#1f2937">{fmt(value)}</text>
-        <text x={CX} y={CY + 2} textAnchor="middle" fontSize="9" fill="#9ca3af">Meta: {fmt(meta)}</text>
-        <text x={CX} y={CY + 16} textAnchor="middle" fontSize="11" fontWeight="600" fill={strokeColor}>{pct.toFixed(0)}% alcanzado</text>
-      </svg>
-    </div>
-  );
-}
-
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, color = "text-[#0F172A]", icon, variation,
-}: { label: string; value: string; sub?: string; color?: string; icon: string; variation?: number }) {
+  label,
+  value,
+  sub,
+  color = "text-[#0F172A]",
+  icon,
+  variation,
+  variant = "light",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  color?: string;
+  icon: string;
+  variation?: number;
+  variant?: "light" | "zentra";
+}) {
+  if (variant === "zentra") {
+    return (
+      <motion.div
+        whileHover={{ y: -2 }}
+        className="rounded-2xl border border-white/10 p-6 shadow-lg shadow-black/10"
+        style={{ backgroundColor: Z.card }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-2xl opacity-90">{icon}</div>
+          {variation !== undefined && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold"
+              style={{
+                backgroundColor: variation >= 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)",
+                color: variation >= 0 ? Z.success : Z.error,
+              }}
+            >
+              {variation >= 0 ? "+" : ""}
+              {variation}%
+            </span>
+          )}
+        </div>
+        <p className={`mt-3 text-3xl font-bold tabular-nums ${color}`}>{value}</p>
+        <p className="mt-1 text-xs font-medium" style={{ color: Z.muted }}>
+          {label}
+        </p>
+        {sub && (
+          <p className="mt-1 text-xs" style={{ color: Z.muted }}>
+            {sub}
+          </p>
+        )}
+      </motion.div>
+    );
+  }
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6"
+      className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="text-2xl">{icon}</div>
@@ -429,79 +459,105 @@ function KpiCard({
               variation >= 0 ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]" : "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
             }`}
           >
-            {variation >= 0 ? "+" : ""}{variation}%
+            {variation >= 0 ? "+" : ""}
+            {variation}%
           </span>
         )}
       </div>
-      <p className={`text-3xl font-bold mt-3 tabular-nums ${color}`}>{value}</p>
-      <p className="text-xs font-medium text-[#475569] mt-1">{label}</p>
-      {sub && <p className="text-xs text-[#475569] mt-1">{sub}</p>}
+      <p className={`mt-3 text-3xl font-bold tabular-nums ${color}`}>{value}</p>
+      <p className="mt-1 text-xs font-medium text-[#475569]">{label}</p>
+      {sub && <p className="mt-1 text-xs text-[#475569]">{sub}</p>}
     </motion.div>
   );
 }
 
 // ── Dashboard Comercial ───────────────────────────────────────────────────────
 
+/** Valor comercial del cliente en el período: 1) facturas emitidas en período, 2) suscripción alta/inicio en período. */
+function valorComercialClienteEnPeriodo(
+  clienteId: string | number,
+  facturas: FacturaRaw[],
+  suscripciones: SuscripcionDashRow[],
+  desde: Date,
+  hasta: Date
+): { monto: number; fuente: "facturas" | "suscripcion" | "sin_dato" } {
+  const id = String(clienteId);
+  const sumF = facturas
+    .filter((f) => String(f.cliente_id) === id && f.estado !== "Anulado" && enRango(f.fecha, desde, hasta))
+    .reduce((s, f) => s + (Number(f.monto) || 0), 0);
+  if (sumF > 0) return { monto: sumF, fuente: "facturas" };
+
+  let sumS = 0;
+  for (const s of suscripciones) {
+    if (String(s.cliente_id) !== id) continue;
+    if (enRango(s.fecha_inicio, desde, hasta) || enRango(s.created_at, desde, hasta)) {
+      sumS += Number(s.precio) || 0;
+    }
+  }
+  if (sumS > 0) return { monto: sumS, fuente: "suscripcion" };
+  return { monto: 0, fuente: "sin_dato" };
+}
+
+function etiquetaPlanServicioCliente(c: ClienteRaw): string {
+  const t = (c.tipo_servicio_cliente ?? "").trim();
+  if (t) return labelClienteDimension(t);
+  const co = (c.condicion_pago ?? "").trim();
+  if (co) return labelClienteDimension(co);
+  return "—";
+}
+
 function DashComercial({
-  prospectos, clientes, tipificaciones, usuario, periodo, config,
+  prospectos,
+  clientes,
+  tipificaciones: _tipificaciones,
+  usuario,
+  periodo,
+  config,
+  facturas,
+  suscripciones,
 }: {
-  prospectos:     ProspectoRaw[];
-  clientes:       ClienteRaw[];
+  prospectos: ProspectoRaw[];
+  clientes: ClienteRaw[];
   tipificaciones: TipificacionRaw[];
-  usuario:        Usuario | null;
-  periodo:        Periodo;
-  config:         ConfigGlobal;
+  usuario: Usuario | null;
+  periodo: Periodo;
+  config: ConfigGlobal;
+  facturas: FacturaRaw[];
+  suscripciones: SuscripcionDashRow[];
 }) {
+  void _tipificaciones;
   const { desde, hasta } = useMemo(() => getRango(periodo), [periodo]);
 
-  // Filtrar por área si es supervisor
   const isSupervisor = usuario?.nivel === "supervisor";
-  const area         = usuario?.area;
+  const area = usuario?.area;
 
-  const prospectosFilt = useMemo(() =>
-    prospectos.filter((p) => {
-      if (isSupervisor && area === "ventas" && p.responsable)
-        return p.responsable.toUpperCase() === usuario?.nombre.toUpperCase();
-      return true;
-    }),
+  const prospectosFilt = useMemo(
+    () =>
+      prospectos.filter((p) => {
+        if (isSupervisor && area === "ventas" && p.responsable)
+          return p.responsable.toUpperCase() === usuario?.nombre.toUpperCase();
+        return true;
+      }),
     [prospectos, isSupervisor, area, usuario]
   );
 
-  // KPIs periodo (datos reales de crm_prospectos, filtrados por empresa_id vía getDashboardData)
-  const leadsNuevos    = prospectosFilt.filter(p => enRango(p.fecha_creacion, desde, hasta)).length;
-  const enNegociacion  = prospectosFilt.filter(p => p.etapa === "NEGOCIACION").length;
-  const clientesGanados= prospectosFilt.filter(p => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)).length;
-  const totalLeadsPeriodo = prospectosFilt.filter(p => enRango(p.fecha_creacion, desde, hasta)).length;
+  const leadsNuevos = prospectosFilt.filter((p) => enRango(p.fecha_creacion, desde, hasta)).length;
+  const enNegociacion = prospectosFilt.filter((p) => p.etapa === "NEGOCIACION").length;
+  const clientesGanados = prospectosFilt.filter(
+    (p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
+  ).length;
+  const totalLeadsPeriodo = prospectosFilt.filter((p) => enRango(p.fecha_creacion, desde, hasta)).length;
   const tasaConversion = totalLeadsPeriodo > 0 ? (clientesGanados / totalLeadsPeriodo) * 100 : 0;
 
-  // Pipeline por etapa (snapshot actual)
   const ETAPAS = ["LEAD", "CONTACTADO", "NEGOCIACION", "GANADO", "PERDIDO"];
-  const pipeline = ETAPAS.map(etapa => ({
+  const pipeline = ETAPAS.map((etapa) => ({
     etapa,
-    count: prospectosFilt.filter(p => p.etapa === etapa).length,
-    valor: prospectosFilt.filter(p => p.etapa === etapa)
-      .reduce((s, p) => s + (p.valor_estimado ?? 0), 0),
+    count: prospectosFilt.filter((p) => p.etapa === etapa).length,
+    valor: prospectosFilt.filter((p) => p.etapa === etapa).reduce((s, p) => s + (p.valor_estimado ?? 0), 0),
   }));
 
-  // Planes pendientes de cierre (top 5 en negociación por valor)
-  const planesPendientes = useMemo(() =>
-    prospectosFilt
-      .filter(p => p.etapa === "NEGOCIACION")
-      .sort((a, b) => (b.valor_estimado ?? 0) - (a.valor_estimado ?? 0))
-      .slice(0, 5)
-      .map(p => ({
-        empresa: p.empresa,
-        plan: p.servicio ?? "—",
-        monto: p.valor_estimado ?? 0,
-        responsable: p.responsable ?? "—",
-        fecha: p.fecha_creacion,
-      })),
-    [prospectosFilt]
-  );
-
-  // Top planes en negociación (agrupado por plan, ordenado por SUM(valor_estimado))
   const topPlanesEnNegociacion = useMemo(() => {
-    const enNeg = prospectosFilt.filter(p => p.etapa === "NEGOCIACION");
+    const enNeg = prospectosFilt.filter((p) => p.etapa === "NEGOCIACION");
     const porPlan: Record<string, number> = {};
     for (const p of enNeg) {
       const plan = (p.servicio ?? "").trim() || "Otros";
@@ -513,17 +569,13 @@ function DashComercial({
       .slice(0, 5);
   }, [prospectosFilt]);
 
-  // Top planes vendidos del mes (prospectos GANADO en mes actual, por cantidad de cierres)
   const topPlanesVendidos = useMemo(() => {
-    const hoy = new Date();
-    const mesInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const mesFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
-    const ganadosMes = prospectosFilt.filter(
-      p => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, mesInicio, mesFin)
+    const ganadosPeriodo = prospectosFilt.filter(
+      (p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
     );
     const porPlan: Record<string, number> = {};
-    for (const p of ganadosMes) {
-      const planes = (p.servicio ?? "").split(",").map(s => s.trim()).filter(Boolean);
+    for (const p of ganadosPeriodo) {
+      const planes = (p.servicio ?? "").split(",").map((s) => s.trim()).filter(Boolean);
       for (const plan of planes.length ? planes : ["Otros"]) {
         const key = plan || "Otros";
         porPlan[key] = (porPlan[key] ?? 0) + 1;
@@ -533,14 +585,13 @@ function DashComercial({
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
-  }, [prospectosFilt]);
+  }, [prospectosFilt, desde, hasta]);
 
-  // Rendimiento por usuario (clientes ganados)
   const rendimiento = useMemo(() => {
     const map: Record<string, number> = {};
     prospectosFilt
-      .filter(p => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta))
-      .forEach(p => {
+      .filter((p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta))
+      .forEach((p) => {
         const v = p.responsable ?? "Sin asignar";
         map[v] = (map[v] ?? 0) + 1;
       });
@@ -549,197 +600,219 @@ function DashComercial({
       .sort((a, b) => b.value - a.value);
   }, [prospectosFilt, desde, hasta]);
 
-  // Top clientes por origen
-  const topClientes = useMemo(() =>
-    clientes
-      .filter(c => enRango(c.created_at, desde, hasta))
-      .slice(0, 8)
-      .map(c => ({
-        nombre: c.empresa ?? c.nombre_contacto,
-        codigo: c.codigo_cliente,
-        origen: c.origen,
-      })),
-    [clientes, desde, hasta]
-  );
+  const filasClientesPeriodo = useMemo(() => {
+    const nuevos = clientes.filter((c) => enRango(c.created_at, desde, hasta));
+    return nuevos
+      .map((c) => {
+        const { monto, fuente } = valorComercialClienteEnPeriodo(c.id, facturas, suscripciones, desde, hasta);
+        return {
+          id: String(c.id),
+          nombre: c.empresa ?? c.nombre_contacto,
+          fechaAlta: c.created_at,
+          planServicio: etiquetaPlanServicioCliente(c),
+          monto,
+          fuente,
+          vendedor: c.vendedor_asignado?.trim() || "—",
+        };
+      })
+      .sort((a, b) => new Date(b.fechaAlta).getTime() - new Date(a.fechaAlta).getTime());
+  }, [clientes, facturas, suscripciones, desde, hasta]);
 
-  // Timeline de actividad
-  const timeline = useMemo(() => {
-    type Evento = { fecha: string; tipo: string; texto: string; color: string };
-    const eventos: Evento[] = [];
-    prospectos
-      .filter(p => enRango(p.fecha_creacion, desde, hasta))
-      .forEach(p => eventos.push({
-        fecha: p.fecha_creacion,
-        tipo: "Lead creado",
-        texto: p.empresa,
-        color: "bg-blue-100 text-blue-700",
-      }));
-    clientes
-      .filter(c => enRango(c.created_at, desde, hasta))
-      .forEach(c => eventos.push({
-        fecha: c.created_at,
-        tipo: "Cliente ganado",
-        texto: c.empresa ?? c.nombre_contacto,
-        color: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
-      }));
-    tipificaciones
-      .filter(t => enRango(t.fecha, desde, hasta))
-      .forEach(t => eventos.push({
-        fecha: t.fecha,
-        tipo: "Tipificación",
-        texto: t.tipo_gestion,
-        color: "bg-violet-100 text-violet-700",
-      }));
-    return eventos
-      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-      .slice(0, 12);
-  }, [prospectos, clientes, tipificaciones, desde, hasta]);
+  const totalValorClientesNuevos = filasClientesPeriodo.reduce((s, r) => s + r.monto, 0);
+  const nClientesNuevos = filasClientesPeriodo.length;
+  const ticketPromedio = nClientesNuevos > 0 ? totalValorClientesNuevos / nClientesNuevos : 0;
+
+  const panelClass = "rounded-2xl border border-white/10 p-6 shadow-lg shadow-black/10 sm:p-8";
+  const panelStyle = { backgroundColor: Z.card } as const;
+  const titleClass = "text-xs font-bold uppercase tracking-wider";
+  const titleStyle = { color: Z.muted } as const;
 
   return (
-    <div className="space-y-5">
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiCard icon="🎯" label="Leads nuevos"      value={String(leadsNuevos)} color="text-[#0EA5E9]" variation={12} />
-        <KpiCard icon="💬" label="En negociación"    value={String(enNegociacion)} color="text-amber-600" />
-        <KpiCard icon="✅" label="Clientes ganados"  value={String(clientesGanados)} color="text-[#0EA5E9]" variation={8} />
-        <KpiCard icon="📈" label="Tasa de conversión" value={`${tasaConversion.toFixed(1)}%`}
-          color={tasaConversion >= config.meta_conversion_leads ? "text-[#0EA5E9]" : "text-[#0F172A]"}
-          variation={tasaConversion >= config.meta_conversion_leads ? 5 : -2} />
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard
+          variant="zentra"
+          icon="🎯"
+          label="Leads nuevos"
+          value={String(leadsNuevos)}
+          color="text-[#60A5FA]"
+          variation={12}
+        />
+        <KpiCard variant="zentra" icon="💬" label="En negociación" value={String(enNegociacion)} color="text-amber-400" />
+        <KpiCard
+          variant="zentra"
+          icon="✅"
+          label="Clientes ganados (CRM)"
+          value={String(clientesGanados)}
+          color="text-[#60A5FA]"
+          variation={8}
+        />
+        <KpiCard
+          variant="zentra"
+          icon="📈"
+          label="Tasa de conversión"
+          value={`${tasaConversion.toFixed(1)}%`}
+          color={tasaConversion >= config.meta_conversion_leads ? "text-emerald-400" : "text-white"}
+          variation={tasaConversion >= config.meta_conversion_leads ? 5 : -2}
+        />
       </div>
 
-      {/* Metas comerciales — gauge charts tipo Power BI */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-6">Progreso de metas</h3>
-        <div className="grid grid-cols-2 gap-8">
-          <GaugeChart label="Clientes nuevos" value={clientesGanados} meta={config.meta_clientes_nuevos} />
-          <GaugeChart label="Conversión de leads" value={tasaConversion} meta={config.meta_conversion_leads} format="pct" />
-        </div>
-      </div>
-
-      {/* Pipeline + Rendimiento */}
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">Pipeline CRM</h3>
-          <PipelineBar data={pipeline} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <motion.div whileHover={{ y: -2 }} className={panelClass} style={panelStyle}>
+          <h3 className={titleClass} style={titleStyle}>
+            Pipeline CRM
+          </h3>
+          <div className="mt-5">
+            <PipelineBar data={pipeline} tone="zentra" />
+          </div>
         </motion.div>
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">
+        <motion.div whileHover={{ y: -2 }} className={panelClass} style={panelStyle}>
+          <h3 className={titleClass} style={titleStyle}>
             Clientes ganados por vendedor
           </h3>
-          <HBarChart data={rendimiento} color="bg-[#0EA5E9]" />
+          <div className="mt-5">
+            <HBarChart data={rendimiento} color="bg-[#2563EB]" tone="zentra" />
+          </div>
         </motion.div>
       </div>
 
-      {/* Planes pendientes de cierre + Top planes vendidos */}
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">Planes pendientes de cierre</h3>
-          {planesPendientes.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Sin prospectos en negociación</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-2">Empresa</th>
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-2">Plan</th>
-                  <th className="text-right text-xs font-semibold text-slate-600 px-3 py-2">Monto</th>
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-2">Responsable</th>
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-2">Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {planesPendientes.map((p, i) => (
-                  <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-3 py-2 text-xs font-medium text-gray-800 truncate max-w-[100px]" title={p.empresa}>{p.empresa}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600 truncate max-w-[80px]" title={p.plan}>{p.plan}</td>
-                    <td className="px-3 py-2 text-xs text-right tabular-nums font-semibold text-gray-700">Gs. {formatGsM(p.monto)}</td>
-                    <td className="px-3 py-2 text-xs text-gray-500 truncate max-w-[80px]">{p.responsable}</td>
-                    <td className="px-3 py-2 text-xs text-gray-500">{formatFecha(p.fecha)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </motion.div>
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">Top planes vendidos del mes</h3>
-          <HBarChart data={topPlanesVendidos} color="bg-green-500" />
-        </motion.div>
-      </div>
+      <motion.div whileHover={{ y: -2 }} className={panelClass} style={panelStyle}>
+        <h3 className={titleClass} style={titleStyle}>
+          Top planes vendidos · período seleccionado
+        </h3>
+        <div className="mt-5">
+          <HBarChart data={topPlanesVendidos} color="bg-emerald-500" tone="zentra" />
+        </div>
+      </motion.div>
 
-      {/* Top planes en negociación */}
-      <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-        <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">Top planes en negociación</h3>
+      <motion.div whileHover={{ y: -2 }} className={panelClass} style={panelStyle}>
+        <h3 className={titleClass} style={titleStyle}>
+          Top planes en negociación
+        </h3>
         {topPlanesEnNegociacion.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">Sin prospectos en negociación</p>
+          <p className="mt-6 text-center text-sm" style={{ color: Z.muted }}>
+            Sin prospectos en negociación
+          </p>
         ) : (
-          <DonutChart
-            segments={topPlanesEnNegociacion.map((d, i) => ({
-              label: d.label,
-              value: d.value,
-              color: ["#F59E0B", "#F97316", "#FB923C", "#FDBA74", "#FED7AA"][i] ?? "#9ca3af",
-            }))}
-            centerLabel="monto total"
-            formatValue={(v) => formatGsM(v)}
-          />
+          <div className="mt-6">
+            <DonutChart
+              variant="zentra"
+              legendDetail
+              segments={topPlanesEnNegociacion.map((d, i) => ({
+                label: d.label,
+                value: d.value,
+                color: ["#F59E0B", "#F97316", "#FB923C", "#FDBA74", "#FED7AA"][i] ?? "#9ca3af",
+              }))}
+              centerLabel="monto total"
+              formatValue={(v) => formatGsM(v)}
+            />
+          </div>
         )}
       </motion.div>
 
-      {/* Top clientes + Timeline */}
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-4">
-            Clientes del periodo
-          </h3>
-          {topClientes.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Sin clientes en el periodo</p>
-          ) : (
+      <motion.div
+        whileHover={{ y: -3 }}
+        className="rounded-2xl border p-6 shadow-xl shadow-black/25 sm:p-10"
+        style={{ backgroundColor: Z.surface, borderColor: "rgba(37,99,235,0.35)" }}
+      >
+        <div className="flex flex-col gap-2 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: Z.accent }}>
+              Cartera · período
+            </p>
+            <h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl" style={{ color: Z.text }}>
+              Clientes del período
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed" style={{ color: Z.muted }}>
+              Altas con <strong style={{ color: Z.text }}>fecha de creación</strong> en el rango del filtro. Valor: suma de{" "}
+              <strong style={{ color: Z.text }}>facturas emitidas en el período</strong> por cliente; si no hay, suma de{" "}
+              <strong style={{ color: Z.text }}>precio de suscripción</strong> con alta o inicio en el período.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 px-5 py-4" style={{ backgroundColor: Z.card }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: Z.muted }}>
+              Clientes nuevos
+            </p>
+            <p className="mt-2 text-3xl font-bold tabular-nums" style={{ color: Z.text }}>
+              {nClientesNuevos}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 px-5 py-4" style={{ backgroundColor: Z.card }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: Z.muted }}>
+              Valor asociado (Gs.)
+            </p>
+            <p className="mt-2 text-3xl font-bold tabular-nums" style={{ color: Z.accent }}>
+              {formatGsM(totalValorClientesNuevos)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 px-5 py-4" style={{ backgroundColor: Z.card }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: Z.muted }}>
+              Ticket promedio
+            </p>
+            <p className="mt-2 text-3xl font-bold tabular-nums" style={{ color: Z.text }}>
+              {nClientesNuevos > 0 ? formatGsM(ticketPromedio) : "—"}
+            </p>
+          </div>
+        </div>
+
+        {filasClientesPeriodo.length === 0 ? (
+          <p className="mt-8 text-center text-sm" style={{ color: Z.muted }}>
+            No hay altas de cliente en este período.
+          </p>
+        ) : (
+          <div
+            className="mt-8 max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-white/10"
+            style={{ backgroundColor: Z.card }}
+          >
             <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-3">Cliente</th>
-                  <th className="text-left text-xs font-semibold text-slate-600 px-3 py-3">Origen</th>
+              <thead className="sticky top-0 border-b border-white/10" style={{ backgroundColor: Z.card }}>
+                <tr>
+                  {["Cliente", "Alta", "Plan / servicio", "Monto (Gs.)", "Origen valor", "Vendedor"].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: Z.muted }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
-                {topClientes.map((c, i) => (
-                  <tr key={i} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                    <td className="px-3 py-2.5 text-sm font-medium text-[#0F172A] truncate max-w-[140px]">{c.nombre}</td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[#475569]">{c.origen}</span>
+              <tbody className="divide-y divide-white/5">
+                {filasClientesPeriodo.map((row) => (
+                  <tr key={row.id} className="transition-colors hover:bg-white/[0.04]">
+                    <td className="max-w-[160px] truncate px-4 py-3 font-medium" style={{ color: Z.text }} title={row.nombre}>
+                      {row.nombre}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs" style={{ color: Z.muted }}>
+                      {formatFecha(row.fechaAlta)}
+                    </td>
+                    <td className="max-w-[140px] truncate px-4 py-3 text-xs" style={{ color: Z.muted }} title={row.planServicio}>
+                      {row.planServicio}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold tabular-nums" style={{ color: Z.text }}>
+                      {row.monto > 0 ? formatGs(row.monto) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: Z.muted }}>
+                      {row.fuente === "facturas"
+                        ? "Facturas período"
+                        : row.fuente === "suscripcion"
+                          ? "Suscripción"
+                          : "Sin factura / susc. en período"}
+                    </td>
+                    <td className="max-w-[120px] truncate px-4 py-3 text-xs" style={{ color: Z.muted }} title={row.vendedor}>
+                      {row.vendedor}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-        </motion.div>
-
-        <motion.div whileHover={{ y: -2 }} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
-            Actividad reciente
-          </h3>
-          {timeline.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Sin actividad en el periodo</p>
-          ) : (
-            <div className="space-y-2.5">
-              {timeline.map((e, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${e.color}`}>
-                    {e.tipo}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-700 truncate">{e.texto}</p>
-                    <p className="text-xs text-gray-400">{formatFecha(e.fecha)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      </div>
-
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }
@@ -1366,6 +1439,7 @@ export default function DashboardPage() {
   const [prospectos,     setProspectos]     = useState<ProspectoRaw[]>([]);
   const [clientes,       setClientes]       = useState<ClienteRaw[]>([]);
   const [facturas,       setFacturas]       = useState<FacturaRaw[]>([]);
+  const [suscripciones,  setSuscripciones]  = useState<SuscripcionDashRow[]>([]);
   const [pagos,          setPagos]          = useState<PagoRaw[]>([]);
   const [tipificaciones, setTipificaciones] = useState<TipificacionRaw[]>([]);
   const [productos,      setProductos]      = useState<ProductoRaw[]>([]);
@@ -1401,6 +1475,7 @@ export default function DashboardPage() {
         setProspectos(data.prospectos);
         setClientes(data.clientes);
         setFacturas(data.facturas);
+        setSuscripciones(data.suscripciones);
         setPagos(data.pagos);
         setTipificaciones(data.tipificaciones);
         setProductos(data.productos);
@@ -1412,6 +1487,7 @@ export default function DashboardPage() {
         setProspectos([]);
         setClientes([]);
         setFacturas([]);
+        setSuscripciones([]);
         setPagos([]);
         setTipificaciones([]);
         setProductos([]);
@@ -1561,6 +1637,8 @@ export default function DashboardPage() {
           usuario={usuarioActivo}
           periodo={periodo}
           config={config}
+          facturas={facturas}
+          suscripciones={suscripciones}
         />
       )}
 

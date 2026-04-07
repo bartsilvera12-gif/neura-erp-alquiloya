@@ -111,6 +111,16 @@ export interface PagoRaw {
   fecha_pago: string;
 }
 
+/** Suscripciones para métricas comerciales (valor cliente nuevo en período). */
+export interface SuscripcionDashRow {
+  id: string;
+  cliente_id: string;
+  precio: number;
+  moneda: string;
+  fecha_inicio: string;
+  created_at: string;
+}
+
 export interface DashboardData {
   prospectos: ProspectoRaw[];
   clientes: ClienteRaw[];
@@ -121,6 +131,7 @@ export interface DashboardData {
   ventas: VentaRaw[];
   compras: CompraRaw[];
   gastos: GastoRaw[];
+  suscripciones: SuscripcionDashRow[];
   /** Clientes dados de baja operativa en el mes actual */
   clientes_baja_mes: number;
   /** Monto mensual perdido por bajas del mes (suma de precios de suscripciones canceladas) */
@@ -209,6 +220,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   let ventas: VentaRaw[] = [];
   let compras: CompraRaw[] = [];
   let gastos: GastoRaw[] = [];
+  let suscripciones: SuscripcionDashRow[] = [];
   let clientesBajaMes = 0;
   let montoPerdidoBajasMes = 0;
 
@@ -219,7 +231,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     const inicioMes = `${anio}-${String(mes).padStart(2, "0")}-01`;
     const finMes = `${anio}-${String(mes).padStart(2, "0")}-31`;
 
-    const [clientesQ, facturasQ, pagosQ, tipificacionesQ, productosQ, ventasQ, ventasItemsQ, comprasQ, gastosQ, bajasQ, suscBajasQ] =
+    const [clientesQ, facturasQ, pagosQ, tipificacionesQ, productosQ, ventasQ, ventasItemsQ, comprasQ, gastosQ, suscripcionesDashQ, bajasQ, suscBajasQ] =
       await Promise.all([
         supabase.from("clientes").select("*").is("deleted_at", null),
         supabase.from("facturas").select("*"),
@@ -230,6 +242,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         supabase.from("ventas_items").select("*"),
         supabase.from("compras").select("*"),
         supabase.from("gastos").select("id, monto, fecha"),
+        supabase.from("suscripciones").select("id, cliente_id, precio, moneda, fecha_inicio, created_at"),
         supabase.from("clientes").select("id").not("baja_operativa_at", "is", null).gte("baja_operativa_at", inicioMes).lte("baja_operativa_at", finMes + "T23:59:59.999Z"),
         supabase.from("suscripciones").select("cliente_id, precio").eq("estado", "cancelada"),
       ]);
@@ -249,6 +262,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     if (ventasQ.error) throw new Error(ventasQ.error.message);
     if (ventasItemsQ.error) throw new Error(ventasItemsQ.error.message);
     if (comprasQ.error) throw new Error(comprasQ.error.message);
+    if (suscripcionesDashQ.error) throw new Error(suscripcionesDashQ.error.message);
 
     clientes = (clientesQ.data ?? []).map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -352,6 +366,15 @@ export async function getDashboardData(): Promise<DashboardData> {
       monto: toNum(r.monto),
       fecha: (r.fecha as string) ?? "",
     }));
+
+    suscripciones = (suscripcionesDashQ.data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      cliente_id: r.cliente_id as string,
+      precio: toNum(r.precio),
+      moneda: (r.moneda as string) ?? "GS",
+      fecha_inicio: toCalendarDateStr(r.fecha_inicio as string),
+      created_at: toIsoTimestampStr(r.created_at as string),
+    }));
   } catch (err) {
     console.warn("[dashboard] Error cargando tablas empresa (clientes, facturas, etc.):", err);
     // prospectos ya cargados; clientes, facturas, etc. quedan vacíos
@@ -367,6 +390,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     ventas,
     compras,
     gastos,
+    suscripciones,
     clientes_baja_mes: clientesBajaMes,
     monto_perdido_bajas_mes: montoPerdidoBajasMes,
   };
