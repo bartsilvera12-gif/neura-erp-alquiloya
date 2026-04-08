@@ -186,6 +186,8 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
   const [opsBusy, setOpsBusy] = useState(false);
   const [hasActiveBotFlows, setHasActiveBotFlows] = useState(false);
   const [botFlowsChecked, setBotFlowsChecked] = useState(false);
+  const [compValidacionesOpen, setCompValidacionesOpen] = useState(false);
+  const [listColumnHidden, setListColumnHidden] = useState(false);
 
   const inboxFilterKey = searchParams?.toString() ?? "";
 
@@ -548,8 +550,12 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
     }
   }, [conversations, selectedId]);
 
+  useEffect(() => {
+    setCompValidacionesOpen(false);
+  }, [selectedId]);
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 max-h-[calc(100dvh-7rem)] gap-3 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 h-[calc(100dvh-5.25rem)] max-h-[calc(100dvh-5.25rem)] gap-2 overflow-hidden">
       {lightboxUrl ? (
         <button
           type="button"
@@ -567,25 +573,25 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
         </button>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Conversaciones</h1>
-          <p className="text-sm text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold text-slate-800 leading-tight">Conversaciones</h1>
+          <p className="text-xs text-slate-500 leading-snug">
             Omnicanal ·{" "}
             {mode === "historial"
-              ? "Historial omnicanal (todas las conversaciones)"
+              ? "Historial omnicanal"
               : vista === "inbox"
-                ? "Inbox (abiertas y pendientes)"
-                : "Automatización / bot"}
+                ? "Inbox"
+                : "Bot"}
+            {mode === "historial" ? (
+              <>
+                {" · "}
+                <Link href="/dashboard/conversaciones" className="text-[#0EA5E9] hover:underline font-medium">
+                  Inbox
+                </Link>
+              </>
+            ) : null}
           </p>
-          {mode === "historial" ? (
-            <Link
-              href="/dashboard/conversaciones"
-              className="mt-2 inline-block text-sm font-medium text-[#0EA5E9] hover:underline"
-            >
-              ← Volver al Inbox
-            </Link>
-          ) : null}
         </div>
       </div>
 
@@ -602,8 +608,8 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shrink-0">
-        <span className="font-semibold text-slate-500 uppercase tracking-wide">Filtros</span>
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] shrink-0">
+        <span className="font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Filtros</span>
         <select
           className="border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-700 max-w-[160px]"
           value={asignacionSel}
@@ -652,28 +658,37 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
       </div>
 
       {hasActiveChannel === false && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3 shrink-0">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg px-2 py-2 shrink-0">
           No hay un canal de conversación activo para tu empresa. Los mensajes no se registrarán hasta configurarlo.
         </div>
       )}
 
       {listError && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-2 shrink-0">
+        <div className="bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg px-2 py-1.5 shrink-0">
           {listError}
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      <div className="flex flex-1 min-h-0 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
         {/* Lista */}
-        <div className="w-full max-w-[420px] border-r border-slate-200 flex flex-col min-h-0 bg-slate-50/80">
-          <div className="p-3 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide shrink-0">
-            Chats
+        {!listColumnHidden ? (
+        <div className="w-full max-w-[min(360px,40vw)] shrink-0 border-r border-slate-200 flex flex-col min-h-0 bg-slate-50/80">
+          <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Chats</span>
+            <button
+              type="button"
+              onClick={() => setListColumnHidden(true)}
+              className="text-[10px] font-medium text-slate-500 hover:text-slate-800 px-1.5 py-0.5 rounded border border-transparent hover:border-slate-200 hover:bg-white"
+              title="Ocultar lista de chats"
+            >
+              Ocultar
+            </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             {loadingList ? (
-              <div className="p-6 text-sm text-slate-400 text-center animate-pulse">Cargando…</div>
+              <div className="p-4 text-xs text-slate-400 text-center animate-pulse">Cargando…</div>
             ) : conversations.length === 0 ? (
-              <div className="p-6 text-sm text-slate-500 text-center space-y-2">
+              <div className="p-4 text-xs text-slate-500 text-center space-y-1">
                 <p>No hay conversaciones aún</p>
               </div>
             ) : (
@@ -682,8 +697,8 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                   key={c.id}
                   type="button"
                   onClick={() => handleSelect(c.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-white transition-colors ${
-                    selectedId === c.id ? "bg-white border-l-4 border-l-[#0EA5E9]" : ""
+                  className={`w-full text-left px-2.5 py-2 border-b border-slate-100 hover:bg-white transition-colors ${
+                    selectedId === c.id ? "bg-white border-l-[3px] border-l-[#0EA5E9]" : ""
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -746,79 +761,71 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
             )}
           </div>
         </div>
+        ) : null}
 
         {/* Panel mensajes */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           {!selectedId ? (
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm min-h-0">
-              Seleccioná una conversación
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm min-h-0 px-2">
+              <span>Seleccioná una conversación</span>
+              {listColumnHidden ? (
+                <button
+                  type="button"
+                  onClick={() => setListColumnHidden(false)}
+                  className="text-xs font-medium text-[#0EA5E9] hover:underline"
+                >
+                  Mostrar lista de chats
+                </button>
+              ) : null}
             </div>
           ) : (
-            <>
-              <div className="px-4 py-3 border-b border-slate-200 bg-white flex flex-wrap items-center gap-2 shrink-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <div className="font-semibold text-slate-800 truncate">
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                  <span className="font-semibold text-slate-800 text-sm truncate min-w-0 max-w-[min(100%,14rem)]">
                     {selected?.contact.name || selected?.contact.phone_number}
-                  </div>
+                  </span>
                   {selected ? (
                     <ChannelBadge type={selected.channel.type} nombre={selected.channel.nombre} />
                   ) : null}
+                  {isHumanActive ? (
+                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
+                      Humano
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-violet-800 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded shrink-0">
+                      Bot
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-mono truncate min-w-0">
+                    {selected?.contact.phone_number}
+                  </span>
+                  {listColumnHidden ? (
+                    <button
+                      type="button"
+                      onClick={() => setListColumnHidden(false)}
+                      className="ml-auto shrink-0 text-[10px] font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-1.5 py-0.5 bg-white"
+                      title="Mostrar lista de chats"
+                    >
+                      Chats
+                    </button>
+                  ) : null}
                 </div>
-                <span className="text-xs text-slate-400 font-mono">
-                  {selected?.contact.phone_number}
-                </span>
-                {isHumanActive ? (
-                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    Modo humano · el bot no responde
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-semibold text-violet-800 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">
-                    Bot activo
-                  </span>
-                )}
-                {isHumanActive && (
-                  <button
-                    type="button"
-                    disabled={releasingBot}
-                    onClick={() => void handleReleaseToBot()}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg px-2 py-1 bg-white disabled:opacity-50"
-                  >
-                    {releasingBot ? "…" : "Volver a modo bot"}
-                  </button>
-                )}
-                {selected?.contact.cliente_id && (
-                  <Link
-                    href={`/clientes/${selected.contact.cliente_id}`}
-                    className="text-xs text-[#0EA5E9] hover:underline"
-                  >
-                    Ver cliente
-                  </Link>
-                )}
-                {selected?.contact.crm_prospecto_id && (
-                  <Link
-                    href={`/crm/${selected.contact.crm_prospecto_id}`}
-                    className="text-xs text-violet-600 hover:underline"
-                  >
-                    Ver prospecto CRM
-                  </Link>
-                )}
                 {selected ? (
-                  <div className="flex flex-wrap w-full gap-2 items-center pt-2 border-t border-slate-100 mt-1">
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                     <span
-                      className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${badgeEstadoClass(selected.status)}`}
+                      className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded border ${badgeEstadoClass(selected.status)}`}
                     >
                       {labelEstado(selected.status)}
                     </span>
                     <span
-                      className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${badgePrioridadClass(selected.priority)}`}
+                      className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded border ${badgePrioridadClass(selected.priority)}`}
                     >
                       {labelPrioridad(selected.priority)}
                     </span>
                     <span className="text-[10px] text-slate-500">
                       Cola:{" "}
-                      <span className="font-medium text-slate-700">
-                        {selected.queue_name ?? "—"}
-                      </span>
+                      <span className="font-medium text-slate-700">{selected.queue_name ?? "—"}</span>
                     </span>
                     <span className="text-[10px] text-slate-500">
                       Agente:{" "}
@@ -826,19 +833,29 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                         {selected.assigned_agent_name ?? "Sin asignar"}
                       </span>
                     </span>
+                    {isHumanActive && (
+                      <button
+                        type="button"
+                        disabled={releasingBot}
+                        onClick={() => void handleReleaseToBot()}
+                        className="text-[10px] font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded px-1.5 py-0.5 bg-white disabled:opacity-50"
+                      >
+                        {releasingBot ? "…" : "Modo bot"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={opsBusy}
                       onClick={() =>
                         void runConversationOp(() => assignConversationToMe(selected.id))
                       }
-                      className="text-[11px] font-medium text-white bg-[#0EA5E9] hover:bg-[#0284C7] rounded-md px-2 py-1 disabled:opacity-50"
+                      className="text-[10px] font-medium text-white bg-[#0EA5E9] hover:bg-[#0284C7] rounded px-1.5 py-0.5 disabled:opacity-50"
                     >
                       Asignarme
                     </button>
                     <select
                       disabled={opsBusy}
-                      className="text-[11px] border border-slate-200 rounded-md px-1.5 py-1 max-w-[200px]"
+                      className="text-[10px] border border-slate-200 rounded px-1 py-0.5 max-w-[9rem] min-h-[1.5rem]"
                       value=""
                       onChange={(e) => {
                         const v = e.target.value;
@@ -849,7 +866,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                       }}
                       aria-label="Reasignar conversación"
                     >
-                      <option value="">Reasignar a…</option>
+                      <option value="">Reasignar…</option>
                       {opsAgents
                         .filter((a) => a.id !== selected.assigned_agent_id)
                         .map((a) => (
@@ -860,7 +877,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                     </select>
                     <select
                       disabled={opsBusy}
-                      className="text-[11px] border border-slate-200 rounded-md px-1.5 py-1 max-w-[160px]"
+                      className="text-[10px] border border-slate-200 rounded px-1 py-0.5 max-w-[7rem] min-h-[1.5rem]"
                       value={selected.queue_id ?? ""}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -882,7 +899,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                     </select>
                     <select
                       disabled={opsBusy}
-                      className="text-[11px] border border-slate-200 rounded-md px-1.5 py-1"
+                      className="text-[10px] border border-slate-200 rounded px-1 py-0.5 min-h-[1.5rem]"
                       value={selected.priority}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -894,9 +911,9 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                       }}
                       aria-label="Prioridad"
                     >
-                      <option value="low">Prioridad baja</option>
-                      <option value="medium">Prioridad media</option>
-                      <option value="high">Prioridad alta</option>
+                      <option value="low">Baja</option>
+                      <option value="medium">Media</option>
+                      <option value="high">Alta</option>
                     </select>
                     {selected.status !== "closed" ? (
                       <button
@@ -907,7 +924,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                             changeConversationStatus(selected.id, "closed")
                           )
                         }
-                        className="text-[11px] font-medium text-slate-700 border border-slate-300 rounded-md px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                        className="text-[10px] font-medium text-slate-700 border border-slate-300 rounded px-1.5 py-0.5 hover:bg-slate-50 disabled:opacity-50"
                       >
                         Cerrar
                       </button>
@@ -920,99 +937,134 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                             changeConversationStatus(selected.id, "open")
                           )
                         }
-                        className="text-[11px] font-medium text-emerald-800 border border-emerald-300 rounded-md px-2 py-1 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+                        className="text-[10px] font-medium text-emerald-800 border border-emerald-300 rounded px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
                       >
                         Reabrir
                       </button>
+                    )}
+                    {selected.contact.cliente_id ? (
+                      <Link
+                        href={`/clientes/${selected.contact.cliente_id}`}
+                        className="text-[10px] text-[#0EA5E9] hover:underline"
+                      >
+                        Cliente
+                      </Link>
+                    ) : null}
+                    {selected.contact.crm_prospecto_id ? (
+                      <Link
+                        href={`/crm/${selected.contact.crm_prospecto_id}`}
+                        className="text-[10px] text-violet-600 hover:underline"
+                      >
+                        CRM
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-b border-amber-100/90 bg-amber-50/30 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCompValidacionesOpen((o) => !o)}
+                  aria-expanded={compValidacionesOpen}
+                  className="w-full text-left px-2 py-1 text-xs font-medium text-amber-900 flex items-center justify-between gap-2 hover:bg-amber-50/80"
+                >
+                  <span>
+                    ⚠️ Validaciones ({compLoading ? "…" : compVals.length})
+                  </span>
+                  <span className="text-slate-500 tabular-nums shrink-0" aria-hidden>
+                    {compValidacionesOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+                {compValidacionesOpen ? (
+                  <div className="px-2 pb-2 max-h-48 overflow-y-auto overscroll-contain border-t border-amber-100/80">
+                    {compLoading ? (
+                      <p className="text-xs text-slate-500 pt-1">Cargando…</p>
+                    ) : compVals.length === 0 ? (
+                      <p className="text-xs text-slate-500 pt-1">
+                        No hay comprobantes registrados en esta conversación.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5 pt-1">
+                        {compVals.map((v) => (
+                          <li
+                            key={v.id}
+                            className="flex flex-wrap items-center gap-1.5 text-[11px] bg-white border border-slate-200 rounded-md px-1.5 py-1"
+                          >
+                            <span className="font-mono text-slate-600">{v.estado_validacion}</span>
+                            {v.monto_validacion_status != null && v.monto_validacion_status !== "" ? (
+                              <span
+                                className="text-[10px] text-slate-500 max-w-[200px] truncate"
+                                title={v.motivo_validacion ?? ""}
+                              >
+                                monto: {v.monto_validacion_status}
+                                {v.monto_validacion_esperado_gs != null
+                                  ? ` · esp ${v.monto_validacion_esperado_gs}`
+                                  : ""}
+                                {v.monto_validacion_ocr_gs != null ? ` · ocr ${v.monto_validacion_ocr_gs}` : ""}
+                                {v.monto_validacion_diferencia_gs != null
+                                  ? ` · Δ ${v.monto_validacion_diferencia_gs}`
+                                  : ""}
+                              </span>
+                            ) : null}
+                            {v.bank_val_status != null && v.bank_val_status !== "" ? (
+                              <span
+                                className="text-[10px] text-slate-500 max-w-[220px] truncate"
+                                title={v.motivo_validacion ?? ""}
+                              >
+                                banco: {v.bank_val_status}
+                                {v.bank_val_coincidencias != null && v.bank_val_min_requeridas != null
+                                  ? ` · ${v.bank_val_coincidencias}/${v.bank_val_min_requeridas}`
+                                  : ""}
+                              </span>
+                            ) : null}
+                            {v.comprobante_url ? (
+                              <a
+                                href={v.comprobante_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#0EA5E9] hover:underline"
+                              >
+                                Ver archivo
+                              </a>
+                            ) : null}
+                            {v.estado_validacion !== "valido" ? (
+                              <button
+                                type="button"
+                                disabled={compActionId === v.id}
+                                onClick={async () => {
+                                  const convId = selectedId;
+                                  if (!convId) return;
+                                  setCompActionId(v.id);
+                                  try {
+                                    await approveComprobanteValidacion(v.id);
+                                    const rows = await fetchComprobanteValidacionesForConversation(convId);
+                                    setCompVals(rows);
+                                  } catch (e) {
+                                    setSendError(
+                                      e instanceof Error ? e.message : "No se pudo aprobar el comprobante"
+                                    );
+                                  } finally {
+                                    setCompActionId(null);
+                                  }
+                                }}
+                                className="text-emerald-700 font-medium hover:underline disabled:opacity-50"
+                              >
+                                Aprobar (cerrar compra)
+                              </button>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                 ) : null}
               </div>
 
-              <div className="px-4 py-2 border-b border-slate-200 bg-amber-50/40 text-sm shrink-0 max-h-36 overflow-y-auto overscroll-contain">
-                <div className="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-2">
-                  Comprobantes (validación)
-                </div>
-                {compLoading ? (
-                  <p className="text-xs text-slate-500">Cargando…</p>
-                ) : compVals.length === 0 ? (
-                  <p className="text-xs text-slate-500">No hay comprobantes registrados en esta conversación.</p>
-                ) : (
-                  <ul className="space-y-2 max-h-40 overflow-y-auto">
-                    {compVals.map((v) => (
-                      <li
-                        key={v.id}
-                        className="flex flex-wrap items-center gap-2 text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5"
-                      >
-                        <span className="font-mono text-slate-600">{v.estado_validacion}</span>
-                        {v.monto_validacion_status != null && v.monto_validacion_status !== "" ? (
-                          <span className="text-[10px] text-slate-500 max-w-[200px] truncate" title={v.motivo_validacion ?? ""}>
-                            monto: {v.monto_validacion_status}
-                            {v.monto_validacion_esperado_gs != null
-                              ? ` · esp ${v.monto_validacion_esperado_gs}`
-                              : ""}
-                            {v.monto_validacion_ocr_gs != null ? ` · ocr ${v.monto_validacion_ocr_gs}` : ""}
-                            {v.monto_validacion_diferencia_gs != null
-                              ? ` · Δ ${v.monto_validacion_diferencia_gs}`
-                              : ""}
-                          </span>
-                        ) : null}
-                        {v.bank_val_status != null && v.bank_val_status !== "" ? (
-                          <span
-                            className="text-[10px] text-slate-500 max-w-[220px] truncate"
-                            title={v.motivo_validacion ?? ""}
-                          >
-                            banco: {v.bank_val_status}
-                            {v.bank_val_coincidencias != null && v.bank_val_min_requeridas != null
-                              ? ` · ${v.bank_val_coincidencias}/${v.bank_val_min_requeridas}`
-                              : ""}
-                          </span>
-                        ) : null}
-                        {v.comprobante_url ? (
-                          <a
-                            href={v.comprobante_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[#0EA5E9] hover:underline"
-                          >
-                            Ver archivo
-                          </a>
-                        ) : null}
-                        {v.estado_validacion !== "valido" ? (
-                          <button
-                            type="button"
-                            disabled={compActionId === v.id}
-                            onClick={async () => {
-                              const convId = selectedId;
-                              if (!convId) return;
-                              setCompActionId(v.id);
-                              try {
-                                await approveComprobanteValidacion(v.id);
-                                const rows = await fetchComprobanteValidacionesForConversation(convId);
-                                setCompVals(rows);
-                              } catch (e) {
-                                setSendError(
-                                  e instanceof Error ? e.message : "No se pudo aprobar el comprobante"
-                                );
-                              } finally {
-                                setCompActionId(null);
-                              }
-                            }}
-                            className="text-emerald-700 font-medium hover:underline disabled:opacity-50"
-                          >
-                            Aprobar (cerrar compra)
-                          </button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
               <div
                 ref={messagesScrollRef}
                 onScroll={onMessagesScroll}
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 bg-slate-50/50"
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 space-y-2 bg-slate-50/50"
               >
                 {loadingMsg ? (
                   <div className="text-center text-slate-400 text-sm py-8">Cargando mensajes…</div>
@@ -1032,7 +1084,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                         className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
+                          className={`max-w-[85%] rounded-xl px-3 py-1.5 text-sm ${
                             m.from_me
                               ? "bg-[#0EA5E9] text-white rounded-br-md"
                               : "bg-white border border-slate-200 text-slate-800 rounded-bl-md shadow-sm"
@@ -1173,7 +1225,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
 
               <form
                 onSubmit={handleSend}
-                className="p-3 border-t border-slate-200 bg-white flex flex-col gap-2 shrink-0"
+                className="p-2 border-t border-slate-200 bg-white flex flex-col gap-1.5 shrink-0 min-h-0"
               >
                 <input
                   ref={fileInputRef}
@@ -1183,22 +1235,22 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                   onChange={(e) => void handleSendFile(e)}
                 />
                 {sendError && (
-                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
                     {sendError}
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 items-stretch">
                   <button
                     type="button"
                     disabled={uploadingFile || !selectedId}
                     onClick={() => fileInputRef.current?.click()}
-                    className="shrink-0 border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 px-3 py-2 rounded-lg text-sm font-medium"
+                    className="shrink-0 border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 px-2.5 py-2 rounded-lg text-sm font-medium min-h-[2.5rem]"
                     title="Adjuntar imagen o documento"
                   >
                     {uploadingFile ? "…" : "Adjunto"}
                   </button>
                   <input
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] outline-none"
+                    className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2.5 py-2 text-sm min-h-[2.5rem] focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] outline-none"
                     placeholder="Escribí un mensaje…"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -1207,13 +1259,13 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
                   <button
                     type="submit"
                     disabled={sending || !input.trim()}
-                    className="bg-[#0EA5E9] hover:bg-[#0284C7] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium shrink-0"
+                    className="bg-[#0EA5E9] hover:bg-[#0284C7] disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium shrink-0 min-h-[2.5rem]"
                   >
                     {sending ? "…" : "Enviar"}
                   </button>
                 </div>
               </form>
-            </>
+            </div>
           )}
         </div>
       </div>
