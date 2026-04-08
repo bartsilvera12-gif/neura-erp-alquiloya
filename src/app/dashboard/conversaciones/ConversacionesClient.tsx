@@ -225,7 +225,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
         }
       }
       const base =
-        mode === "historial" ? "/dashboard/conversaciones/historial" : "/dashboard/conversaciones";
+        mode === "historial" ? "/dashboard/historial-omnicanal" : "/dashboard/conversaciones";
       const qs = params.toString();
       router.push(qs ? `${base}?${qs}` : base);
     },
@@ -282,7 +282,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
     if (next === "inbox") params.delete("vista");
     else if (next === "bot" && hasActiveBotFlows) params.set("vista", "bot");
     else if (next === "historial") {
-      router.push("/dashboard/conversaciones/historial");
+      router.push("/dashboard/historial-omnicanal");
       return;
     }
     const qs = params.toString();
@@ -311,7 +311,7 @@ export function ConversacionesClient({ mode }: { mode: ConversacionesClientMode 
   useEffect(() => {
     if (mode !== "inbox") return;
     if (searchParams?.get("vista") === "historial") {
-      router.replace("/dashboard/conversaciones/historial");
+      router.replace("/dashboard/historial-omnicanal");
     }
   }, [mode, router, searchParams]);
 

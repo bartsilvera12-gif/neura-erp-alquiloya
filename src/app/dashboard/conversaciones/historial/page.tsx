@@ -1,10 +1,5 @@
-import { Suspense } from "react";
-import { ConversacionesClient } from "../ConversacionesClient";
+import { redirect } from "next/navigation";
 
-export default function ConversacionesHistorialPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-slate-400 text-sm animate-pulse">Cargando historial…</div>}>
-      <ConversacionesClient mode="historial" />
-    </Suspense>
-  );
+export default function ConversacionesHistorialRedirectPage() {
+  redirect("/dashboard/historial-omnicanal");
 }

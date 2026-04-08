@@ -25,6 +25,8 @@ import {
   Megaphone,
   Ticket,
   MessageCircle,
+  History,
+  Headphones,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getMisModulos, getTodosModulos } from "@/lib/empresas/actions";
@@ -32,6 +34,7 @@ import type { ModuloEmpresa } from "@/lib/empresas/actions";
 import { getFavoritos, toggleFavorito } from "@/lib/favorites";
 
 type MenuItem = {
+  key: string;
   slug: string;
   label: string;
   href: string;
@@ -40,42 +43,51 @@ type MenuItem = {
   showWhen?: string;
 };
 
-/** Inbox solo coincide con la ruta exacta (no operación ni historial). */
 function menuChildPathActive(path: string, childHref: string, exactMatch?: boolean): boolean {
   if (path === childHref) return true;
-  if (exactMatch || childHref === "/dashboard/conversaciones") return false;
+  if (exactMatch) return false;
   return path.startsWith(`${childHref}/`);
 }
 
 const MENU_STRUCTURE: MenuItem[] = [
-  { slug: "dashboard", label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { key: "dashboard", slug: "dashboard", label: "Dashboard", href: "/", icon: LayoutDashboard },
   {
+    key: "conversaciones",
     slug: "conversaciones",
     label: "Conversaciones",
     href: "/dashboard/conversaciones",
     icon: MessageCircle,
-    children: [
-      { label: "Inbox", href: "/dashboard/conversaciones", exactMatch: true },
-      { label: "Historial omnicanal", href: "/dashboard/conversaciones/historial" },
-      { label: "Colas y agentes", href: "/dashboard/conversaciones/operacion" },
-    ],
   },
-  { slug: "ventas", label: "Ventas", href: "/ventas", icon: ShoppingCart },
-  { slug: "inventario", label: "Inventario", href: "/inventario", icon: Package, children: [
+  {
+    key: "historial-omnicanal",
+    slug: "historial-omnicanal",
+    label: "Historial omnicanal",
+    href: "/dashboard/historial-omnicanal",
+    icon: History,
+  },
+  {
+    key: "colas-agentes",
+    slug: "colas-agentes",
+    label: "Colas y agentes",
+    href: "/dashboard/colas-agentes",
+    icon: Headphones,
+  },
+  { key: "ventas", slug: "ventas", label: "Ventas", href: "/ventas", icon: ShoppingCart },
+  { key: "inventario", slug: "inventario", label: "Inventario", href: "/inventario", icon: Package, children: [
     { label: "Productos", href: "/inventario" },
     { label: "Movimientos", href: "/inventario/movimientos" },
   ]},
-  { slug: "clientes", label: "Clientes", href: "/clientes", icon: Users },
-  { slug: "compras", label: "Compras", href: "/compras", icon: Package },
-  { slug: "gastos", label: "Gastos", href: "/gastos", icon: Receipt },
-  { slug: "pagos", label: "Pagos", href: "/pagos", icon: Banknote },
-  { slug: "usuarios", label: "Usuarios", href: "/usuarios", icon: UserCog },
-  { slug: "configuracion", label: "Configuración", href: "/configuracion", icon: Settings },
-  { slug: "planes", label: "Planes", href: "/planes", icon: FileText },
-  { slug: "gestion-clientes", label: "Gestión Clientes", href: "/gestion-clientes", icon: Users },
-  { slug: "crm", label: "CRM Funnel", href: "/crm", icon: Sparkles },
-  { slug: "marketing", label: "Marketing Ops", href: "/marketing", icon: Megaphone },
-  { slug: "sorteos", label: "Sorteos", href: "/sorteos", icon: Ticket },
+  { key: "clientes", slug: "clientes", label: "Clientes", href: "/clientes", icon: Users },
+  { key: "compras", slug: "compras", label: "Compras", href: "/compras", icon: Package },
+  { key: "gastos", slug: "gastos", label: "Gastos", href: "/gastos", icon: Receipt },
+  { key: "pagos", slug: "pagos", label: "Pagos", href: "/pagos", icon: Banknote },
+  { key: "usuarios", slug: "usuarios", label: "Usuarios", href: "/usuarios", icon: UserCog },
+  { key: "configuracion", slug: "configuracion", label: "Configuración", href: "/configuracion", icon: Settings },
+  { key: "planes", slug: "planes", label: "Planes", href: "/planes", icon: FileText },
+  { key: "gestion-clientes", slug: "gestion-clientes", label: "Gestión Clientes", href: "/gestion-clientes", icon: Users },
+  { key: "crm", slug: "crm", label: "CRM Funnel", href: "/crm", icon: Sparkles },
+  { key: "marketing", slug: "marketing", label: "Marketing Ops", href: "/marketing", icon: Megaphone },
+  { key: "sorteos", slug: "sorteos", label: "Sorteos", href: "/sorteos", icon: Ticket },
 ];
 
 function NavItem({
@@ -206,7 +218,6 @@ export default function Sidebar() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
-    conversaciones: true,
     inventario: true,
     sorteos: true,
   });
@@ -253,8 +264,15 @@ export default function Sidebar() {
   };
 
   const modulosSlugs = new Set(modulos.map((m) => m.slug));
-  const hasAccess = (slug: string) =>
-    esSuperAdmin || slug === "dashboard" || modulosSlugs.has(slug);
+  const hasChatModuleAccess = () =>
+    modulosSlugs.has("conversaciones") || modulosSlugs.has("omnicanal");
+  const hasAccess = (slug: string) => {
+    if (esSuperAdmin || slug === "dashboard") return true;
+    if (slug === "conversaciones" || slug === "historial-omnicanal" || slug === "colas-agentes") {
+      return hasChatModuleAccess();
+    }
+    return modulosSlugs.has(slug);
+  };
 
   const isActive = (slug: string, href: string) => {
     const p = pathname ?? "";
@@ -262,8 +280,8 @@ export default function Sidebar() {
     return p === href || p.startsWith(href + "/");
   };
 
-  const toggleExpand = (slug: string) => {
-    setExpandedItems((prev) => ({ ...prev, [slug]: !prev[slug] }));
+  const toggleExpand = (menuKey: string) => {
+    setExpandedItems((prev) => ({ ...prev, [menuKey]: !prev[menuKey] }));
   };
 
   const slugToId = (slug: string) => modulos.find((m) => m.slug === slug)?.id ?? slug;
@@ -308,7 +326,7 @@ export default function Sidebar() {
             <div className="space-y-0.5">
               {MENU_STRUCTURE.filter((item) => favoritos.includes(slugToId(item.slug))).map((item) => (
                 <NavItem
-                  key={item.slug}
+                  key={item.key}
                   item={item}
                   itemId={slugToId(item.slug)}
                   isActive={isActive(item.slug, item.href)}
@@ -316,8 +334,8 @@ export default function Sidebar() {
                   onToggleFavorito={handleToggleFavorito}
                   hasAccess={hasAccess(item.slug)}
                   collapsed={collapsed}
-                  expanded={expandedItems[item.slug] ?? false}
-                  onToggleExpand={() => toggleExpand(item.slug)}
+                  expanded={expandedItems[item.key] ?? false}
+                  onToggleExpand={() => toggleExpand(item.key)}
                 />
               ))}
             </div>
@@ -334,7 +352,7 @@ export default function Sidebar() {
           ) : (
             MENU_STRUCTURE.filter((item) => !favoritos.includes(slugToId(item.slug))).map((item) => (
               <NavItem
-                key={item.slug}
+                key={item.key}
                 item={item}
                 itemId={slugToId(item.slug)}
                 isActive={isActive(item.slug, item.href)}
@@ -342,8 +360,8 @@ export default function Sidebar() {
                 onToggleFavorito={handleToggleFavorito}
                 hasAccess={hasAccess(item.slug)}
                 collapsed={collapsed}
-                expanded={expandedItems[item.slug] ?? false}
-                onToggleExpand={() => toggleExpand(item.slug)}
+                expanded={expandedItems[item.key] ?? false}
+                onToggleExpand={() => toggleExpand(item.key)}
               />
             ))
           )}
