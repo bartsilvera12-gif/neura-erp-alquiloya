@@ -84,8 +84,15 @@ function NuevoClienteForm() {
   });
 
   useEffect(() => {
-    if (form.condicion_pago === "MENSUAL") getPlanes().then(setPlanes);
-  }, [form.condicion_pago]);
+    getPlanes().then(setPlanes);
+  }, []);
+
+  // Contado: al elegir plan, precargar monto de factura con el precio del plan (editable después).
+  useEffect(() => {
+    if (form.condicion_pago !== "CONTADO") return;
+    const p = planes.find((x) => x.id === formSusc.plan_id);
+    if (p) setFormContado((fc) => ({ ...fc, monto: String(p.precio) }));
+  }, [formSusc.plan_id, form.condicion_pago, planes]);
 
   // Pre-fill desde CRM si viene con ?from_crm=id
   useEffect(() => {
@@ -165,6 +172,7 @@ function NuevoClienteForm() {
       condicion_pago: form.condicion_pago.trim().toUpperCase() || undefined,
       moneda_preferida: form.moneda_preferida,
       estado: form.estado,
+      plan_comercial_id: formSusc.plan_id.trim() || null,
     });
 
     if (!nuevo) {
@@ -532,6 +540,32 @@ function NuevoClienteForm() {
               </div>
             </div>
 
+            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+              <SectionTitle>Plan</SectionTitle>
+              <div>
+                <label className={labelClass}>Plan</label>
+                <select
+                  value={formSusc.plan_id}
+                  onChange={(e) => {
+                    const p = planes.find((x) => x.id === e.target.value);
+                    setFormSusc((prev) => ({
+                      ...prev,
+                      plan_id: e.target.value,
+                      precio: p ? String(p.precio) : prev.precio,
+                    }));
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">— Seleccionar plan —</option>
+                  {planes.filter((p) => p.estado === "activo").map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} — {p.moneda} {p.precio.toLocaleString("es-PY")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Campos factura inicial Contado */}
             {form.condicion_pago === "CONTADO" && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
@@ -575,22 +609,6 @@ function NuevoClienteForm() {
             {form.condicion_pago === "MENSUAL" && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                 <SectionTitle>Configuración de suscripción</SectionTitle>
-                <div>
-                  <label className={labelClass}>Plan</label>
-                  <select
-                    value={formSusc.plan_id}
-                    onChange={(e) => {
-                      const p = planes.find((x) => x.id === e.target.value);
-                      setFormSusc((prev) => ({ ...prev, plan_id: e.target.value, precio: p ? String(p.precio) : prev.precio }));
-                    }}
-                    className={inputClass}
-                  >
-                    <option value="">— Seleccionar plan —</option>
-                    {planes.filter((p) => p.estado === "activo").map((p) => (
-                      <option key={p.id} value={p.id}>{p.nombre} — Gs. {p.precio.toLocaleString("es-PY")}</option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className={labelClass}>Precio (Gs.)</label>
                   <MontoInput

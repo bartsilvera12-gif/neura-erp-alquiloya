@@ -31,6 +31,7 @@ export async function apiCreateCliente(data: {
   condicion_pago?: string;
   moneda_preferida?: string;
   estado?: string;
+  plan_comercial_id?: string | null;
 }): Promise<{ id: string; [key: string]: unknown } | null> {
   const result = await apiPost<{ id: string; [key: string]: unknown }>("/api/clientes", data);
   return result.success ? result.data : null;
