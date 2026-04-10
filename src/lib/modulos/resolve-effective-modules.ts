@@ -1,6 +1,12 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 export type ModuloRow = { id: string; nombre: string; slug: string };
+
+/**
+ * Cliente Supabase para consultas a tablas ERP en PostgREST.
+ * Debe ser `any` aquí: en Vercel/TS estricto, `SupabaseClient<…, "zentra_erp", …>` no asigna a
+ * alias con genéricos y rompe el build al pasar `createClient(..., { db: { schema: "zentra_erp" } })`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ModulosSupabase = any;
 
 /** Admin de empresa (`admin` al crear empresa, `administrador` en el alta interna): ven todos los módulos habilitados para la empresa. */
 export function esRolAdminEmpresa(rol: string | null | undefined): boolean {
@@ -9,7 +15,7 @@ export function esRolAdminEmpresa(rol: string | null | undefined): boolean {
 }
 
 async function modulosRowsByIds(
-  supabase: SupabaseClient,
+  supabase: ModulosSupabase,
   moduloIds: string[]
 ): Promise<ModuloRow[]> {
   if (moduloIds.length === 0) return [];
@@ -19,7 +25,7 @@ async function modulosRowsByIds(
     .in("id", moduloIds)
     .order("slug");
   if (errMod) throw new Error(errMod.message);
-  return (modulos ?? []).map((m) => ({
+  return (modulos ?? []).map((m: { id?: unknown; nombre?: unknown; slug?: unknown }) => ({
     id: m.id as string,
     nombre: (m.nombre as string) ?? "",
     slug: (m.slug as string) ?? "",
@@ -33,14 +39,14 @@ async function modulosRowsByIds(
  * - resto (supervisor, usuario, etc.) → intersección empresa (activo) ∩ usuario_modulos
  */
 export async function resolveEffectiveModules(
-  supabase: SupabaseClient,
+  supabase: ModulosSupabase,
   usuario: { id: string; empresa_id: string | null; rol: string | null }
 ): Promise<ModuloRow[]> {
   const rol = (usuario.rol ?? "").trim();
   if (rol === "super_admin") {
     const { data, error } = await supabase.from("modulos").select("id, nombre, slug").order("slug");
     if (error) throw new Error(error.message);
-    return (data ?? []).map((m) => ({
+    return (data ?? []).map((m: { id?: unknown; nombre?: unknown; slug?: unknown }) => ({
       id: m.id as string,
       nombre: (m.nombre as string) ?? "",
       slug: (m.slug as string) ?? "",
@@ -58,7 +64,14 @@ export async function resolveEffectiveModules(
     .eq("activo", true);
 
   if (errEm) throw new Error(errEm.message);
-  const empresaModuloIds = [...new Set((emData ?? []).map((r) => r.modulo_id as string).filter(Boolean))];
+  const emRows = (emData ?? []) as { modulo_id?: unknown }[];
+  const empresaModuloIds: string[] = [
+    ...new Set(
+      emRows
+        .map((r) => (r.modulo_id != null ? String(r.modulo_id) : ""))
+        .filter((x): x is string => x.length > 0)
+    ),
+  ];
   if (empresaModuloIds.length === 0) return [];
 
   if (esRolAdminEmpresa(usuario.rol)) {
@@ -71,7 +84,14 @@ export async function resolveEffectiveModules(
     .eq("usuario_id", usuario.id);
 
   if (errUm) throw new Error(errUm.message);
-  const userIds = [...new Set((umData ?? []).map((r) => r.modulo_id as string).filter(Boolean))];
+  const umRows = (umData ?? []) as { modulo_id?: unknown }[];
+  const userIds: string[] = [
+    ...new Set(
+      umRows
+        .map((r) => (r.modulo_id != null ? String(r.modulo_id) : ""))
+        .filter((x): x is string => x.length > 0)
+    ),
+  ];
 
   let moduloIds: string[];
   if (userIds.length === 0) {
@@ -88,7 +108,7 @@ export async function resolveEffectiveModules(
 
 /** Filtra modulo_ids contra los habilitados para la empresa. */
 export async function filterModuloIdsForEmpresa(
-  supabase: SupabaseClient,
+  supabase: ModulosSupabase,
   empresaId: string,
   moduloIds: string[]
 ): Promise<string[]> {
@@ -100,6 +120,7 @@ export async function filterModuloIdsForEmpresa(
     .eq("activo", true)
     .in("modulo_id", moduloIds);
   if (error) throw new Error(error.message);
-  const allowed = new Set((data ?? []).map((r) => r.modulo_id as string));
+  const fmRows = (data ?? []) as { modulo_id?: unknown }[];
+  const allowed = new Set(fmRows.map((r) => (r.modulo_id != null ? String(r.modulo_id) : "")));
   return moduloIds.filter((id) => allowed.has(id));
 }
