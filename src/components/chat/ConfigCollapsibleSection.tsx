@@ -1,61 +1,89 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 
 type ConfigCollapsibleSectionProps = {
   title: string;
   description?: string;
-  /** Si true, la sección inicia expandida (estado local, no persiste). */
+  /** Panel abierto al montar (solo UI; independiente del switch). */
   defaultExpanded?: boolean;
+  /** Switch “activo” al montar (solo indicador visual; independiente de abierto/cerrado). */
+  defaultActive?: boolean;
   children: React.ReactNode;
 };
 
 /**
- * Sección de configuración con cabecera fija y expansión controlada por switch (estilo SaaS).
- * El switch ON usa verde alineado al badge "Activo" del ERP (emerald).
+ * Sección de configuración estilo SaaS:
+ * - **Switch**: solo indica estado visual activo/inactivo (no abre ni cierra).
+ * - **Cabecera** (título + chevron): expande/contrae el contenido.
  */
 export function ConfigCollapsibleSection({
   title,
   description,
   defaultExpanded = false,
+  defaultActive = true,
   children,
 }: ConfigCollapsibleSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [isActive, setIsActive] = useState(defaultActive);
   const headingId = useId();
   const panelId = useId();
+  const switchId = useId();
+
+  const shellClass =
+    isActive
+      ? "border-emerald-200/90 bg-white shadow-md ring-1 ring-emerald-100/50"
+      : "border-slate-300/90 bg-slate-100/60 shadow-sm ring-0";
 
   return (
     <div
-      className={`rounded-xl border shadow-sm overflow-hidden transition-[border-color,box-shadow,background-color] duration-300 ease-out ${
-        expanded
-          ? "border-emerald-200/90 bg-white shadow-md ring-1 ring-emerald-100/50"
-          : "border-slate-200 bg-slate-50/70 shadow-sm"
-      }`}
+      className={`rounded-xl border shadow-sm overflow-hidden transition-[border-color,box-shadow,background-color,ring-color] duration-300 ease-out ${shellClass}`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 px-4 py-4 sm:px-5 sm:py-4">
-        <div className="min-w-0 flex-1" id={headingId}>
-          <h3
-            className={`text-sm font-semibold tracking-tight transition-colors duration-200 ${
-              expanded ? "text-slate-900" : "text-slate-600"
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between sm:gap-4 px-4 py-4 sm:px-5 sm:py-4">
+        <button
+          type="button"
+          id={headingId}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          onClick={() => setExpanded((v) => !v)}
+          className="flex min-w-0 flex-1 items-start gap-2 rounded-lg text-left outline-none transition-colors hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 sm:gap-3 sm:pr-1"
+        >
+          <span
+            className={`mt-0.5 shrink-0 text-slate-400 transition-transform duration-300 ease-out ${
+              expanded ? "rotate-180" : ""
             }`}
+            aria-hidden
           >
-            {title}
-          </h3>
-          {description ? (
-            <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-4xl">{description}</p>
-          ) : null}
-        </div>
+            <ChevronDown className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <h3
+              className={`text-sm font-semibold tracking-tight transition-colors duration-200 ${
+                isActive ? "text-slate-900" : "text-slate-600"
+              }`}
+            >
+              {title}
+            </h3>
+            {description ? (
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-4xl">{description}</p>
+            ) : null}
+            <p className="mt-1.5 hidden text-[10px] text-slate-400 sm:block">
+              Clic para {expanded ? "contraer" : "expandir"}
+            </p>
+          </span>
+        </button>
 
-        <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end sm:gap-1.5 sm:pt-0.5">
-          <label className="inline-flex cursor-pointer items-center gap-2 select-none">
-            <span className="sr-only">{expanded ? "Contraer sección" : "Expandir sección"}</span>
+        <div className="flex shrink-0 flex-row items-center justify-end gap-3 border-t border-slate-200/60 pt-3 sm:flex-col sm:items-end sm:justify-start sm:border-t-0 sm:pt-0.5 sm:gap-1.5">
+          <label htmlFor={switchId} className="inline-flex cursor-pointer items-center gap-2 select-none">
+            <span className="sr-only">Marcar sección como activa o inactiva (solo visual)</span>
             <input
+              id={switchId}
               type="checkbox"
               role="switch"
-              aria-checked={expanded}
-              aria-controls={panelId}
-              checked={expanded}
-              onChange={(e) => setExpanded(e.target.checked)}
+              aria-checked={isActive}
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
               className="peer sr-only"
             />
             <span
@@ -65,10 +93,10 @@ export function ConfigCollapsibleSection({
           </label>
           <span
             className={`text-[10px] font-bold uppercase tracking-wide transition-colors duration-200 ${
-              expanded ? "text-emerald-700" : "text-slate-400"
+              isActive ? "text-emerald-700" : "text-slate-500"
             }`}
           >
-            {expanded ? "Visible" : "Oculto"}
+            {isActive ? "Activo" : "Inactivo"}
           </span>
         </div>
       </div>
