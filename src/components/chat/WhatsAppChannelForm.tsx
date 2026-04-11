@@ -1,14 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ComprobanteValidationConfigSection } from "@/components/chat/ComprobanteValidationConfigSection";
+import { useEffect, useRef, useState } from "react";
+import { BusinessAutomationConfigSection } from "@/components/chat/BusinessAutomationConfigSection";
+import { ConfigCollapsibleSection } from "@/components/chat/ConfigCollapsibleSection";
+import {
+  ComprobanteValidationPanelComprobantesCore,
+  ComprobanteValidationPanelDatosBancarios,
+  ComprobanteValidationPanelMensajesYOcr,
+} from "@/components/chat/ComprobanteValidationPanels";
 import {
   comprobanteValidationSettingsForForm,
   defaultComprobanteValidationSettings,
   parseComprobanteValidationConfig,
   type ComprobanteValidationSettings,
 } from "@/lib/chat/comprobante-validation-types";
+import {
+  businessAutomationSettingsForPersistence,
+  defaultBusinessAutomationSettings,
+  parseBusinessAutomationFromChannelConfig,
+  type BusinessAutomationSettings,
+} from "@/lib/chat/channel-business-automation-types";
 import {
   saveChatChannel,
   type ChatChannelFormInput,
@@ -36,6 +48,30 @@ function rowToForm(row: ChatChannelRow): ChatChannelFormInput {
       typeof row.config?.display_phone_number === "string" ? row.config.display_phone_number : "",
     whatsapp_access_token: "",
   };
+}
+
+function FormFeedback({
+  error,
+  success,
+  id,
+}: {
+  error: string | null;
+  success: string | null;
+  id?: string;
+}) {
+  if (!error && !success) return null;
+  return (
+    <div className="space-y-2" id={id}>
+      {error ? (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-2">{error}</div>
+      ) : null}
+      {success ? (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-4 py-2">
+          {success}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export type WhatsAppChannelFormProps = {
@@ -71,14 +107,27 @@ export function WhatsAppChannelForm({
       ? parseComprobanteValidationConfig(initialRow.config)
       : defaultComprobanteValidationSettings()
   );
+  const [baSettings, setBaSettings] = useState<BusinessAutomationSettings>(() =>
+    mode === "edit" && initialRow
+      ? parseBusinessAutomationFromChannelConfig(initialRow.config)
+      : defaultBusinessAutomationSettings()
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const bottomFeedbackRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      bottomFeedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [error]);
 
   useEffect(() => {
     if (mode === "edit" && initialRow) {
       setForm(rowToForm(initialRow));
       setCvSettings(parseComprobanteValidationConfig(initialRow.config));
+      setBaSettings(parseBusinessAutomationFromChannelConfig(initialRow.config));
     }
   }, [mode, initialRow]);
 
@@ -96,6 +145,7 @@ export function WhatsAppChannelForm({
           ...form,
           id: channelId.trim(),
           comprobante_validation: comprobanteValidationSettingsForForm(cvSettings),
+          business_automation: businessAutomationSettingsForPersistence(baSettings),
         });
         setSuccess("Cambios guardados.");
         onSaved?.(id);
@@ -103,6 +153,7 @@ export function WhatsAppChannelForm({
         const id = await saveChatChannel({
           ...form,
           comprobante_validation: comprobanteValidationSettingsForForm(cvSettings),
+          business_automation: businessAutomationSettingsForPersistence(baSettings),
         });
         setSuccess("Canal creado.");
         onSaved?.(id);
@@ -115,94 +166,128 @@ export function WhatsAppChannelForm({
   }
 
   return (
-    <div className="space-y-4">
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-2">{error}</div>
-      )}
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-4 py-2">
-          {success}
-        </div>
-      )}
+    <div className="space-y-6 max-w-3xl">
+      <FormFeedback error={error} success={success} id="canal-form-feedback-top" />
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nombre en el ERP</label>
-          <input
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            value={form.nombre}
-            onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))}
-            placeholder="Ej: WhatsApp ventas"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-            Phone number ID (Graph API) *
-          </label>
-          <input
-            required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
-            value={form.meta_phone_number_id}
-            onChange={(e) => setForm((p) => ({ ...p, meta_phone_number_id: e.target.value }))}
-            placeholder="Ej: 123456789012345"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-            Provider channel ID (opcional)
-          </label>
-          <input
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
-            value={form.provider_channel_id}
-            onChange={(e) => setForm((p) => ({ ...p, provider_channel_id: e.target.value }))}
-            placeholder="Por defecto se usa el mismo Phone number ID"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-            Número visible (opcional)
-          </label>
-          <input
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            value={form.display_phone_number ?? ""}
-            onChange={(e) => setForm((p) => ({ ...p, display_phone_number: e.target.value }))}
-            placeholder="+595 981 000000"
-          />
-          <p className="text-xs text-slate-400 mt-1">Se guarda en config para referencia; no afecta el webhook.</p>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-            Token de acceso Meta (enviar mensajes)
-          </label>
-          <input
-            type="password"
-            autoComplete="off"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
-            value={form.whatsapp_access_token ?? ""}
-            onChange={(e) => setForm((p) => ({ ...p, whatsapp_access_token: e.target.value }))}
-            placeholder={
-              mode === "edit"
-                ? "Dejar vacío para no cambiar el token guardado"
-                : "Pegá el token permanente de la app (WhatsApp)"
-            }
-          />
-          <p className="text-xs text-slate-400 mt-1">
-            Necesario para enviar desde Conversaciones. Alternativa: variable{" "}
-            <code className="text-[10px] bg-slate-100 px-1 rounded">WHATSAPP_TOKEN</code> en el servidor.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={form.activo}
-            onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))}
-          />
-          Canal activo (recibe mensajes del webhook)
-        </label>
+        <div className="space-y-3">
+          <ConfigCollapsibleSection
+            title="Credenciales y conexión"
+            description="Identificadores Meta, token para enviar mensajes y estado del canal en el ERP."
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nombre en el ERP</label>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  value={form.nombre}
+                  onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))}
+                  placeholder="Ej: WhatsApp ventas"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Phone number ID (Graph API) *
+                </label>
+                <input
+                  required
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono bg-white"
+                  value={form.meta_phone_number_id}
+                  onChange={(e) => setForm((p) => ({ ...p, meta_phone_number_id: e.target.value }))}
+                  placeholder="Ej: 123456789012345"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Provider channel ID (opcional)
+                </label>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono bg-white"
+                  value={form.provider_channel_id}
+                  onChange={(e) => setForm((p) => ({ ...p, provider_channel_id: e.target.value }))}
+                  placeholder="Por defecto se usa el mismo Phone number ID"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Número visible (opcional)
+                </label>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  value={form.display_phone_number ?? ""}
+                  onChange={(e) => setForm((p) => ({ ...p, display_phone_number: e.target.value }))}
+                  placeholder="+595 981 000000"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Se guarda en config para referencia; no afecta el webhook.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Token de acceso Meta (enviar mensajes)
+                </label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono bg-white"
+                  value={form.whatsapp_access_token ?? ""}
+                  onChange={(e) => setForm((p) => ({ ...p, whatsapp_access_token: e.target.value }))}
+                  placeholder={
+                    mode === "edit"
+                      ? "Dejar vacío para no cambiar el token guardado"
+                      : "Pegá el token permanente de la app (WhatsApp)"
+                  }
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Necesario para enviar desde Conversaciones. Alternativa: variable{" "}
+                  <code className="text-[10px] bg-slate-100 px-1 rounded">WHATSAPP_TOKEN</code> en el servidor.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.activo}
+                  onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))}
+                />
+                Canal activo (recibe mensajes del webhook)
+              </label>
+            </div>
+          </ConfigCollapsibleSection>
 
-        <ComprobanteValidationConfigSection value={cvSettings} onChange={setCvSettings} />
+          <ConfigCollapsibleSection
+            title="Mensajes automáticos (estilo WhatsApp Business)"
+            description="Bienvenida, horario de atención y aviso fuera de horario. Capa simple en el webhook, sin flujos."
+          >
+            <BusinessAutomationConfigSection value={baSettings} onChange={setBaSettings} />
+          </ConfigCollapsibleSection>
 
-        <div className="flex flex-wrap gap-2 pt-1">
+          <ConfigCollapsibleSection
+            title="Validación de comprobantes"
+            description="Activación, monto vs flujo, duplicados, revisión manual y umbrales de OCR."
+          >
+            <ComprobanteValidationPanelComprobantesCore value={cvSettings} onChange={setCvSettings} />
+          </ConfigCollapsibleSection>
+
+          <ConfigCollapsibleSection
+            title="Datos bancarios esperados"
+            description="Titular, cuenta y alias esperados para comparar con el OCR del comprobante."
+          >
+            <ComprobanteValidationPanelDatosBancarios value={cvSettings} onChange={setCvSettings} />
+          </ConfigCollapsibleSection>
+
+          <ConfigCollapsibleSection
+            title="Mensajes ante situaciones y reglas OCR"
+            description="Textos para cada caso y tabla de reglas por campo OCR."
+          >
+            <ComprobanteValidationPanelMensajesYOcr value={cvSettings} onChange={setCvSettings} />
+          </ConfigCollapsibleSection>
+        </div>
+
+        <div ref={bottomFeedbackRef}>
+          <FormFeedback error={error} success={success} id="canal-form-feedback-bottom" />
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
           <button
             type="submit"
             disabled={saving}

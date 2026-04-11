@@ -90,10 +90,21 @@ export async function fetchChatConversations(
       .select("id")
       .eq("empresa_id", empresa_id)
       .eq("usuario_id", usuario_id);
-    if (maErr) throw new Error(maErr.message);
-    const ids = (myAgents ?? []).map((r) => r.id as string);
-    if (ids.length === 0) return [];
-    q = q.in("assigned_agent_id", ids);
+    if (maErr) {
+      console.warn(
+        "[fetchChatConversations] no se pudo cargar chat_agents para filtro «mios»; se listan todas:",
+        maErr.message
+      );
+    } else {
+      const ids = (myAgents ?? []).map((r) => r.id as string);
+      if (ids.length > 0) {
+        q = q.in("assigned_agent_id", ids);
+      } else {
+        console.warn(
+          "[fetchChatConversations] filtro «mios» sin filas en chat_agents para el usuario; se listan todas las conversaciones"
+        );
+      }
+    }
   } else if (assignment === "unassigned") {
     q = q.is("assigned_agent_id", null);
   }
@@ -135,19 +146,22 @@ export async function fetchChatConversations(
       .select("id, type, nombre")
       .eq("empresa_id", empresa_id)
       .in("id", channelIds);
-    if (chErr) throw new Error(chErr.message);
-    channelById = Object.fromEntries(
-      (chrows ?? []).map((r) => {
-        const rec = r as { id: string; type?: string | null; nombre?: string | null };
-        return [
-          rec.id,
-          {
-            type: (rec.type as string) ?? "whatsapp",
-            nombre: rec.nombre ?? null,
-          },
-        ];
-      })
-    );
+    if (chErr) {
+      console.warn("[fetchChatConversations] chat_channels:", chErr.message);
+    } else {
+      channelById = Object.fromEntries(
+        (chrows ?? []).map((r) => {
+          const rec = r as { id: string; type?: string | null; nombre?: string | null };
+          return [
+            rec.id,
+            {
+              type: (rec.type as string) ?? "whatsapp",
+              nombre: rec.nombre ?? null,
+            },
+          ];
+        })
+      );
+    }
   }
 
   const queueIds = [
@@ -172,10 +186,13 @@ export async function fetchChatConversations(
       .select("id, nombre")
       .eq("empresa_id", empresa_id)
       .in("id", queueIds);
-    if (qErr) throw new Error(qErr.message);
-    queueNombreById = Object.fromEntries(
-      (qrows ?? []).map((r) => [r.id as string, (r as { nombre?: string | null }).nombre ?? null])
-    );
+    if (qErr) {
+      console.warn("[fetchChatConversations] chat_queues:", qErr.message);
+    } else {
+      queueNombreById = Object.fromEntries(
+        (qrows ?? []).map((r) => [r.id as string, (r as { nombre?: string | null }).nombre ?? null])
+      );
+    }
   }
 
   let agentUsuarioById: Record<string, string> = {};
@@ -185,20 +202,36 @@ export async function fetchChatConversations(
       .select("id, usuario_id")
       .eq("empresa_id", empresa_id)
       .in("id", assignedAgentIds);
-    if (aErr) throw new Error(aErr.message);
-    agentUsuarioById = Object.fromEntries(
-      (arows ?? []).map((r) => [r.id as string, (r as { usuario_id: string }).usuario_id])
-    );
+    if (aErr) {
+      console.warn("[fetchChatConversations] chat_agents (enriquecido):", aErr.message);
+    } else {
+      agentUsuarioById = Object.fromEntries(
+        (arows ?? []).map((r) => [r.id as string, (r as { usuario_id: string }).usuario_id])
+      );
+    }
   }
 
-  const contactIds = [...new Set(list.map((c) => c.contact_id as string))];
-  const { data: contacts, error: e2 } = await supabase
-    .from("chat_contacts")
-    .select("id, name, phone_number, cliente_id, crm_prospecto_id")
-    .in("id", contactIds);
+  const contactIds = [
+    ...new Set(
+      list
+        .map((c) => (c.contact_id as string | null | undefined)?.trim())
+        .filter((x): x is string => Boolean(x && x.length > 0))
+    ),
+  ];
+  let byId: Record<string, Record<string, unknown>> = {};
+  if (contactIds.length > 0) {
+    const { data: contacts, error: e2 } = await supabase
+      .from("chat_contacts")
+      .select("id, name, phone_number, cliente_id, crm_prospecto_id")
+      .eq("empresa_id", empresa_id)
+      .in("id", contactIds);
 
-  if (e2) throw new Error(e2.message);
-  const byId = Object.fromEntries((contacts ?? []).map((c) => [c.id, c]));
+    if (e2) {
+      console.warn("[fetchChatConversations] chat_contacts:", e2.message);
+    } else {
+      byId = Object.fromEntries((contacts ?? []).map((c) => [c.id, c as Record<string, unknown>]));
+    }
+  }
 
   const agentUserIds = [
     ...new Set(
@@ -218,20 +251,25 @@ export async function fetchChatConversations(
       .from("usuarios")
       .select("id, nombre, email")
       .in("id", agentUserIds);
-    if (uErr) throw new Error(uErr.message);
-    usuarioNombreById = Object.fromEntries(
-      (urows ?? []).map((u) => [
-        u.id as string,
-        {
-          nombre: (u as { nombre?: string | null }).nombre ?? null,
-          email: (u as { email?: string | null }).email ?? null,
-        },
-      ])
-    );
+    if (uErr) {
+      console.warn("[fetchChatConversations] usuarios (catálogo):", uErr.message);
+    } else {
+      usuarioNombreById = Object.fromEntries(
+        (urows ?? []).map((u) => [
+          u.id as string,
+          {
+            nombre: (u as { nombre?: string | null }).nombre ?? null,
+            email: (u as { email?: string | null }).email ?? null,
+          },
+        ])
+      );
+    }
   }
 
   return list.map((row) => {
-    const c = byId[row.contact_id as string];
+    const c = byId[row.contact_id as string] as
+      | { id?: string; name?: string | null; phone_number?: string; cliente_id?: string | null; crm_prospecto_id?: string | null }
+      | undefined;
     const cid = (row.channel_id as string | null | undefined)?.trim() ?? "";
     const chMeta = cid ? channelById[cid] : undefined;
     const channelId = cid;
@@ -390,6 +428,8 @@ export type ChatChannelFormInput = {
   whatsapp_access_token?: string;
   /** Se guarda en `config.comprobante_validation` (validación de comprobantes WhatsApp). */
   comprobante_validation?: Record<string, unknown>;
+  /** Mensajes automáticos livianos en `config.business_automation` (no es chat_flows). */
+  business_automation?: Record<string, unknown>;
 };
 
 /** Crea o actualiza canal WhatsApp (Meta). Devuelve el id del canal. */
@@ -429,6 +469,9 @@ export async function saveChatChannel(input: ChatChannelFormInput): Promise<stri
 
   if (input.comprobante_validation !== undefined) {
     config.comprobante_validation = input.comprobante_validation;
+  }
+  if (input.business_automation !== undefined) {
+    config.business_automation = input.business_automation;
   }
 
   const base = {

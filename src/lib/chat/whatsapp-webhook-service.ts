@@ -22,6 +22,7 @@ import {
   syncWhatsappConversationFlowFromCatalog,
   WEBHOOK_IMMEDIATE_HANDOFF_BUTTON_IDS,
 } from "@/lib/chat/resolve-whatsapp-active-flow";
+import { runWhatsappBusinessAutomationAfterInbound } from "@/lib/chat/channel-business-automation-runtime";
 import { sendWhatsAppText } from "@/lib/chat/whatsapp-send-service";
 import { saveProspectoFromWebhook } from "@/lib/crm/storage";
 import type {
@@ -773,6 +774,21 @@ export async function processInboundWebhookValue(
             });
           }
         }
+      }
+
+      try {
+        await runWhatsappBusinessAutomationAfterInbound({
+          supabase,
+          empresaId,
+          channelId,
+          conversationId,
+          humanTakenOver: convHuman || convFlowStatus === "human",
+        });
+      } catch (e) {
+        console.warn(logW, "business_automation_failed", {
+          conversationId,
+          err: e instanceof Error ? e.message : String(e),
+        });
       }
 
       console.info(logW, "conversation_updated_unread", { conversationId });
