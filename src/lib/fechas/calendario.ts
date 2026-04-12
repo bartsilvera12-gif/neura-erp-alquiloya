@@ -23,6 +23,24 @@ export function hoyYmdLocal(d: Date = new Date()): string {
 }
 
 /**
+ * Mes calendario local que contiene `ref` (no usar cadenas tipo `YYYY-MM-31`).
+ * Equivalente a inicio = new Date(y, m, 1) y fin = new Date(y, m + 1, 0) con hora máxima en `hasta`.
+ */
+export function rangoMesCalendarioLocal(ref: Date = new Date()): { desde: Date; hasta: Date } {
+  const y = ref.getFullYear();
+  const m0 = ref.getMonth();
+  const desde = new Date(y, m0, 1, 0, 0, 0, 0);
+  const hasta = new Date(y, m0 + 1, 0, 23, 59, 59, 999);
+  return { desde, hasta };
+}
+
+/** Primer y último día del mes calendario local (YYYY-MM-DD). */
+export function ymdInicioFinMesLocal(ref: Date = new Date()): { inicioYmd: string; finYmd: string } {
+  const { desde, hasta } = rangoMesCalendarioLocal(ref);
+  return { inicioYmd: hoyYmdLocal(desde), finYmd: hoyYmdLocal(hasta) };
+}
+
+/**
  * Rango inclusivo en calendario local (misma idea que getRango + enRango en el dashboard).
  * Cadenas vacías = sin límite en ese extremo. Si ambas vacías, devuelve null (sin filtro).
  * Si solo una fecha, el otro extremo queda abierto (1970…2100).

@@ -3,6 +3,7 @@ import { getTenantSupabaseFromAuth } from "@/lib/supabase/tenant-api";
 import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { API_ERRORS } from "@/lib/api/errors";
+import { ymdInicioFinMesLocal } from "@/lib/fechas/calendario";
 
 type TableKey =
   | "clientes"
@@ -50,10 +51,7 @@ export async function GET(request: NextRequest) {
     const empresaId = auth.empresa_id;
 
     const now = new Date();
-    const anio = now.getFullYear();
-    const mes = now.getMonth() + 1;
-    const inicioMes = `${anio}-${String(mes).padStart(2, "0")}-01`;
-    const finMes = `${anio}-${String(mes).padStart(2, "0")}-31`;
+    const { inicioYmd: inicioMes, finYmd: finMes } = ymdInicioFinMesLocal(now);
 
     const includeDebug = request.nextUrl.searchParams.get("debug") === "1";
     const dataSchema = includeDebug ? await fetchDataSchemaForEmpresaId(empresaId) : null;

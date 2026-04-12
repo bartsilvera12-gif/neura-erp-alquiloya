@@ -1,5 +1,6 @@
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import { getEmpresaId } from "@/lib/db/empresa";
+import { ymdInicioFinMesLocal } from "@/lib/fechas/calendario";
 import { getBrowserSupabaseForEmpresaData } from "@/lib/supabase/browser-data-client";
 
 export type Gasto = {
@@ -67,8 +68,7 @@ export async function getGastos(): Promise<Gasto[]> {
 export async function getGastosMesActual(): Promise<Gasto[]> {
   const supabase = await getBrowserSupabaseForEmpresaData();
   const hoy = new Date();
-  const inicioMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-01`;
-  const finMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-31`;
+  const { inicioYmd: inicioMes, finYmd: finMes } = ymdInicioFinMesLocal(hoy);
 
   const { data, error } = await supabase
     .from("gastos")

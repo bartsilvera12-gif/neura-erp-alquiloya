@@ -3,40 +3,47 @@ import { getTenantSupabaseFromAuth } from "@/lib/supabase/tenant-api";
 import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { API_ERRORS } from "@/lib/api/errors";
-import { enRangoCalendario, toCalendarDateStr } from "@/lib/fechas/calendario";
+import { enRangoCalendario, rangoMesCalendarioLocal, toCalendarDateStr } from "@/lib/fechas/calendario";
 import { esFacturaAnulada } from "@/lib/dashboard/data";
 
 type Periodo = "hoy" | "7d" | "30d" | "mes" | "anio";
 
 function rangoPeriodo(periodo: Periodo): { desde: Date; hasta: Date } {
-  const hasta = new Date();
-  hasta.setHours(23, 59, 59, 999);
-  const desde = new Date();
+  const ahora = new Date();
   switch (periodo) {
-    case "hoy":
+    case "mes":
+      return rangoMesCalendarioLocal(ahora);
+    case "hoy": {
+      const desde = new Date(ahora);
       desde.setHours(0, 0, 0, 0);
-      break;
-    case "7d":
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      return { desde, hasta };
+    }
+    case "7d": {
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      const desde = new Date(ahora);
       desde.setDate(desde.getDate() - 7);
       desde.setHours(0, 0, 0, 0);
-      break;
-    case "30d":
+      return { desde, hasta };
+    }
+    case "30d": {
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      const desde = new Date(ahora);
       desde.setDate(desde.getDate() - 30);
       desde.setHours(0, 0, 0, 0);
-      break;
-    case "mes":
-      desde.setDate(1);
-      desde.setHours(0, 0, 0, 0);
-      break;
-    case "anio":
-      desde.setMonth(0, 1);
-      desde.setHours(0, 0, 0, 0);
-      break;
+      return { desde, hasta };
+    }
+    case "anio": {
+      const desde = new Date(ahora.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const hasta = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { desde, hasta };
+    }
     default:
-      desde.setDate(1);
-      desde.setHours(0, 0, 0, 0);
+      return rangoMesCalendarioLocal(ahora);
   }
-  return { desde, hasta };
 }
 
 function toNum(v: unknown): number {

@@ -20,7 +20,12 @@ import {
   type GastoRaw,
   type SuscripcionDashRow,
 } from "@/lib/dashboard/data";
-import { enRangoCalendario, enMesCalendarioActual, toCalendarDateStr } from "@/lib/fechas/calendario";
+import {
+  enRangoCalendario,
+  enMesCalendarioActual,
+  rangoMesCalendarioLocal,
+  toCalendarDateStr,
+} from "@/lib/fechas/calendario";
 
 // ── ZENTRA (solo dashboard / esta página) ─────────────────────────────────────
 const Z = {
@@ -92,16 +97,41 @@ function formatFecha(s: string): string {
 }
 
 function getRango(periodo: Periodo): { desde: Date; hasta: Date } {
-  const hasta = new Date(); hasta.setHours(23, 59, 59, 999);
-  const desde = new Date();
+  const ahora = new Date();
   switch (periodo) {
-    case "hoy":  desde.setHours(0, 0, 0, 0); break;
-    case "7d":   desde.setDate(desde.getDate() - 7); desde.setHours(0,0,0,0); break;
-    case "30d":  desde.setDate(desde.getDate() - 30); desde.setHours(0,0,0,0); break;
-    case "mes":  desde.setDate(1); desde.setHours(0,0,0,0); break;
-    case "anio": desde.setMonth(0,1); desde.setHours(0,0,0,0); break;
+    case "mes":
+      return rangoMesCalendarioLocal(ahora);
+    case "hoy": {
+      const desde = new Date(ahora);
+      desde.setHours(0, 0, 0, 0);
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      return { desde, hasta };
+    }
+    case "7d": {
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      const desde = new Date(ahora);
+      desde.setDate(desde.getDate() - 7);
+      desde.setHours(0, 0, 0, 0);
+      return { desde, hasta };
+    }
+    case "30d": {
+      const hasta = new Date(ahora);
+      hasta.setHours(23, 59, 59, 999);
+      const desde = new Date(ahora);
+      desde.setDate(desde.getDate() - 30);
+      desde.setHours(0, 0, 0, 0);
+      return { desde, hasta };
+    }
+    case "anio": {
+      const desde = new Date(ahora.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const hasta = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { desde, hasta };
+    }
+    default:
+      return rangoMesCalendarioLocal(ahora);
   }
-  return { desde, hasta };
 }
 
 /** Fecha pura YYYY-MM-DD: comparación calendario (sin UTC). ISO con hora: rango por instante. */
