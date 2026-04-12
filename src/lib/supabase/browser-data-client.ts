@@ -40,7 +40,15 @@ export async function getBrowserSupabaseForEmpresaData(): Promise<AppSupabaseCli
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error("No se pudo resolver el schema de datos de la empresa");
+    const text = await res.text().catch(() => "");
+    let detail = `${res.status}`;
+    try {
+      const j = JSON.parse(text) as { error?: string; code?: string };
+      if (j?.error) detail = `${res.status} ${j.code ?? ""}: ${j.error}`.trim();
+    } catch {
+      if (text) detail = `${res.status}: ${text.slice(0, 200)}`;
+    }
+    throw new Error(`No se pudo resolver el schema de datos de la empresa (${detail})`);
   }
   const body = (await res.json()) as { schema?: string };
   const schema = resolveEmpresaDataSchema(body.schema);

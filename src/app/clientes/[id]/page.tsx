@@ -7,7 +7,6 @@ import {
   addNotaCliente,
   clienteNombre,
   getCliente,
-  getNotasCliente,
   toggleEstado,
   updateCliente,
 } from "@/lib/clientes/storage";
@@ -207,7 +206,9 @@ export default function ClienteDetailPage() {
         if (process.env.NODE_ENV === "development") console.warn("[cliente detalle] getCliente null", { id });
         return;
       }
-      c.notas = await getNotasCliente(id);
+      // `notas` ya vienen en la fila desde GET /api/clientes/[id] (select *). Evitar
+      // getNotasCliente() aquí: usa getBrowserSupabaseForEmpresaData → /api/empresas/data-schema
+      // y si ese endpoint fallaba (p. ej. RLS en empresas) la ficha quedaba en error aunque el cliente existiera.
       setCliente(c);
       setForm({
         tipo_cliente:        c.tipo_cliente,

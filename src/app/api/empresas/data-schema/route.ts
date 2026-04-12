@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveApiAuthContext } from "@/lib/middleware/api-auth-context";
-import { SUPABASE_APP_SCHEMA, resolveEmpresaDataSchema } from "@/lib/supabase/schema";
+import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
+import { SUPABASE_APP_SCHEMA } from "@/lib/supabase/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -19,21 +20,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ schema: SUPABASE_APP_SCHEMA });
   }
 
-  const { data: erows, error: eErr } = await r.ctx.userScopedSupabase
-    .from("empresas")
-    .select("data_schema")
-    .eq("id", r.ctx.empresa_id)
-    .limit(1);
-
-  if (eErr) {
-    return NextResponse.json(
-      { error: "No se pudo leer configuración de empresa", code: "empresas_fetch_error" },
-      { status: 502 }
-    );
-  }
-
-  const raw = (erows?.[0] as { data_schema?: string | null } | undefined)?.data_schema;
-  const schema = resolveEmpresaDataSchema(raw);
+  /**
+   * Lectura con service role (misma fuente que `createServiceRoleClientForEmpresa`), no con
+   * `userScopedSupabase`: en producción RLS sobre `empresas` puede devolver 502 y rompe el
+   * cliente browser (`getBrowserSupabaseForEmpresaData`) en toda la app.
+   */
+  const schema = await fetchDataSchemaForEmpresaId(r.ctx.empresa_id);
 
   return NextResponse.json({ schema });
 }
