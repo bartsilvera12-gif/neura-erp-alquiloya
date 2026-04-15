@@ -1,8 +1,18 @@
 "use server";
 
 import { requireEmpresaTenantServiceRole } from "@/lib/chat/empresa-tenant-service-role";
+import {
+  appendOmnicanalConversationScopeToQuery,
+  filterConversationIdsByOmnicanalScope,
+  getOmnicanalScope,
+  resolveQueueIdsForUsuarios,
+  shouldBypassOmnicanalConversationScope,
+} from "@/lib/chat/omnicanal-scope";
 import { insertChatRoutingEvent, updateContactLastRouted } from "@/lib/chat/routing-audit";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+
+/** Fila imposible para forzar 0 resultados en consultas `in`/count cuando el alcance no admite filas. */
+const OMNICANAL_NO_MATCH_UUID = "00000000-0000-0000-0000-000000000001";
 
 const STATUSES = new Set(["open", "pending", "closed"]);
 const PRIORITIES = new Set(["low", "medium", "high"]);
@@ -257,13 +267,36 @@ export type ChatQueueListRow = {
 };
 
 export async function listChatQueues(): Promise<ChatQueueListRow[]> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
-  const { data, error } = await supabase
+  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+
+  let q = supabase
     .from("chat_queues")
     .select("id, nombre, is_active, channel_type, descripcion, distribution_strategy, priority")
     .eq("empresa_id", empresa_id)
     .order("priority", { ascending: false })
     .order("nombre", { ascending: true });
+
+  if (!bypass) {
+    if (scope.role === "supervisor") {
+      const extra = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      const union = [...new Set([...scope.queueIds, ...extra])];
+      if (union.length > 0) {
+        q = q.in("id", union);
+      } else {
+        return [];
+      }
+    } else if (scope.agentUsuarioIds.length > 0) {
+      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      if (qids.length === 0) return [];
+      q = q.in("id", qids);
+    } else {
+      return [];
+    }
+  }
+
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []) as ChatQueueListRow[];
 }
@@ -307,58 +340,108 @@ export type MonitoringUnassignedRow = {
 };
 
 export async function fetchMonitoringDashboard(): Promise<MonitoringDashboard> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
 
-  const [
-    queuesRes,
-    agentsRes,
-    unassignedRes,
-    pendingRes,
-    channelsRes,
-    recentRes,
-    awaitingFirstRes,
-    reassignRes,
-  ] = await Promise.all([
-    supabase.from("chat_queues").select("id", { count: "exact", head: true }).eq("empresa_id", empresa_id).eq("is_active", true),
-    supabase
-      .from("chat_agents")
-      .select("usuario_id")
-      .eq("empresa_id", empresa_id)
-      .eq("is_active", true),
-    supabase
-      .from("chat_conversations")
-      .select("*", { count: "exact", head: true })
-      .eq("empresa_id", empresa_id)
-      .is("assigned_agent_id", null)
-      .in("status", ["open", "pending"]),
-    supabase
-      .from("chat_conversations")
-      .select("*", { count: "exact", head: true })
-      .eq("empresa_id", empresa_id)
-      .eq("status", "pending"),
+  let queuesCountQ = supabase
+    .from("chat_queues")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", empresa_id)
+    .eq("is_active", true);
+  if (!bypass) {
+    if (scope.role === "supervisor") {
+      const extra = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      const union = [...new Set([...scope.queueIds, ...extra])];
+      if (union.length > 0) {
+        queuesCountQ = queuesCountQ.in("id", union);
+      } else {
+        queuesCountQ = queuesCountQ.eq("id", OMNICANAL_NO_MATCH_UUID);
+      }
+    } else if (scope.agentUsuarioIds.length > 0) {
+      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      if (qids.length > 0) {
+        queuesCountQ = queuesCountQ.in("id", qids);
+      } else {
+        queuesCountQ = queuesCountQ.eq("id", OMNICANAL_NO_MATCH_UUID);
+      }
+    } else {
+      queuesCountQ = queuesCountQ.eq("id", OMNICANAL_NO_MATCH_UUID);
+    }
+  }
+
+  let agentsCountQ = supabase
+    .from("chat_agents")
+    .select("usuario_id")
+    .eq("empresa_id", empresa_id)
+    .eq("is_active", true);
+  if (!bypass) {
+    if (scope.agentUsuarioIds.length > 0) {
+      agentsCountQ = agentsCountQ.in("usuario_id", scope.agentUsuarioIds);
+    } else {
+      agentsCountQ = agentsCountQ.eq("id", OMNICANAL_NO_MATCH_UUID);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scopedConv = async (q: any): Promise<any> => {
+    if (bypass) return q;
+    return appendOmnicanalConversationScopeToQuery(supabase, empresa_id, scope, q);
+  };
+
+  const [queuesRes, agentsRes] = await Promise.all([queuesCountQ, agentsCountQ]);
+
+  const [unassignedRes, pendingRes, channelsRes, recentRes, awaitingFirstRes, reassignRes] = await Promise.all([
+    (async () => {
+      let q = supabase
+        .from("chat_conversations")
+        .select("*", { count: "exact", head: true })
+        .eq("empresa_id", empresa_id)
+        .is("assigned_agent_id", null)
+        .in("status", ["open", "pending"]);
+      q = await scopedConv(q);
+      return await q;
+    })(),
+    (async () => {
+      let q = supabase
+        .from("chat_conversations")
+        .select("*", { count: "exact", head: true })
+        .eq("empresa_id", empresa_id)
+        .eq("status", "pending");
+      q = await scopedConv(q);
+      return await q;
+    })(),
     supabase
       .from("chat_channels")
       .select("*", { count: "exact", head: true })
       .eq("empresa_id", empresa_id)
       .eq("activo", true)
       .eq("config_status", "active"),
-    supabase
-      .from("chat_conversations")
-      .select(
-        "id, status, last_message_at, created_at, queue_id, channel_id, contact_id, assigned_agent_id"
-      )
-      .eq("empresa_id", empresa_id)
-      .is("assigned_agent_id", null)
-      .in("status", ["open", "pending"])
-      .order("last_message_at", { ascending: false, nullsFirst: false })
-      .limit(30),
-    supabase
-      .from("chat_conversations")
-      .select("*", { count: "exact", head: true })
-      .eq("empresa_id", empresa_id)
-      .not("assigned_agent_id", "is", null)
-      .is("first_human_response_at", null)
-      .in("status", ["open", "pending"]),
+    (async () => {
+      let q = supabase
+        .from("chat_conversations")
+        .select(
+          "id, status, last_message_at, created_at, queue_id, channel_id, contact_id, assigned_agent_id"
+        )
+        .eq("empresa_id", empresa_id)
+        .is("assigned_agent_id", null)
+        .in("status", ["open", "pending"])
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(30);
+      q = await scopedConv(q);
+      return await q;
+    })(),
+    (async () => {
+      let q = supabase
+        .from("chat_conversations")
+        .select("*", { count: "exact", head: true })
+        .eq("empresa_id", empresa_id)
+        .not("assigned_agent_id", "is", null)
+        .is("first_human_response_at", null)
+        .in("status", ["open", "pending"]);
+      q = await scopedConv(q);
+      return await q;
+    })(),
     supabase
       .from("chat_routing_events")
       .select("id, created_at, conversation_id, queue_id, payload")
@@ -379,7 +462,7 @@ export async function fetchMonitoringDashboard(): Promise<MonitoringDashboard> {
   const agentRows = agentsRes.data ?? [];
   const distinctUsers = new Set(agentRows.map((r) => r.usuario_id as string).filter(Boolean));
 
-  const convList = recentRes.data ?? [];
+  let convList = recentRes.data ?? [];
   const queueIds = [...new Set(convList.map((c) => (c.queue_id as string | null)?.trim()).filter(Boolean))] as string[];
   const channelIds = [...new Set(convList.map((c) => (c.channel_id as string | null)?.trim()).filter(Boolean))] as string[];
   const contactIds = [...new Set(convList.map((c) => (c.contact_id as string | null)?.trim()).filter(Boolean))] as string[];
@@ -437,13 +520,24 @@ export async function fetchMonitoringDashboard(): Promise<MonitoringDashboard> {
 
   let recent_initial_reassignments: MonitoringReassignmentRow[] = [];
   if (!reassignRes.error && reassignRes.data) {
-    recent_initial_reassignments = (reassignRes.data as Record<string, unknown>[]).map((r) => ({
-      id: r.id as string,
-      created_at: (r.created_at as string) ?? "",
-      conversation_id: r.conversation_id as string,
-      queue_id: (r.queue_id as string | null) ?? null,
-      payload: (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>,
-    }));
+    const rawRows = reassignRes.data as Record<string, unknown>[];
+    const convIds = rawRows.map((r) => String(r.conversation_id ?? "").trim()).filter(Boolean);
+    const visible = await filterConversationIdsByOmnicanalScope(
+      supabase,
+      catalogSr,
+      empresa_id,
+      usuario_id,
+      convIds
+    );
+    recent_initial_reassignments = rawRows
+      .filter((r) => visible.has(String(r.conversation_id ?? "").trim()))
+      .map((r) => ({
+        id: r.id as string,
+        created_at: (r.created_at as string) ?? "",
+        conversation_id: r.conversation_id as string,
+        queue_id: (r.queue_id as string | null) ?? null,
+        payload: (typeof r.payload === "object" && r.payload !== null ? r.payload : {}) as Record<string, unknown>,
+      }));
   }
 
   const unassigned_recent: MonitoringUnassignedRow[] = convList.map((row) => {
@@ -496,13 +590,26 @@ export type ChatAgentDirectoryRow = {
 
 /** Agentes con nombre para reasignación y vistas de supervisor. */
 export async function listChatAgentsDirectory(): Promise<ChatAgentDirectoryRow[]> {
-  const { supabase, catalogSr, empresa_id } = await requireEmpresaTenantServiceRole();
-  const { data, error } = await supabase
+  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+
+  let aq = supabase
     .from("chat_agents")
     .select("id, queue_id, is_online, max_conversations, usuario_id")
     .eq("empresa_id", empresa_id)
     .eq("is_active", true)
     .order("queue_id", { ascending: true });
+
+  if (!bypass) {
+    if (scope.agentUsuarioIds.length > 0) {
+      aq = aq.in("usuario_id", scope.agentUsuarioIds);
+    } else {
+      aq = aq.eq("id", OMNICANAL_NO_MATCH_UUID);
+    }
+  }
+
+  const { data, error } = await aq;
 
   if (error) throw new Error(error.message);
 
@@ -569,17 +676,26 @@ export type SupervisorAgentLoadRow = ChatAgentDirectoryRow & {
 };
 
 export async function fetchSupervisorAgentLoads(): Promise<SupervisorAgentLoadRow[]> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
   const agents = await listChatAgentsDirectory();
   if (agents.length === 0) return [];
 
   const agentIds = agents.map((a) => a.id);
-  const { data: counts, error } = await supabase
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+
+  let cq = supabase
     .from("chat_conversations")
     .select("assigned_agent_id, first_human_response_at, status")
     .eq("empresa_id", empresa_id)
     .in("assigned_agent_id", agentIds)
     .neq("status", "closed");
+
+  if (!bypass) {
+    cq = await appendOmnicanalConversationScopeToQuery(supabase, empresa_id, scope, cq);
+  }
+
+  const { data: counts, error } = await cq;
 
   if (error) throw new Error(error.message);
 
@@ -604,13 +720,22 @@ export async function fetchSupervisorAgentLoads(): Promise<SupervisorAgentLoadRo
 }
 
 export async function countUnassignedOpenConversations(): Promise<number> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
-  const { count, error } = await supabase
+  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+
+  let q = supabase
     .from("chat_conversations")
     .select("*", { count: "exact", head: true })
     .eq("empresa_id", empresa_id)
     .is("assigned_agent_id", null)
     .in("status", ["open", "pending"]);
+
+  if (!bypass) {
+    q = await appendOmnicanalConversationScopeToQuery(supabase, empresa_id, scope, q);
+  }
+
+  const { count, error } = await q;
 
   if (error) throw new Error(error.message);
   return count ?? 0;

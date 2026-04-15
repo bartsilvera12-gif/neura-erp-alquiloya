@@ -56,7 +56,7 @@ async function usuarioTieneFilaChatAgents(
  * - **sin rol** pero con fila en `chat_agents`: `role` null, `agentUsuarioIds = [usuarioId]` (vista mínima tipo operador).
  * - **sin rol** y sin `chat_agents`: todo vacío y `role` null.
  *
- * No aplica filtros a inbox/historial/monitoreo/finalizadas; solo datos para el siguiente paso.
+ * El filtrado en consultas lo aplican los módulos (inbox, monitoreo, etc.); historial/finalizadas pueden ignorar este scope.
  */
 export async function getOmnicanalScope(
   supabase: AppSupabaseClient,
@@ -96,4 +96,120 @@ export async function getOmnicanalScope(
   }
 
   return { role: null, queueIds: [], agentUsuarioIds: [] };
+}
+
+/** Rol operativo admin omnicanal = sin restricción por listas de colas/agentes. */
+export function isOmnicanalAdminScope(scope: OmnicanalScope): boolean {
+  return scope.role === "admin";
+}
+
+/**
+ * Admin ERP (`admin`, `administrador`, `super_admin`) sin rol operativo omnicanal:
+ * no se restringe por colas/agentes (compatibilidad con quien gestiona pero no está en `chat_empresa_operator_roles`).
+ */
+export async function shouldBypassOmnicanalConversationScope(
+  catalogSr: AppSupabaseClient,
+  usuarioId: string,
+  scope: OmnicanalScope
+): Promise<boolean> {
+  if (isOmnicanalAdminScope(scope)) return true;
+  const uid = normalizeId(usuarioId);
+  if (!uid) return false;
+  const { data, error } = await catalogSr.from("usuarios").select("rol").eq("id", uid).maybeSingle();
+  if (error || !data) return false;
+  const r = String((data as { rol?: string | null }).rol ?? "")
+    .trim()
+    .toLowerCase();
+  return r === "admin" || r === "administrador" || r === "super_admin";
+}
+
+/** Resuelve `chat_agents.id` para los `usuario_id` indicados (misma empresa). */
+export async function resolveChatAgentIdsForUsuarios(
+  supabase: AppSupabaseClient,
+  empresaId: string,
+  usuarioIds: string[]
+): Promise<string[]> {
+  const ids = [...new Set(usuarioIds.map((x) => normalizeId(x)).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from("chat_agents")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .in("usuario_id", ids)
+    .eq("is_active", true);
+  if (error) throw new Error(error.message);
+  return [...new Set((data ?? []).map((r) => String((r as { id?: string }).id ?? "").trim()).filter(Boolean))];
+}
+
+/** Colas (`chat_queues.id`) en las que participan los usuarios agentes dados. */
+export async function resolveQueueIdsForUsuarios(
+  supabase: AppSupabaseClient,
+  empresaId: string,
+  usuarioIds: string[]
+): Promise<string[]> {
+  const ids = [...new Set(usuarioIds.map((x) => normalizeId(x)).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from("chat_agents")
+    .select("queue_id")
+    .eq("empresa_id", empresaId)
+    .in("usuario_id", ids)
+    .eq("is_active", true);
+  if (error) throw new Error(error.message);
+  return [...new Set((data ?? []).map((r) => String((r as { queue_id?: string }).queue_id ?? "").trim()).filter(Boolean))];
+}
+
+const NO_CONVERSATION_MATCH = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Restringe un query builder de `chat_conversations` al alcance omnicanal.
+ * No aplicar si `shouldBypassOmnicanalConversationScope` es true.
+ * Admin operativo (`role === admin`) no debe llamar esta función (no-op si se llama).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function appendOmnicanalConversationScopeToQuery(
+  supabase: AppSupabaseClient,
+  empresaId: string,
+  scope: OmnicanalScope,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  q: any
+): Promise<any> {
+  if (isOmnicanalAdminScope(scope)) return q;
+
+  const agentFkIds = await resolveChatAgentIdsForUsuarios(supabase, empresaId, scope.agentUsuarioIds);
+  const queueIds = scope.queueIds ?? [];
+
+  if (queueIds.length === 0 && agentFkIds.length === 0) {
+    return q.eq("id", NO_CONVERSATION_MATCH);
+  }
+  if (queueIds.length > 0 && agentFkIds.length > 0) {
+    return q.or(`queue_id.in.(${queueIds.join(",")}),assigned_agent_id.in.(${agentFkIds.join(",")})`);
+  }
+  if (queueIds.length > 0) {
+    return q.in("queue_id", queueIds);
+  }
+  return q.in("assigned_agent_id", agentFkIds);
+}
+
+/** Filtra ids de conversación que caen dentro del alcance (misma lógica que el append). */
+export async function filterConversationIdsByOmnicanalScope(
+  supabase: AppSupabaseClient,
+  catalogSr: AppSupabaseClient,
+  empresaId: string,
+  usuarioId: string,
+  conversationIds: string[]
+): Promise<Set<string>> {
+  const ids = [...new Set(conversationIds.map((x) => normalizeId(x)).filter(Boolean))];
+  if (ids.length === 0) return new Set();
+
+  const scope = await getOmnicanalScope(supabase, empresaId, usuarioId);
+  if (await shouldBypassOmnicanalConversationScope(catalogSr, usuarioId, scope)) {
+    return new Set(ids);
+  }
+
+  let q = supabase.from("chat_conversations").select("id").eq("empresa_id", empresaId).in("id", ids);
+  q = await appendOmnicanalConversationScopeToQuery(supabase, empresaId, scope, q);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((r) => String((r as { id?: string }).id ?? "").trim()).filter(Boolean));
 }

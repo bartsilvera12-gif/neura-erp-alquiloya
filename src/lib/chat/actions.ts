@@ -12,6 +12,11 @@ import {
 } from "@/lib/chat/comprobante-validation-types";
 import { requireEmpresaTenantServiceRole } from "@/lib/chat/empresa-tenant-service-role";
 import {
+  appendOmnicanalConversationScopeToQuery,
+  getOmnicanalScope,
+  shouldBypassOmnicanalConversationScope,
+} from "@/lib/chat/omnicanal-scope";
+import {
   deleteOmnichannelRouteByMetaPhone,
   syncOmnichannelRouteForWhatsappChannel,
 } from "@/lib/chat/omnichannel-route-sync";
@@ -115,6 +120,14 @@ export async function fetchChatConversations(
       .not("active_flow_session_id", "is", null);
   } else if (vista === "historial") {
     q = q.eq("status", "closed");
+  }
+
+  if (vista !== "historial") {
+    const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+    const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+    if (!bypass) {
+      q = await appendOmnicanalConversationScopeToQuery(supabase, empresa_id, scope, q);
+    }
   }
 
   const assignment = filters?.assignment ?? "all";
