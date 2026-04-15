@@ -36,11 +36,7 @@ import {
   getMetaInboundDocumentFilename,
   isImageMimeHint,
 } from "@/lib/chat/message-erp-display";
-import {
-  playInboxNotificationBeep,
-  readInboxNotificationSoundEnabled,
-  writeInboxNotificationSoundEnabled,
-} from "@/lib/chat/inbox-notification-preference";
+import { playInboxNotificationBeep, readInboxNotificationSoundEnabled } from "@/lib/chat/inbox-notification-preference";
 import { createBrowserClientForSchema } from "@/lib/supabase";
 import { ChannelBadge } from "@/components/chat/ChannelBadge";
 
@@ -205,6 +201,8 @@ export function ConversacionesClient({
   const [botFlowsChecked, setBotFlowsChecked] = useState(false);
   const [compValidacionesOpen, setCompValidacionesOpen] = useState(false);
   const [listColumnHidden, setListColumnHidden] = useState(false);
+  /** Filtro local del listado (nombre o teléfono); no altera la carga desde servidor. */
+  const [listSearch, setListSearch] = useState("");
 
   const inboxFilterKey = searchParams?.toString() ?? "";
 
@@ -218,12 +216,6 @@ export function ConversacionesClient({
   const inboxSoundPrimedRef = useRef(false);
   /** Dedupe de ids de mensaje entrante ya notificados con sonido. */
   const inboundSoundMsgIdsRef = useRef<Set<string>>(new Set());
-
-  const [inboxSoundEnabled, setInboxSoundEnabled] = useState(false);
-
-  useEffect(() => {
-    setInboxSoundEnabled(readInboxNotificationSoundEnabled());
-  }, []);
 
   const loadConversations = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -244,24 +236,6 @@ export function ConversacionesClient({
       }
     },
     [vista, inboxFilterKey]
-  );
-
-  const patchInboxQuery = useCallback(
-    (patch: Record<string, string | null | undefined>) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === null || v === undefined || v === "" || v === "all") {
-          params.delete(k);
-        } else {
-          params.set(k, v);
-        }
-      }
-      const base =
-        mode === "historial" ? "/dashboard/historial-omnicanal" : "/dashboard/conversaciones";
-      const qs = params.toString();
-      router.push(qs ? `${base}?${qs}` : base);
-    },
-    [mode, router, searchParams]
   );
 
   const loadMessages = useCallback(async (conversationId: string, opts?: { silent?: boolean }) => {
@@ -604,20 +578,25 @@ export function ConversacionesClient({
     }
   }
 
+  const visibleConversations = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    if (!q) return conversations;
+    const qDigits = q.replace(/\D/g, "");
+    return conversations.filter((c) => {
+      const name = (c.contact.name || "").toLowerCase();
+      const phone = String(c.contact.phone_number || "");
+      const phoneDigits = phone.replace(/\D/g, "");
+      if (name.includes(q)) return true;
+      if (phone.toLowerCase().includes(q)) return true;
+      if (qDigits.length > 0 && phoneDigits.includes(qDigits)) return true;
+      return false;
+    });
+  }, [conversations, listSearch]);
+
   const selected = conversations.find((c) => c.id === selectedId);
   const isHumanActive =
     !!selected && (selected.human_taken_over || selected.flow_status === "human");
   const requestedConversationId = searchParams?.get("conversationId") ?? null;
-
-  const asignacionSel =
-    searchParams?.get("asignacion") === "mios"
-      ? "mios"
-      : searchParams?.get("asignacion") === "sin_asignar"
-        ? "sin_asignar"
-        : "all";
-  const colaSel = searchParams?.get("cola") ?? "";
-  const estadoSel = searchParams?.get("estado") ?? "";
-  const prioridadSel = searchParams?.get("prioridad") ?? "";
 
   useEffect(() => {
     if (!requestedConversationId || !conversations.length) return;
@@ -680,79 +659,27 @@ export function ConversacionesClient({
       </div>
 
       {mode === "inbox" ? (
-        <div className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-100/80 p-1 w-fit shrink-0">
-          <button type="button" className={tabClass(vista === "inbox")} onClick={() => setVista("inbox")}>
-            Inbox
-          </button>
-          {hasActiveBotFlows ? (
-            <button type="button" className={tabClass(vista === "bot")} onClick={() => setVista("bot")}>
-              Bot
+        <div className="flex flex-wrap items-stretch gap-2 shrink-0 min-w-0">
+          <div className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-100/80 p-1 w-fit shrink-0 self-center">
+            <button type="button" className={tabClass(vista === "inbox")} onClick={() => setVista("inbox")}>
+              Inbox
             </button>
-          ) : null}
+            {hasActiveBotFlows ? (
+              <button type="button" className={tabClass(vista === "bot")} onClick={() => setVista("bot")}>
+                Bot
+              </button>
+            ) : null}
+          </div>
+          <input
+            type="search"
+            value={listSearch}
+            onChange={(e) => setListSearch(e.target.value)}
+            placeholder="Buscar por nombre o número"
+            className="flex-1 min-w-[12rem] border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 bg-white placeholder:text-slate-400 outline-none focus:ring-1 focus:ring-sky-400/40 focus:border-sky-300"
+            aria-label="Buscar por nombre o número"
+          />
         </div>
       ) : null}
-
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] shrink-0">
-        <span className="font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Filtros</span>
-        <select
-          className="border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-700 max-w-[160px]"
-          value={asignacionSel}
-          onChange={(e) => patchInboxQuery({ asignacion: e.target.value })}
-          aria-label="Asignación"
-        >
-          <option value="all">Todas</option>
-          <option value="mios">Mis conversaciones</option>
-          <option value="sin_asignar">Sin asignar</option>
-        </select>
-        <select
-          className="border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-700 max-w-[160px]"
-          value={colaSel}
-          onChange={(e) => patchInboxQuery({ cola: e.target.value || null })}
-          aria-label="Cola"
-        >
-          <option value="">Todas las colas</option>
-          {opsQueues.filter((q) => q.is_active).map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          className="border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-700 max-w-[140px]"
-          value={estadoSel}
-          onChange={(e) => patchInboxQuery({ estado: e.target.value || null })}
-          aria-label="Estado"
-        >
-          <option value="">Todos los estados</option>
-          <option value="open">Abierta</option>
-          <option value="pending">Pendiente</option>
-          <option value="closed">Cerrada</option>
-        </select>
-        <select
-          className="border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-700 max-w-[130px]"
-          value={prioridadSel}
-          onChange={(e) => patchInboxQuery({ prioridad: e.target.value || null })}
-          aria-label="Prioridad"
-        >
-          <option value="">Todas</option>
-          <option value="low">Prioridad baja</option>
-          <option value="medium">Prioridad media</option>
-          <option value="high">Prioridad alta</option>
-        </select>
-        <label className="inline-flex items-center gap-1.5 text-slate-600 cursor-pointer select-none shrink-0">
-          <input
-            type="checkbox"
-            className="rounded border-slate-300"
-            checked={inboxSoundEnabled}
-            onChange={(e) => {
-              const v = e.target.checked;
-              setInboxSoundEnabled(v);
-              writeInboxNotificationSoundEnabled(v);
-            }}
-          />
-          <span className="font-medium text-slate-600">Sonido al recibir mensajes</span>
-        </label>
-      </div>
 
       {hasActiveChannel === false && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg px-2 py-2 shrink-0">
@@ -788,8 +715,12 @@ export function ConversacionesClient({
               <div className="p-4 text-xs text-slate-500 text-center space-y-1">
                 <p>No hay conversaciones aún</p>
               </div>
+            ) : visibleConversations.length === 0 ? (
+              <div className="p-4 text-xs text-slate-500 text-center space-y-1">
+                <p>Ningún chat coincide con la búsqueda</p>
+              </div>
             ) : (
-              conversations.map((c) => (
+              visibleConversations.map((c) => (
                 <button
                   key={c.id}
                   type="button"
