@@ -28,6 +28,7 @@ import {
 } from "@/lib/chat/resolve-whatsapp-active-flow";
 import { runWhatsappBusinessAutomationAfterInbound } from "@/lib/chat/channel-business-automation-runtime";
 import { sendWhatsAppText } from "@/lib/chat/whatsapp-send-service";
+import { ensureWhatsappInboundCrmLeadPg } from "@/lib/crm/whatsapp-inbound-lead-pg";
 import { ensureWhatsappInboundCrmProspecto } from "@/lib/crm/whatsapp-inbound-lead";
 import type {
   MetaInboundMessage,
@@ -37,7 +38,11 @@ import type {
 } from "@/lib/chat/types";
 import { normalizeWaPhone } from "@/lib/chat/wa-phone";
 import { applySorteoReferralToActiveSession } from "@/lib/sorteos/referral-attribution";
-import { createServiceRoleClientWithDbSchema } from "@/lib/supabase/empresa-data-schema";
+import {
+  createServiceRoleClientWithDbSchema,
+  fetchDataSchemaForEmpresaId,
+} from "@/lib/supabase/empresa-data-schema";
+import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { SUPABASE_APP_SCHEMA, resolveEmpresaDataSchema } from "@/lib/supabase/schema";
 
 export { normalizeWaPhone } from "@/lib/chat/wa-phone";
@@ -654,17 +659,34 @@ export async function processInboundWebhookValue(
       if (!arCrm.ok) {
         console.warn("[webhook/whatsapp][crm] assignConversation", arCrm.error);
       }
-      const crmRes = await ensureWhatsappInboundCrmProspecto({
-        chatSupabase: supabase,
-        etapaSupabase: catalogSupabase,
-        empresaId,
-        contactId,
-        conversationId,
-        channelId,
-        firstMessagePreview: preview,
-      });
-      if (!crmRes.ok) {
-        errors.push(crmRes.error);
+      const pool = getChatPostgresPool();
+      if (pool) {
+        const ds = await fetchDataSchemaForEmpresaId(empresaId);
+        const crmPg = await ensureWhatsappInboundCrmLeadPg({
+          pool,
+          data_schema: ds,
+          empresa_id: empresaId,
+          contact_id: contactId,
+          conversation_id: conversationId,
+          channel_id: channelId,
+          first_message_preview: preview,
+        });
+        if (!crmPg.ok) {
+          errors.push(crmPg.error);
+        }
+      } else {
+        const crmRes = await ensureWhatsappInboundCrmProspecto({
+          chatSupabase: supabase,
+          etapaSupabase: catalogSupabase,
+          empresaId,
+          contactId,
+          conversationId,
+          channelId,
+          firstMessagePreview: preview,
+        });
+        if (!crmRes.ok) {
+          errors.push(crmRes.error);
+        }
       }
 
       const flowEngine = createFlowEngine({ supabase });
