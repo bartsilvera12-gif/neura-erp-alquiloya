@@ -5,6 +5,7 @@ import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
 import { isBootstrapSuperAdminEmail } from "@/lib/auth/super-admin-bootstrap-email";
 import { NextResponse } from "next/server";
 import { esRolAdminEmpresa } from "@/lib/modulos/resolve-effective-modules";
+import { ensureOmnicanalDashboardEmpresaModulos } from "@/lib/empresas/ensure-omnicanal-dashboard-empresa-modulos";
 
 export async function GET(
   _req: Request,
@@ -151,7 +152,22 @@ export async function PATCH(
         }
       }
 
-      const allowed = new Set(modulo_ids);
+      const ensured = await ensureOmnicanalDashboardEmpresaModulos(supabase, id);
+      if (!ensured.ok) {
+        return NextResponse.json(
+          { error: `Módulos omnicanal: ${ensured.error}` },
+          { status: 400 }
+        );
+      }
+
+      const { data: emActive } = await supabase
+        .from("empresa_modulos")
+        .select("modulo_id")
+        .eq("empresa_id", id)
+        .eq("activo", true);
+      const allowed = new Set(
+        (emActive ?? []).map((r) => String((r as { modulo_id: string }).modulo_id)).filter(Boolean)
+      );
       const { data: userRows } = await supabase.from("usuarios").select("id").eq("empresa_id", id);
       const uids = (userRows ?? []).map((r) => r.id as string);
       if (uids.length > 0) {

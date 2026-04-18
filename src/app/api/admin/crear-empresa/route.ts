@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
 import { supabaseServiceRoleClientOptions } from "@/lib/supabase/schema";
+import { ensureOmnicanalDashboardEmpresaModulos } from "@/lib/empresas/ensure-omnicanal-dashboard-empresa-modulos";
 import { NextResponse } from "next/server";
 
 function mensajeErrorCrearUsuarioAuth(msg: string): string {
@@ -202,6 +203,12 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+    }
+
+    const ensured = await ensureOmnicanalDashboardEmpresaModulos(supabase, empresaId as string);
+    if (!ensured.ok) {
+      await cleanupFailure(supabase);
+      return NextResponse.json({ error: ensured.error }, { status: 400 });
     }
 
     return NextResponse.json({
