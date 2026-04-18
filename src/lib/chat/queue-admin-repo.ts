@@ -1,4 +1,5 @@
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { isErpRolSupervisor, isErpRolUsuario } from "@/lib/usuarios/erp-rol-normalize";
 
 const DISTRIBUTION = new Set(["round_robin", "least_load", "manual_pull"]);
 
@@ -394,18 +395,20 @@ function mapUsuarioPickRows(data: unknown[]): UsuarioPickRow[] {
 }
 
 /**
- * Equipos y supervisión: solo perfiles ERP `usuarios.rol = supervisor` (catálogo).
+ * Equipos y supervisión: perfiles ERP supervisor (comparación normalizada: heredados con distinto casing).
  */
 export async function repoListSupervisoresForEquiposPick(ctx: QueueAdminTenantContext): Promise<UsuarioPickRow[]> {
   const { data, error } = await ctx.catalogSr
     .from("usuarios")
-    .select("id, nombre, email")
+    .select("id, nombre, email, rol")
     .eq("empresa_id", ctx.empresa_id)
     .eq("estado", "activo")
-    .eq("rol", "supervisor")
     .order("nombre", { ascending: true });
   if (error) throw new Error(error.message);
-  return mapUsuarioPickRows(data ?? []);
+  const filtered = (data ?? []).filter((row) =>
+    isErpRolSupervisor((row as { rol?: string | null }).rol)
+  );
+  return mapUsuarioPickRows(filtered);
 }
 
 /**
@@ -429,14 +432,14 @@ export async function repoListAgentesForEquiposPick(ctx: QueueAdminTenantContext
 
   const { data, error } = await ctx.catalogSr
     .from("usuarios")
-    .select("id, nombre, email")
+    .select("id, nombre, email, rol")
     .eq("empresa_id", ctx.empresa_id)
     .eq("estado", "activo")
-    .eq("rol", "usuario")
     .in("id", usuarioIds)
     .order("nombre", { ascending: true });
   if (error) throw new Error(error.message);
-  return mapUsuarioPickRows(data ?? []);
+  const filtered = (data ?? []).filter((row) => isErpRolUsuario((row as { rol?: string | null }).rol));
+  return mapUsuarioPickRows(filtered);
 }
 
 export async function repoListQueueClosureTaxonomy(

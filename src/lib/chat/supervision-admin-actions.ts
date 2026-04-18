@@ -2,15 +2,12 @@
 
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
 import { requireEmpresaTenantServiceRole } from "@/lib/chat/empresa-tenant-service-role";
+import { isErpRolSupervisor, isErpRolUsuario } from "@/lib/usuarios/erp-rol-normalize";
 import {
   getOmnicanalScope,
   isOmnicanalAdminScope,
   shouldBypassOmnicanalConversationScope,
 } from "@/lib/chat/omnicanal-scope";
-
-function normalizeErpRol(rol: string | null | undefined): string {
-  return (rol ?? "").trim().toLowerCase();
-}
 
 async function validateSupervisorErpProfile(
   catalogSr: AppSupabaseClient,
@@ -25,7 +22,7 @@ async function validateSupervisorErpProfile(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Supervisor no encontrado en la empresa.");
-  if (normalizeErpRol((data as { rol?: string }).rol) !== "supervisor") {
+  if (!isErpRolSupervisor((data as { rol?: string }).rol)) {
     throw new Error("Solo usuarios con perfil Supervisor en el ERP pueden ser supervisores.");
   }
 }
@@ -44,7 +41,7 @@ async function validateAgentErpProfileAndQueue(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Agente no encontrado en la empresa.");
-  if (normalizeErpRol((data as { rol?: string }).rol) !== "usuario") {
+  if (!isErpRolUsuario((data as { rol?: string }).rol)) {
     throw new Error("Solo usuarios con perfil Usuario en el ERP pueden ser agentes en esta relación.");
   }
 
