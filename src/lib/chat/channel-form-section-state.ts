@@ -71,6 +71,11 @@ export function parseFormSectionStateFromChannelConfig(config: unknown): Channel
     out.quick_replies = { active: qrLegacyEnabled, expanded: false };
   }
 
+  /** Inactivo ⇒ nunca persistir “expandido” (evita panel 1fr + hueco tras recargar). */
+  if (!out.quick_replies.active) {
+    out.quick_replies = { ...out.quick_replies, expanded: false };
+  }
+
   return out;
 }
 

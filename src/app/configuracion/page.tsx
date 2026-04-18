@@ -1,8 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  BarChart3,
+  FileText,
+  GitBranch,
+  Inbox,
+  LayoutGrid,
+  MessageCircle,
+  Receipt,
+  SlidersHorizontal,
+  UsersRound,
+} from "lucide-react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import MontoInput from "@/components/ui/MontoInput";
 import { getConfig, saveConfig, resetConfig } from "@/lib/config/storage";
 import { getCurrentUser } from "@/lib/auth";
@@ -40,10 +50,63 @@ function HelpText({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{children}</p>;
 }
 
-function tabLinkClass(active: boolean) {
-  return `flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
-    active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-  }`;
+type ConfigModuleCardProps = {
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+  badge?: string;
+  disabled?: boolean;
+  href?: string;
+  onSelect?: () => void;
+};
+
+function ConfigModuleCard({
+  title,
+  description,
+  icon: Icon,
+  badge,
+  disabled,
+  href,
+  onSelect,
+}: ConfigModuleCardProps) {
+  const inner = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-50 to-white text-sky-600 ring-1 ring-sky-100/90">
+          <Icon className="h-5 w-5" aria-hidden />
+        </div>
+        {badge ? (
+          <span className="shrink-0 rounded-full border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-3 min-w-0">
+        <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed line-clamp-3">{description}</p>
+      </div>
+      <p className="mt-4 text-xs font-semibold text-[#0EA5E9] transition-colors group-hover:text-[#0284C7]">
+        {href && !disabled ? "Abrir módulo →" : disabled ? "Contratá omnicanal para habilitar" : "Editar aquí →"}
+      </p>
+    </>
+  );
+
+  const shell =
+    "group flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm outline-none transition-all hover:border-sky-200/90 hover:shadow-md focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2";
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={`${shell} hover:-translate-y-px`}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" disabled={disabled} onClick={onSelect} className={`${shell} disabled:cursor-not-allowed disabled:opacity-55`}>
+      {inner}
+    </button>
+  );
 }
 
 function MetricCard({
@@ -61,7 +124,7 @@ function MetricCard({
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ConfiguracionPage() {
-  const pathname = usePathname() ?? "";
+  const detailPanelRef = useRef<HTMLDivElement>(null);
   const [tab,       setTab]       = useState<Tab>("facturacion");
   const [config,    setConfig]    = useState<ConfigGlobal | null>(null);
   const [success,   setSuccess]   = useState(false);
@@ -109,6 +172,13 @@ export default function ConfiguracionPage() {
   useEffect(() => {
     if (tab === "crm") getEtapasParaConfig().then(setEtapasCrm);
   }, [tab]);
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   useEffect(() => {
     const cfg = getConfig();
@@ -178,18 +248,20 @@ export default function ConfiguracionPage() {
     return <div className="flex items-center justify-center py-24 text-sm text-gray-400">Cargando configuración…</div>;
   }
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "facturacion",  label: "Facturación",           icon: "🧾" },
-    { id: "politicas",    label: "Políticas del sistema",  icon: "📋" },
-    { id: "preferencias", label: "Preferencias",           icon: "⚙️" },
-    { id: "metricas",     label: "Métricas",               icon: "🎯" },
-    { id: "crm",          label: "Configuración CRM",      icon: "📊" },
+  const INTERNAL_TABS: { id: Tab; label: string }[] = [
+    { id: "facturacion", label: "Facturación" },
+    { id: "politicas", label: "Políticas del sistema" },
+    { id: "preferencias", label: "Preferencias" },
+    { id: "metricas", label: "Métricas" },
+    { id: "crm", label: "Configuración CRM" },
   ];
 
   const facturaPreview = `${form.prefijo_factura}${String(form.numeracion_inicial).padStart(6, "0")}`;
 
+  const omnicanalBadge = hasConversacionesModulo ? "Activo" : "No habilitado";
+
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-10 max-w-6xl pb-10">
 
       {/* Encabezado */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -222,47 +294,119 @@ export default function ConfiguracionPage() {
         </div>
       )}
 
-      {/* Tabs + accesos omnicanal (rutas dedicadas) */}
-      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 w-fit max-w-full">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
-              tab === t.id
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}>
-            <span>{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
-        {hasConversacionesModulo && (
-          <>
-            <Link
-              href="/configuracion/canales"
-              className={tabLinkClass(pathname.startsWith("/configuracion/canales"))}
-            >
-              <span>💬</span>
-              Canales y comunicación
-            </Link>
-            <Link
-              href="/configuracion/colas"
-              className={tabLinkClass(pathname.startsWith("/configuracion/colas"))}
-            >
-              <span>📥</span>
-              Colas y enrutamiento
-            </Link>
-            <Link
-              href="/configuracion/conversaciones/flujos"
-              className={tabLinkClass(pathname.startsWith("/configuracion/conversaciones/flujos"))}
-            >
-              <span>🔀</span>
-              Flujos conversacionales
-            </Link>
-          </>
-        )}
-      </div>
+      <section aria-label="Accesos a módulos" className="space-y-4">
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Centro de configuración</h2>
+          <p className="mt-1 text-sm text-slate-600 max-w-2xl">
+            Navegación por áreas globales del ERP y accesos rápidos al omnicanal. Las tarjetas internas abren el editor en esta misma página.
+          </p>
+        </div>
+        <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
+          <li>
+            <ConfigModuleCard
+              title="Facturación"
+              description="Numeración, condiciones de pago y acceso a SIFEN / facturación electrónica."
+              icon={Receipt}
+              onSelect={() => selectTab("facturacion")}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Políticas del sistema"
+              description="Descuentos máximos, retención de clientes y límites por empresa."
+              icon={FileText}
+              onSelect={() => selectTab("politicas")}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Preferencias"
+              description="Moneda base, zona horaria, idioma y formato de fecha."
+              icon={SlidersHorizontal}
+              onSelect={() => selectTab("preferencias")}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Métricas"
+              description="Metas comerciales y financieras para tableros y seguimiento."
+              icon={BarChart3}
+              onSelect={() => selectTab("metricas")}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Configuración CRM"
+              description="Etapas del pipeline y columnas del embudo por empresa."
+              icon={LayoutGrid}
+              onSelect={() => selectTab("crm")}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Canales y comunicación"
+              description="WhatsApp, redes y email: credenciales y estado de conexión."
+              icon={MessageCircle}
+              badge={omnicanalBadge}
+              href={hasConversacionesModulo ? "/configuracion/canales" : undefined}
+              disabled={!hasConversacionesModulo}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Colas y enrutamiento"
+              description="Reglas de asignación y prioridad de conversaciones entrantes."
+              icon={Inbox}
+              badge={omnicanalBadge}
+              href={hasConversacionesModulo ? "/configuracion/colas" : undefined}
+              disabled={!hasConversacionesModulo}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Flujos conversacionales"
+              description="Automatizaciones del hilo conversacional y ramas por canal."
+              icon={GitBranch}
+              badge={omnicanalBadge}
+              href={hasConversacionesModulo ? "/configuracion/conversaciones/flujos" : undefined}
+              disabled={!hasConversacionesModulo}
+            />
+          </li>
+          <li>
+            <ConfigModuleCard
+              title="Equipos y supervisión"
+              description="Relaciones supervisor → agente para monitoreo y reporting operativo."
+              icon={UsersRound}
+              badge={omnicanalBadge}
+              href={hasConversacionesModulo ? "/configuracion/omnicanal-equipos" : undefined}
+              disabled={!hasConversacionesModulo}
+            />
+          </li>
+        </ul>
+      </section>
 
       {/* ── Formulario ──────────────────────────────────────────────── */}
+      <section ref={detailPanelRef} id="config-detalle" className="scroll-mt-8 space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Editor en esta página</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {INTERNAL_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => selectTab(t.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  tab === t.id
+                    ? "bg-[#0EA5E9] text-white shadow-sm"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
       <div className="space-y-5">
 
         {/* ══ TAB: FACTURACIÓN ══════════════════════════════════════ */}
@@ -774,6 +918,7 @@ export default function ConfiguracionPage() {
         </div>
 
       </div>
+      </section>
     </div>
   );
 }

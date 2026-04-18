@@ -508,14 +508,18 @@ export function WhatsAppChannelForm({
               description="Plantillas reutilizables que los asesores insertan desde Conversaciones con el ícono de rayo."
               active={sectionUi.quick_replies.active}
               expanded={sectionUi.quick_replies.expanded}
-              onActiveChange={(v) => patchSection("quick_replies", { active: v })}
-              onExpandedChange={(v) => patchSection("quick_replies", { expanded: v })}
+              hideBodyWhenInactive
+              onActiveChange={(v) =>
+                patchSection("quick_replies", v ? { active: true } : { active: false, expanded: false })
+              }
+              onExpandedChange={(v) => {
+                if (!sectionUi.quick_replies.active) return;
+                patchSection("quick_replies", { expanded: v });
+              }}
             >
-              <ChannelQuickRepliesEditor
-                channelId={channelId.trim()}
-                disabled={!sectionUi.quick_replies.active}
-                hideIntro
-              />
+              {sectionUi.quick_replies.active && sectionUi.quick_replies.expanded ? (
+                <ChannelQuickRepliesEditor channelId={channelId.trim()} disabled={false} hideIntro />
+              ) : null}
             </ConfigCollapsibleSection>
           ) : null}
         </div>
