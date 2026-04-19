@@ -18,7 +18,8 @@ export interface LineaVenta {
 
 /** Cabecera de venta: condiciones comerciales + totales consolidados. */
 export interface Venta {
-  id:             number;
+  /** UUID en base de datos (antes del bloque DB-first era numérico local). */
+  id:             string;
   numero_control: string;   // VTA-000001, VTA-000002, …
 
   items: LineaVenta[];       // 1 o más productos

@@ -105,6 +105,11 @@ function MetricCard({
 /** Muestra el primer producto de la venta y un badge con el resto. */
 function ResumenProductos({ v }: { v: Venta }) {
   const primero = v.items[0];
+  if (!primero) {
+    return (
+      <span className="text-xs text-gray-400">Sin líneas cargadas</span>
+    );
+  }
   const extra   = v.items.length - 1;
   return (
     <div className="flex flex-col gap-0.5">
@@ -139,8 +144,19 @@ export default function VentasPage() {
   const [filtroIva,  setFiltroIva]  = useState<TipoIvaVenta | "">("");
 
   useEffect(() => {
-    const data = getVentas();
-    setTodas([...data].sort((a, b) => b.id - a.id));
+    let cancelled = false;
+    getVentas().then((data) => {
+      if (cancelled) return;
+      const ordenadas = [...data].sort((a, b) => {
+        const ta = new Date(a.fecha).getTime();
+        const tb = new Date(b.fecha).getTime();
+        return tb - ta || b.numero_control.localeCompare(a.numero_control);
+      });
+      setTodas(ordenadas);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const metricas = calcularMetricas(todas);
