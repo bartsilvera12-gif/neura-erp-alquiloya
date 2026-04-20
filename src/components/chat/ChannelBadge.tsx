@@ -11,9 +11,10 @@ const LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
 };
 
-export function channelTypeLabel(type: string): string {
-  const k = type.trim().toLowerCase();
-  return LABELS[k] ?? type;
+export function channelTypeLabel(type: string | null | undefined): string {
+  const raw = typeof type === "string" ? type : "";
+  const k = raw.trim().toLowerCase();
+  return LABELS[k] ?? (raw.trim() || "Canal");
 }
 
 export function ChannelBadge({
@@ -21,11 +22,12 @@ export function ChannelBadge({
   nombre,
   className = "",
 }: {
-  type: string;
+  type: string | null | undefined;
   nombre: string | null;
   className?: string;
 }) {
-  const t = type.trim().toLowerCase();
+  const raw = typeof type === "string" ? type : type != null ? String(type) : "";
+  const t = raw.trim().toLowerCase() || "whatsapp";
   const label = nombre?.trim() || channelTypeLabel(t);
   const iconClass = "h-3.5 w-3.5 shrink-0 opacity-90";
   let icon: ReactNode;

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChannelBadge, channelTypeLabel } from "@/components/chat/ChannelBadge";
 import { OmnichannelChannelCard } from "@/components/chat/OmnichannelChannelCard";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { normalizeChannelType } from "@/lib/chat/channel-type-utils";
 import { fetchChatChannels, type ChatChannelRow } from "@/lib/chat/actions";
 import { OMNICHANNEL_CARD_DEFINITIONS } from "@/lib/chat/omnichannel-catalog";
 
@@ -47,8 +48,13 @@ export function CanalesHubInner() {
           setAllowed(false);
           return;
         }
-        const body = (await res.json()) as { superAdmin?: boolean; slugs?: string[] };
-        setAllowed(hasOmnichannelFromModuleAccess(body));
+        try {
+          const body = (await res.json()) as { superAdmin?: boolean; slugs?: unknown };
+          const slugs = Array.isArray(body.slugs) ? body.slugs.filter((s): s is string => typeof s === "string") : [];
+          setAllowed(hasOmnichannelFromModuleAccess({ superAdmin: body.superAdmin, slugs }));
+        } catch {
+          setAllowed(false);
+        }
       })
       .catch(() => setAllowed(false));
   }, []);
@@ -59,7 +65,7 @@ export function CanalesHubInner() {
 
   const filteredRows = useMemo(() => {
     if (!tipoFiltro) return [];
-    return rows.filter((r) => r.type.trim().toLowerCase() === tipoFiltro);
+    return rows.filter((r) => normalizeChannelType(r.type) === tipoFiltro);
   }, [rows, tipoFiltro]);
 
   if (allowed === null) {

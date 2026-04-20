@@ -8,6 +8,7 @@ import { GenericOmnichannelChannelForm } from "@/components/chat/GenericOmnichan
 import { ChannelQuickRepliesStandaloneBlock } from "@/components/chat/ChannelQuickRepliesStandaloneBlock";
 import { WhatsAppChannelForm } from "@/components/chat/WhatsAppChannelForm";
 import { OMNICHANNEL_CARD_DEFINITIONS } from "@/lib/chat/omnichannel-catalog";
+import { normalizeChannelType } from "@/lib/chat/channel-type-utils";
 import {
   deleteChatChannel,
   fetchChatChannelById,
@@ -107,7 +108,7 @@ export default function EditarCanalPage() {
     );
   }
 
-  const type = row.type.trim().toLowerCase();
+  const type = normalizeChannelType(row.type);
   const isWhatsapp = type === "whatsapp";
   const providerNorm = String(row.provider ?? "meta").trim().toLowerCase();
   const isYcloud = isWhatsapp && providerNorm === "ycloud";

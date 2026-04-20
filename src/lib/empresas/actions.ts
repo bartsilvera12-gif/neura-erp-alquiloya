@@ -59,7 +59,12 @@ export async function getMisModulos(): Promise<ModuloEmpresa[]> {
     if (res.status === 401) return [];
     throw new Error("Error al cargar módulos");
   }
-  return res.json();
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) {
+    console.error("[getMisModulos] respuesta no es un array:", data);
+    throw new Error("Respuesta inválida del servidor al cargar módulos.");
+  }
+  return data as ModuloEmpresa[];
 }
 
 /** Obtiene todos los módulos de la tabla modulos (para super_admin). */

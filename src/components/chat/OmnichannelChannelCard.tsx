@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { OmnichannelCardDefinition } from "@/lib/chat/omnichannel-catalog";
+import { normalizeChannelType } from "@/lib/chat/channel-type-utils";
 import type { ChatChannelRow } from "@/lib/chat/actions";
 
 export type ChannelCardUiStatus = "inactive" | "incomplete" | "active";
@@ -23,7 +24,8 @@ function badgeLabel(status: ChannelCardUiStatus): string {
 }
 
 function resolveRowsForType(rows: ChatChannelRow[], type: string): ChatChannelRow[] {
-  return rows.filter((r) => r.type.trim().toLowerCase() === type);
+  const want = type.trim().toLowerCase();
+  return rows.filter((r) => normalizeChannelType(r.type) === want);
 }
 
 export function resolveCardUiStatus(rows: ChatChannelRow[]): ChannelCardUiStatus {

@@ -25,6 +25,7 @@ import {
   syncOmnichannelRouteForWhatsappChannel,
 } from "@/lib/chat/omnichannel-route-sync";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { normalizeChannelType } from "@/lib/chat/channel-type-utils";
 
 export type ConversacionesVista = "inbox" | "bot" | "historial";
 
@@ -706,7 +707,7 @@ function mapChatChannelRow(r: Record<string, unknown>): ChatChannelRow {
   return {
     id: r.id as string,
     empresa_id: r.empresa_id as string,
-    type: (r.type as string) ?? "whatsapp",
+    type: normalizeChannelType(r.type),
     meta_phone_number_id: typeof mp === "string" ? mp : mp != null ? String(mp) : null,
     nombre: (r.nombre as string) ?? null,
     provider: (r.provider as string) ?? "meta",
