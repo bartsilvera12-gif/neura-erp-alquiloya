@@ -32,19 +32,33 @@ export async function GET(
     let options: Array<Record<string, unknown>> = [];
     let blocks: Array<Record<string, unknown>> = [];
     if (ids.length) {
-      const { data: opts } = await supabase
+      const { data: opts, error: optsErr } = await supabase
         .from("chat_flow_options")
         .select("id, node_id, label, option_value, meta_button_id, next_node_code, sort_order, option_payload")
         .in("node_id", ids)
         .order("sort_order", { ascending: true });
+      if (optsErr) {
+        console.error("[api/chat/flows/:flowCode/nodes][GET] chat_flow_options:", optsErr.message);
+        return NextResponse.json({ ok: false, error: `Opciones del flujo: ${optsErr.message}` }, { status: 400 });
+      }
       options = (opts ?? []) as Array<Record<string, unknown>>;
-      const { data: blks } = await supabase
+      const { data: blks, error: blksErr } = await supabase
         .from("chat_flow_node_blocks")
         .select("id, node_id, block_type, content_text, media_url, sort_order, created_at")
         .eq("empresa_id", auth.empresa_id)
         .in("node_id", ids)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
+      if (blksErr) {
+        console.error("[api/chat/flows/:flowCode/nodes][GET] chat_flow_node_blocks:", blksErr.message);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Bloques del flujo (revisá que exista la tabla en el schema de la empresa): ${blksErr.message}`,
+          },
+          { status: 400 }
+        );
+      }
       blocks = (blks ?? []) as Array<Record<string, unknown>>;
     }
 
