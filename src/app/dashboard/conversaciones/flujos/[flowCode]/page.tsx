@@ -1075,89 +1075,11 @@ export default function FlowEditorPage() {
                 </div>
               )}
 
-              <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                Este paso va a → <span className="font-medium text-slate-800">{nextStepLabel(node.next_node_code)}</span>
-              </div>
-              <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                Llega desde →{" "}
-                <span className="font-medium text-slate-800">
-                  {getIncomingLabels(node.node_code).length
-                    ? getIncomingLabels(node.node_code).join(" · ")
-                    : "Nodo inicial o sin referencias previas"}
-                </span>
-              </div>
-
-              <div className="border border-slate-100 rounded-lg p-3 bg-slate-50/60 text-xs text-slate-600">
-                {node.node_type === "media" ? (
-                  (() => {
-                    const mediaBlock = getImageBlock(node);
-                    const mediaUrl = mediaBlock?.media_url?.trim() ?? "";
-                    const caption = mediaBlock?.content_text?.trim() ?? "";
-                    return (
-                      <div className="space-y-2">
-                        <div className="font-semibold uppercase text-[11px] text-slate-500">Vista previa del mensaje</div>
-                        {mediaUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={mediaUrl} alt="Preview media" className="max-h-36 rounded border border-slate-200 bg-white" />
-                        ) : (
-                          <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                            Falta URL de imagen.
-                          </div>
-                        )}
-                        <div>{caption || "Sin texto opcional"}</div>
-                        <div className="text-[11px] text-slate-500">
-                          WhatsApp enviará una sola burbuja con imagen y texto opcional debajo.
-                        </div>
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div>
-                    <div className="font-semibold uppercase text-[11px] text-slate-500 mb-1">Vista previa del mensaje</div>
-                    {getTextPreview(node)}
-                  </div>
-                )}
-              </div>
-
-              <details className="border border-slate-100 rounded-lg p-3 bg-slate-50/60">
-                <summary className="text-sm font-medium text-slate-700 cursor-pointer">Opciones avanzadas</summary>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Guardar respuesta como</label>
-                    <input
-                      className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full"
-                      placeholder={
-                        node.node_type === "image_input"
-                          ? "ej: comprobante_pago (URL pública de la imagen)"
-                          : "ej: nombre, cedula, ciudad"
-                      }
-                      value={node.save_as_field ?? ""}
-                      onChange={(e) =>
-                        setNodes((prev) =>
-                          prev.map((n) =>
-                            n.id === node.id ? { ...n, save_as_field: e.target.value || null } : n
-                          )
-                        )
-                      }
-                    />
-                    {node.node_type === "image_input" && (
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Opcional pero recomendado: sin nombre de campo no se guarda en datos del flujo (el avance al siguiente paso igual ocurre).
-                      </p>
-                    )}
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs text-slate-500 mb-1">Acción en CRM (opcional)</label>
-                    <input className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full" placeholder="ej: create_lead, move_funnel_stage, assign_advisor" value={node.crm_action_type ?? ""} onChange={(e) => setNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, crm_action_type: e.target.value || null } : n))} />
-                  </div>
-                </div>
-              </details>
-
               {node.node_type === "media" && (
-                <div className="border border-fuchsia-100 rounded-lg p-3 space-y-3 bg-fuchsia-50/40">
-                  <div className="text-xs font-semibold text-fuchsia-700 uppercase">Mensaje con imagen</div>
+                <div className="border border-fuchsia-100 rounded-lg p-4 space-y-3 bg-white shadow-sm ring-1 ring-fuchsia-100/80">
+                  <div className="text-sm font-semibold text-fuchsia-800">Mensaje con imagen</div>
                   <p className="text-xs text-slate-600">
-                    WhatsApp enviará una sola burbuja con imagen y texto opcional debajo.
+                    WhatsApp envía una sola burbuja: imagen arriba y texto opcional debajo (caption).
                   </p>
                   {getImageBlock(node) ? (
                     (() => {
@@ -1280,7 +1202,7 @@ export default function FlowEditorPage() {
                   ) : (
                     <button
                       type="button"
-                      className="text-xs text-[#0EA5E9] hover:underline"
+                      className="inline-flex items-center rounded-lg bg-[#0EA5E9] px-4 py-2 text-sm font-medium text-white hover:bg-[#0284C7]"
                       onClick={async () => {
                         try {
                           await createBlock(node, "image");
@@ -1290,11 +1212,99 @@ export default function FlowEditorPage() {
                         }
                       }}
                     >
-                      + Configurar mensaje con imagen
+                      Configurar imagen y texto
                     </button>
                   )}
                 </div>
               )}
+
+              <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                Este paso va a → <span className="font-medium text-slate-800">{nextStepLabel(node.next_node_code)}</span>
+              </div>
+              <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                Llega desde →{" "}
+                <span className="font-medium text-slate-800">
+                  {getIncomingLabels(node.node_code).length
+                    ? getIncomingLabels(node.node_code).join(" · ")
+                    : "Nodo inicial o sin referencias previas"}
+                </span>
+              </div>
+
+              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/80 text-sm text-slate-700">
+                {node.node_type === "media" ? (
+                  (() => {
+                    const mediaBlock = getImageBlock(node);
+                    const mediaUrl = mediaBlock?.media_url?.trim() ?? "";
+                    const validUrl = Boolean(mediaUrl && isValidHttpUrl(mediaUrl));
+                    const caption = mediaBlock?.content_text?.trim() ?? "";
+                    return (
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                          Vista previa (como en WhatsApp)
+                        </div>
+                        {validUrl ? (
+                          <div className="space-y-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={mediaUrl}
+                              alt="Vista previa"
+                              className="max-h-40 w-auto rounded-lg border border-slate-200 bg-white shadow-sm"
+                            />
+                            <p className="text-sm text-slate-800 whitespace-pre-wrap">
+                              {caption || "Sin texto bajo la imagen"}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-lg px-3 py-3 bg-white/80">
+                            {mediaBlock
+                              ? "Pegá o subí una imagen con URL https válida en el recuadro de arriba para ver la previsualización."
+                              : "Usá el botón «Configurar imagen y texto» y luego la URL o el archivo: la vista previa se actualiza con lo mismo que se envía al guardar el paso."}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Vista previa del mensaje</div>
+                    {getTextPreview(node)}
+                  </div>
+                )}
+              </div>
+
+              <details className="border border-slate-100 rounded-lg p-3 bg-slate-50/60">
+                <summary className="text-sm font-medium text-slate-700 cursor-pointer">Opciones avanzadas</summary>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Guardar respuesta como</label>
+                    <input
+                      className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full"
+                      placeholder={
+                        node.node_type === "image_input"
+                          ? "ej: comprobante_pago (URL pública de la imagen)"
+                          : "ej: nombre, cedula, ciudad"
+                      }
+                      value={node.save_as_field ?? ""}
+                      onChange={(e) =>
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === node.id ? { ...n, save_as_field: e.target.value || null } : n
+                          )
+                        )
+                      }
+                    />
+                    {node.node_type === "image_input" && (
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Opcional pero recomendado: sin nombre de campo no se guarda en datos del flujo (el avance al siguiente paso igual ocurre).
+                      </p>
+                    )}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-slate-500 mb-1">Acción en CRM (opcional)</label>
+                    <input className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full" placeholder="ej: create_lead, move_funnel_stage, assign_advisor" value={node.crm_action_type ?? ""} onChange={(e) => setNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, crm_action_type: e.target.value || null } : n))} />
+                  </div>
+                </div>
+              </details>
 
               {node.node_type !== "media" && (
               <div className="border border-slate-100 rounded-lg p-3 space-y-3 bg-slate-50/60">
