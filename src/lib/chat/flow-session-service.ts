@@ -45,7 +45,18 @@ export async function insertActiveFlowSessionRow(
     .select("id")
     .single();
   if (error || !data) {
-    console.error("[flow-session] insert_failed", { conversationId, message: error?.message });
+    console.error("[flow-runtime]", "chat_flow_sessions_insert_failed", {
+      conversationId,
+      empresaId,
+      flowCode: fc,
+      message: error?.message,
+      code: (error as { code?: string })?.code,
+      hint:
+        typeof error?.message === "string" &&
+        error.message.includes("chat_flow_sessions_conversation_id_fkey")
+          ? "FK conversation_id suele apuntar a zentra_erp en lugar del chat_conversations tenant; migración 20260422100000"
+          : undefined,
+    });
     return null;
   }
   return (data as { id: string }).id;
