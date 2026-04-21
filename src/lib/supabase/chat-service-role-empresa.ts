@@ -27,5 +27,12 @@ export async function getChatServiceClientForEmpresa(empresaId: string): Promise
       rpcDelegate: catalog as AppSupabaseClient,
     }) as unknown as AppSupabaseClient;
   }
+  if (!pool && isLikelyUnexposedTenantChatSchema(schema)) {
+    console.warn(LOG, "tenant_sin_pool_usando_postgrest", {
+      empresa_id: empresaId,
+      data_schema: schema,
+      hint: "Definir SUPABASE_DB_URL o DIRECT_URL para shim/PG directo",
+    });
+  }
   return createServiceRoleClientForEmpresa(empresaId);
 }

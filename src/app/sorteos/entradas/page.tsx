@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { fetchSorteoEntradasServer } from "@/lib/sorteos/server-queries";
 
+/** Listado usa pool PG en tenants erp_*; forzar runtime Node (no Edge). */
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function formatGs(n: number) {
