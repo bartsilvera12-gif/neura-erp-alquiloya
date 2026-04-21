@@ -1,3 +1,4 @@
+import { resolveApiAuthContext } from "@/lib/middleware/api-auth-context";
 import { createSupabaseServerClient, createSupabaseServerClientWithDbSchema } from "@/lib/supabase/server";
 import { SUPABASE_APP_SCHEMA, resolveEmpresaDataSchema } from "@/lib/supabase/schema";
 
@@ -37,19 +38,13 @@ export async function createSupabaseServerClientForEmpresaData() {
   return createSupabaseServerClientWithDbSchema(schema);
 }
 
-/** `empresa_id` del usuario autenticado (catálogo `usuarios`). */
+/**
+ * `empresa_id` del usuario autenticado.
+ * Misma resolución que `/api/*` (`resolveApiAuthContext`): JWT por cookies, `usuarios` por
+ * `auth_user_id` y variantes de email con service role — no solo `eq("email", ...)`.
+ */
 export async function getEmpresaIdForCurrentUserServer(): Promise<string | null> {
-  const catalog = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await catalog.auth.getUser();
-  if (!user?.email) return null;
-
-  const { data: urows } = await catalog
-    .from("usuarios")
-    .select("empresa_id")
-    .eq("email", user.email)
-    .limit(1);
-
-  return (urows?.[0] as { empresa_id?: string } | undefined)?.empresa_id ?? null;
+  const r = await resolveApiAuthContext(undefined);
+  if (!r.ok || !r.ctx.empresa_id) return null;
+  return r.ctx.empresa_id;
 }
