@@ -1,4 +1,12 @@
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import {
+  pgFetchAgentsForSupervisorUsuarioIds,
+  pgFetchOperatorRole,
+  pgFetchQueueIdsForSupervisorUsuario,
+} from "@/lib/chat/omnicanal-supervision-pg";
+import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
+import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
+import { isInvalidPostgrestSchemaError } from "@/lib/chat/postgrest-schema-error";
 
 export type OmnicanalOperatorRole = "admin" | "supervisor" | "agente";
 
@@ -40,8 +48,15 @@ function asRole(raw: string | null | undefined): OmnicanalOperatorRole | null {
 export async function fetchOmnicanalOperatorRole(
   supabase: AppSupabaseClient,
   empresaId: string,
-  usuarioId: string
+  usuarioId: string,
+  tenantDataSchema?: string
 ): Promise<OmnicanalOperatorRole | null> {
+  const pool = getChatPostgresPool();
+  if (pool && tenantDataSchema && isLikelyUnexposedTenantChatSchema(tenantDataSchema)) {
+    const raw = await pgFetchOperatorRole(pool, tenantDataSchema, empresaId, usuarioId);
+    return asRole(raw);
+  }
+
   const { data, error } = await supabase
     .from("chat_empresa_operator_roles")
     .select("role")
@@ -50,7 +65,7 @@ export async function fetchOmnicanalOperatorRole(
     .maybeSingle();
 
   if (error) {
-    if (isMissingSupervisionTable(error)) return null;
+    if (isMissingSupervisionTable(error) || isInvalidPostgrestSchemaError(error.message)) return null;
     console.warn("[fetchOmnicanalOperatorRole] error no fatal, se asume sin rol:", error.message);
     return null;
   }
@@ -86,8 +101,14 @@ export async function fetchQueueSupervisorUsuarioIds(
 export async function fetchQueueIdsForSupervisorUsuario(
   supabase: AppSupabaseClient,
   empresaId: string,
-  supervisorUsuarioId: string
+  supervisorUsuarioId: string,
+  tenantDataSchema?: string
 ): Promise<string[]> {
+  const pool = getChatPostgresPool();
+  if (pool && tenantDataSchema && isLikelyUnexposedTenantChatSchema(tenantDataSchema)) {
+    return pgFetchQueueIdsForSupervisorUsuario(pool, tenantDataSchema, empresaId, supervisorUsuarioId);
+  }
+
   const { data, error } = await supabase
     .from("chat_queue_supervisors")
     .select("queue_id")
@@ -95,7 +116,7 @@ export async function fetchQueueIdsForSupervisorUsuario(
     .eq("usuario_id", supervisorUsuarioId);
 
   if (error) {
-    if (isMissingSupervisionTable(error)) return [];
+    if (isMissingSupervisionTable(error) || isInvalidPostgrestSchemaError(error.message)) return [];
     console.warn("[fetchQueueIdsForSupervisorUsuario] error no fatal:", error.message);
     return [];
   }
@@ -109,8 +130,14 @@ export async function fetchQueueIdsForSupervisorUsuario(
 export async function fetchAgentsForSupervisorUsuarioIds(
   supabase: AppSupabaseClient,
   empresaId: string,
-  supervisorUsuarioId: string
+  supervisorUsuarioId: string,
+  tenantDataSchema?: string
 ): Promise<string[]> {
+  const pool = getChatPostgresPool();
+  if (pool && tenantDataSchema && isLikelyUnexposedTenantChatSchema(tenantDataSchema)) {
+    return pgFetchAgentsForSupervisorUsuarioIds(pool, tenantDataSchema, empresaId, supervisorUsuarioId);
+  }
+
   const { data, error } = await supabase
     .from("chat_supervisor_agents")
     .select("agent_usuario_id")
@@ -118,7 +145,7 @@ export async function fetchAgentsForSupervisorUsuarioIds(
     .eq("supervisor_usuario_id", supervisorUsuarioId);
 
   if (error) {
-    if (isMissingSupervisionTable(error)) return [];
+    if (isMissingSupervisionTable(error) || isInvalidPostgrestSchemaError(error.message)) return [];
     console.warn("[fetchAgentsForSupervisorUsuarioIds] error no fatal:", error.message);
     return [];
   }

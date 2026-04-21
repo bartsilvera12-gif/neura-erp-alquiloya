@@ -106,3 +106,67 @@ export async function pgMarkFirstHumanReplyIfUnset(
   `;
   await pool.query(q, [empresaId, conversationId.trim(), ts]);
 }
+
+export async function pgSelectChatMessagesForInboxApi(
+  pool: Pool,
+  schema: string,
+  conversationId: string
+): Promise<
+  Array<{
+    id: string;
+    from_me: boolean;
+    message_type: string;
+    content: string | null;
+    raw_payload: unknown;
+    created_at: string;
+  }>
+> {
+  const qt = quoteSchemaTable(schema, "chat_messages");
+  const q = `
+    SELECT id::text AS id, from_me, message_type::text AS message_type, content,
+           raw_payload, created_at
+    FROM ${qt}
+    WHERE conversation_id = $1::uuid
+    ORDER BY created_at ASC
+  `;
+  const r = await pool.query(q, [conversationId.trim()]);
+  return (r.rows ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ""),
+    from_me: Boolean(row.from_me),
+    message_type: String(row.message_type ?? "text"),
+    content: row.content != null ? String(row.content) : null,
+    raw_payload: row.raw_payload ?? null,
+    created_at:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at ?? ""),
+  }));
+}
+
+export async function pgMarkConversationUnreadZero(
+  pool: Pool,
+  schema: string,
+  empresaId: string,
+  conversationId: string
+): Promise<void> {
+  const qt = quoteSchemaTable(schema, "chat_conversations");
+  await pool.query(
+    `UPDATE ${qt} SET unread_count = 0, updated_at = now() WHERE id = $1::uuid AND empresa_id = $2::uuid`,
+    [conversationId.trim(), empresaId]
+  );
+}
+
+export async function pgReleaseConversationToBot(
+  pool: Pool,
+  schema: string,
+  empresaId: string,
+  conversationId: string
+): Promise<void> {
+  const qt = quoteSchemaTable(schema, "chat_conversations");
+  await pool.query(
+    `UPDATE ${qt}
+     SET human_taken_over = false, flow_status = 'bot', updated_at = now()
+     WHERE id = $1::uuid AND empresa_id = $2::uuid`,
+    [conversationId.trim(), empresaId]
+  );
+}

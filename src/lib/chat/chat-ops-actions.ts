@@ -17,6 +17,8 @@ import { isMissingColumnError } from "@/lib/chat/postgres-column-error";
 import { isAgentSessionOnline } from "@/lib/chat/agent-presence";
 import { batchFetchOmnicanalOperatorRoles, type OmnicanalOperatorRole } from "@/lib/chat/omnicanal-supervision-read";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { getChatPostgresPool, quoteSchemaTable } from "@/lib/supabase/chat-pg-pool";
+import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
 
 /** Fila imposible para forzar 0 resultados en consultas `in`/count cuando el alcance no admite filas. */
 const OMNICANAL_NO_MATCH_UUID = "00000000-0000-0000-0000-000000000001";
@@ -276,9 +278,67 @@ export type ChatQueueListRow = {
 };
 
 export async function listChatQueues(): Promise<ChatQueueListRow[]> {
-  const { supabase, catalogSr, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
-  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+  const { supabase, catalogSr, empresa_id, usuario_id, dataSchema } = await requireEmpresaTenantServiceRole();
+  const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id, {
+    tenantDataSchema: dataSchema,
+  });
   const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
+
+  const pool = getChatPostgresPool();
+  if (pool && isLikelyUnexposedTenantChatSchema(dataSchema)) {
+    try {
+      const qt = quoteSchemaTable(dataSchema, "chat_queues");
+      const r = await pool.query(
+        `SELECT id::text AS id, nombre, is_active, channel_type::text AS channel_type,
+                descripcion, distribution_strategy::text AS distribution_strategy, priority
+         FROM ${qt}
+         WHERE empresa_id = $1::uuid
+         ORDER BY priority DESC NULLS LAST, nombre ASC`,
+        [empresa_id]
+      );
+      let rows = (r.rows ?? []).map((row: Record<string, unknown>) => ({
+        id: String(row.id ?? ""),
+        nombre: String(row.nombre ?? ""),
+        is_active: row.is_active !== false,
+        channel_type: (row.channel_type as string | null) ?? null,
+        descripcion: (row.descripcion as string | null) ?? null,
+        distribution_strategy: (row.distribution_strategy as string | undefined) ?? undefined,
+        priority: typeof row.priority === "number" ? row.priority : undefined,
+      })) as ChatQueueListRow[];
+
+      if (!bypass) {
+        if (scope.role === "supervisor") {
+          const qids = await resolveQueueIdsForUsuarios(
+            supabase,
+            empresa_id,
+            scope.agentUsuarioIds,
+            dataSchema
+          );
+          if (qids.length > 0) {
+            const allowed = new Set(qids);
+            rows = rows.filter((row) => allowed.has(row.id));
+          } else {
+            return [];
+          }
+        } else if (scope.agentUsuarioIds.length > 0) {
+          const qids = await resolveQueueIdsForUsuarios(
+            supabase,
+            empresa_id,
+            scope.agentUsuarioIds,
+            dataSchema
+          );
+          if (qids.length === 0) return [];
+          const allowed = new Set(qids);
+          rows = rows.filter((row) => allowed.has(row.id));
+        } else {
+          return [];
+        }
+      }
+      return rows;
+    } catch (e) {
+      console.warn("[listChatQueues] tenant_pg falló, se intenta PostgREST:", e instanceof Error ? e.message : e);
+    }
+  }
 
   let q = supabase
     .from("chat_queues")
@@ -289,14 +349,14 @@ export async function listChatQueues(): Promise<ChatQueueListRow[]> {
 
   if (!bypass) {
     if (scope.role === "supervisor") {
-      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds, dataSchema);
       if (qids.length > 0) {
         q = q.in("id", qids);
       } else {
         return [];
       }
     } else if (scope.agentUsuarioIds.length > 0) {
-      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+      const qids = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds, dataSchema);
       if (qids.length === 0) return [];
       q = q.in("id", qids);
     } else {

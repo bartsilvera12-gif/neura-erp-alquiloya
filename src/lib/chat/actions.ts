@@ -39,8 +39,10 @@ import {
   pgUpdateGenericOmnichannelChannel,
   pgUpdateYCloudWhatsappChannel,
 } from "@/lib/chat/chat-channels-mutate-pg";
+import { pgMarkConversationUnreadZero, pgReleaseConversationToBot } from "@/lib/chat/chat-send-persist-pg";
 import { isInvalidPostgrestSchemaError } from "@/lib/chat/postgrest-schema-error";
 import { normalizeChannelType } from "@/lib/chat/channel-type-utils";
+import { fetchChatConversationsFromTenantPg } from "@/lib/chat/chat-inbox-fetch-pg";
 
 export type ConversacionesVista = "inbox" | "bot" | "historial";
 
@@ -156,6 +158,16 @@ async function fetchChatConversationsUnsafe(
 ): Promise<InboxConversation[]> {
   const { supabase, catalogSr, empresa_id, usuario_id, dataSchema } = await requireEmpresaTenantServiceRole();
 
+  const poolInbox = getChatPostgresPool();
+  if (poolInbox && isLikelyUnexposedTenantChatSchema(dataSchema)) {
+    return fetchChatConversationsFromTenantPg(poolInbox, dataSchema, vista, filters, {
+      supabase,
+      catalogSr,
+      empresa_id,
+      usuario_id,
+    });
+  }
+
   const { data: activeFlowRows, error: activeFlowsErr } = await supabase
     .from("chat_flows")
     .select("flow_code")
@@ -243,11 +255,20 @@ async function fetchChatConversationsUnsafe(
       qb = qb.eq("status", "closed");
     }
 
-    const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id);
+    const scope = await getOmnicanalScope(supabase, empresa_id, usuario_id, {
+      tenantDataSchema: dataSchema,
+    });
     const bypass = await shouldBypassOmnicanalConversationScope(catalogSr, usuario_id, scope);
     try {
       if (!bypass) {
-        const { builder } = await appendOmnicanalConversationScopeToQuery(supabase, empresa_id, scope, qb);
+        const { builder } = await appendOmnicanalConversationScopeToQuery(
+          supabase,
+          empresa_id,
+          scope,
+          qb,
+          undefined,
+          dataSchema
+        );
         qb = builder;
       }
     } catch (e) {
@@ -296,7 +317,12 @@ async function fetchChatConversationsUnsafe(
     if (fq) {
       let queueOk = true;
       if (!bypass && !isOmnicanalAdminScope(scope)) {
-        const allowedQueues = await resolveQueueIdsForUsuarios(supabase, empresa_id, scope.agentUsuarioIds);
+        const allowedQueues = await resolveQueueIdsForUsuarios(
+          supabase,
+          empresa_id,
+          scope.agentUsuarioIds,
+          dataSchema
+        );
         queueOk = allowedQueues.includes(fq);
       }
       qb = queueOk ? qb.eq("queue_id", fq) : qb.eq("id", OMNICANAL_IMPOSSIBLE_CONVERSATION_ID);
@@ -659,7 +685,22 @@ async function fetchChatConversationsUnsafe(
 
 /** True si la empresa tiene al menos un flujo de chat activo (tab Bot en inbox). */
 export async function hasEmpresaActiveChatFlows(): Promise<boolean> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, empresa_id, dataSchema } = await requireEmpresaTenantServiceRole();
+  const pool = getChatPostgresPool();
+  if (pool && isLikelyUnexposedTenantChatSchema(dataSchema)) {
+    try {
+      const r = await pool.query(
+        `SELECT 1 AS one
+         FROM ${quoteSchemaTable(dataSchema, "chat_flows")}
+         WHERE empresa_id = $1::uuid AND COALESCE(activo, false) = true
+         LIMIT 1`,
+        [empresa_id]
+      );
+      return (r.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
   const { count, error } = await supabase
     .from("chat_flows")
     .select("id", { count: "exact", head: true })
@@ -673,9 +714,15 @@ export async function hasEmpresaActiveChatFlows(): Promise<boolean> {
  * Vuelve a modo bot (solo operador). No reinicia el flujo ni la sesión.
  */
 export async function releaseConversationToBot(conversationId: string): Promise<void> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, empresa_id, dataSchema } = await requireEmpresaTenantServiceRole();
   const id = conversationId.trim();
   if (!id) throw new Error("ID inválido");
+
+  const pool = getChatPostgresPool();
+  if (pool && isLikelyUnexposedTenantChatSchema(dataSchema)) {
+    await pgReleaseConversationToBot(pool, dataSchema, empresa_id, id);
+    return;
+  }
 
   const { error } = await supabase
     .from("chat_conversations")
@@ -691,7 +738,13 @@ export async function releaseConversationToBot(conversationId: string): Promise<
 }
 
 export async function markConversationRead(conversationId: string): Promise<void> {
-  const { supabase, empresa_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, empresa_id, dataSchema } = await requireEmpresaTenantServiceRole();
+  const pool = getChatPostgresPool();
+  if (pool && isLikelyUnexposedTenantChatSchema(dataSchema)) {
+    await pgMarkConversationUnreadZero(pool, dataSchema, empresa_id, conversationId.trim());
+    return;
+  }
+
   const { error } = await supabase
     .from("chat_conversations")
     .update({ unread_count: 0, updated_at: new Date().toISOString() })
