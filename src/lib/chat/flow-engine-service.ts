@@ -740,6 +740,59 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     return (data ?? []) as FlowOption[];
   }
 
+  /**
+   * Coincidencia WhatsApp → opción BD: Meta devuelve `interactive.*.id`; debe alinear con `meta_button_id`
+   * u `option_value`. Fallback por título visible si hay un único match (listas / IDs desfasados tras ediciones).
+   */
+  function resolveSelectedFlowOption(
+    options: FlowOption[],
+    metaButtonId: string,
+    rawPayload: Record<string, unknown>
+  ): FlowOption | undefined {
+    const idIn = metaButtonId.trim();
+    if (!idIn || options.length === 0) return undefined;
+
+    let picked = options.find((o) => String(o.meta_button_id ?? "").trim() === idIn);
+    if (picked) return picked;
+
+    picked = options.find((o) => String(o.option_value ?? "").trim() === idIn);
+    if (picked) {
+      console.info("[flow-runtime]", "option_match_by_option_value", { idIn });
+      return picked;
+    }
+
+    const low = idIn.toLowerCase();
+    picked =
+      options.find((o) => String(o.meta_button_id ?? "").trim().toLowerCase() === low) ??
+      options.find((o) => String(o.option_value ?? "").trim().toLowerCase() === low);
+    if (picked) {
+      console.info("[flow-runtime]", "option_match_case_insensitive", { idIn });
+      return picked;
+    }
+
+    const intr = rawPayload?.interactive as
+      | { list_reply?: { id?: string; title?: string }; button_reply?: { id?: string; title?: string } }
+      | undefined;
+    const listTitle = intr?.list_reply?.title?.trim();
+    if (listTitle) {
+      const matches = options.filter((o) => whatsAppInteractiveTitleFromOption(o).trim() === listTitle);
+      if (matches.length === 1) {
+        console.info("[flow-runtime]", "option_match_unique_list_title", { listTitle });
+        return matches[0];
+      }
+    }
+    const btnTitle = intr?.button_reply?.title?.trim();
+    if (btnTitle) {
+      const matches = options.filter((o) => whatsAppInteractiveTitleFromOption(o).trim() === btnTitle);
+      if (matches.length === 1) {
+        console.info("[flow-runtime]", "option_match_unique_button_title", { btnTitle });
+        return matches[0];
+      }
+    }
+
+    return undefined;
+  }
+
   async function getConversationFlowDataMap(input: {
     empresaId: string;
     conversationId: string;
@@ -1470,7 +1523,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     }
 
     const options = await getNodeOptions(currentNode.id);
-    const selected = options.find((o) => o.meta_button_id === params.metaButtonId);
+    const selected = resolveSelectedFlowOption(options, params.metaButtonId, params.rawPayload);
     if (!selected) {
       await insertFlowEvent({
         empresaId: state.empresa_id,
