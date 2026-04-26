@@ -19,6 +19,42 @@ function parseNum(body: Record<string, unknown>, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Día 1-31 o `null` (sin obligación fija). Compat: `fecha_vencimiento_tributario` (YYYY-MM-DD) obsoleto → se toma el día.
+ */
+function parseDiaVencimientoTributario(
+  body: Record<string, unknown>
+): { ok: true; value: number | null } | { ok: false; error: string } {
+  if ("dia_vencimiento_tributario" in body) {
+    const v = body.dia_vencimiento_tributario;
+    if (v === null || v === "" || v === undefined) {
+      return { ok: true, value: null };
+    }
+    const n = typeof v === "number" ? v : parseInt(String(v).trim(), 10);
+    if (!Number.isFinite(n)) {
+      return { ok: false, error: "dia_vencimiento_tributario debe ser un entero entre 1 y 31, o vacío" };
+    }
+    const t = Math.trunc(n);
+    if (t < 1 || t > 31) {
+      return { ok: false, error: "dia_vencimiento_tributario debe estar entre 1 y 31" };
+    }
+    return { ok: true, value: t };
+  }
+  const legacy = body.fecha_vencimiento_tributario;
+  if (legacy === null || legacy === "" || legacy === undefined) {
+    return { ok: true, value: null };
+  }
+  if (typeof legacy === "string" && /^\d{4}-\d{2}-\d{2}$/.test(legacy.trim())) {
+    const d = parseInt(legacy.trim().slice(8, 10), 10);
+    if (d >= 1 && d <= 31) return { ok: true, value: d };
+  }
+  return {
+    ok: false,
+    error:
+      "Use dia_vencimiento_tributario (1-31). fecha_vencimiento_tributario (YYYY-MM-DD) es obsoleto.",
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -102,16 +138,11 @@ export async function PUT(
     const otroDetalle =
       typeof body.obligacion_otro_detalle === "string" ? body.obligacion_otro_detalle.trim() || null : null;
 
-    const fechaRaw = body.fecha_vencimiento_tributario;
-    let fechaVencimiento: string | null = null;
-    if (fechaRaw === null || fechaRaw === "") fechaVencimiento = null;
-    else if (typeof fechaRaw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw.trim())) {
-      fechaVencimiento = fechaRaw.trim();
-    } else if (fechaRaw !== undefined && fechaRaw !== null) {
-      return NextResponse.json(errorResponse("fecha_vencimiento_tributario debe ser YYYY-MM-DD o vacío"), {
-        status: 400,
-      });
+    const parsedDia = parseDiaVencimientoTributario(body);
+    if (!parsedDia.ok) {
+      return NextResponse.json(errorResponse(parsedDia.error), { status: 400 });
     }
+    const diaVencimientoTribut = parsedDia.value;
 
     const honorMensual = parseNum(body, "honorario_mensual");
     const honorAnual = parseNum(body, "honorario_anual");
@@ -165,7 +196,7 @@ export async function PUT(
       perfil_activo: perfilActivo,
       dv,
       razon_social_fiscal: razonSocial,
-      fecha_vencimiento: fechaVencimiento,
+      dia_vencimiento_tributario: diaVencimientoTribut,
       honorario_mensual: honorMensual,
       honorario_anual: honorAnual,
       notas_tributarias: notas,

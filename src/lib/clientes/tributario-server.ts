@@ -11,7 +11,8 @@ export type PerfilTributarioPublic = {
   perfil_activo: boolean;
   dv: string | null;
   razon_social_fiscal: string | null;
-  fecha_vencimiento: string | null;
+  /** 1-31, mismo significado en API que en `cliente_perfil_tributario.dia_vencimiento_tributario`. */
+  dia_vencimiento_tributario: number | null;
   honorario_mensual: number | null;
   honorario_anual: number | null;
   notas_tributarias: string | null;
@@ -78,7 +79,7 @@ export async function fetchPerfilTributarioDetalle(
   const { data: perfil, error } = await supabase
     .from("cliente_perfil_tributario")
     .select(
-      "id, perfil_activo, dv, razon_social_fiscal, fecha_vencimiento, honorario_mensual, honorario_anual, notas_tributarias, obligacion_otro_detalle, clave_tributaria_encrypted"
+      "id, perfil_activo, dv, razon_social_fiscal, dia_vencimiento_tributario, honorario_mensual, honorario_anual, notas_tributarias, obligacion_otro_detalle, clave_tributaria_encrypted"
     )
     .eq("empresa_id", empresaId)
     .eq("cliente_id", clienteId)
@@ -95,7 +96,7 @@ export async function fetchPerfilTributarioDetalle(
     perfil_activo: boolean;
     dv: string | null;
     razon_social_fiscal: string | null;
-    fecha_vencimiento: string | null;
+    dia_vencimiento_tributario: number | null;
     honorario_mensual: number | null;
     honorario_anual: number | null;
     notas_tributarias: string | null;
@@ -128,11 +129,15 @@ export async function fetchPerfilTributarioDetalle(
     });
   }
 
+  const dvt = p.dia_vencimiento_tributario;
+  const diaOut: number | null =
+    dvt == null ? null : (Number.isFinite(Number(dvt)) ? Math.trunc(Number(dvt)) : null);
+
   return {
     perfil_activo: p.perfil_activo,
     dv: p.dv,
     razon_social_fiscal: p.razon_social_fiscal,
-    fecha_vencimiento: p.fecha_vencimiento,
+    dia_vencimiento_tributario: diaOut,
     honorario_mensual: p.honorario_mensual,
     honorario_anual: p.honorario_anual,
     notas_tributarias: p.notas_tributarias,

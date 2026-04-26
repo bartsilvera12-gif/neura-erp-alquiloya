@@ -16,7 +16,8 @@ export type TributarioFormState = {
   /** Vacío = no cambiar en servidor; usar `clear_clave` para borrar */
   clave_tributaria: string;
   clear_clave_tributaria: boolean;
-  fecha_vencimiento_tributario: string;
+  /** Día del 1 al 31 o "" = vacío. */
+  dia_vencimiento_tributario: string;
   honorario_mensual: string;
   honorario_anual: string;
   notas_tributarias: string;
@@ -32,13 +33,28 @@ export function formStateFromPerfil(p: PerfilTributarioCliente | null | undefine
     razon_social_fiscal: p.razon_social_fiscal ?? "",
     clave_tributaria: "",
     clear_clave_tributaria: false,
-    fecha_vencimiento_tributario: p.fecha_vencimiento ? p.fecha_vencimiento.slice(0, 10) : "",
+    dia_vencimiento_tributario:
+      p.dia_vencimiento_tributario != null && p.dia_vencimiento_tributario !== 0
+        ? String(p.dia_vencimiento_tributario)
+        : "",
     honorario_mensual: p.honorario_mensual != null ? String(p.honorario_mensual) : "",
     honorario_anual: p.honorario_anual != null ? String(p.honorario_anual) : "",
     notas_tributarias: p.notas_tributarias ?? "",
     obligacion_catalogo_ids: p.obligaciones.map((o) => o.id),
     obligacion_otro_detalle: p.obligacion_otro_detalle ?? "",
   };
+}
+
+/** `null` si el día es vacío o un entero 1-31; error si el perfil está activo y el valor es inválido. */
+export function getErrorDiaVencimientoTributario(f: TributarioFormState): string | null {
+  if (!f.perfil_activo) return null;
+  const s = f.dia_vencimiento_tributario.trim();
+  if (s === "") return null;
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 31) {
+    return "Indicá un entero del 1 al 31, o dejá vacío el día de vencimiento tributario.";
+  }
+  return null;
 }
 
 export function emptyTributarioForm(): TributarioFormState {
@@ -48,7 +64,7 @@ export function emptyTributarioForm(): TributarioFormState {
     razon_social_fiscal: "",
     clave_tributaria: "",
     clear_clave_tributaria: false,
-    fecha_vencimiento_tributario: "",
+    dia_vencimiento_tributario: "",
     honorario_mensual: "",
     honorario_anual: "",
     notas_tributarias: "",
@@ -175,13 +191,18 @@ export function ClientePerfilTributarioForm({
               )}
             </div>
             <div>
-              <label className={labelClass}>Vencimiento tributario</label>
+              <label className={labelClass}>Día de vencimiento tributario</label>
               <input
-                type="date"
-                value={value.fecha_vencimiento_tributario}
-                onChange={(e) => onChange({ ...value, fecha_vencimiento_tributario: e.target.value })}
+                type="number"
+                min={1}
+                max={31}
+                value={value.dia_vencimiento_tributario}
+                onChange={(e) => onChange({ ...value, dia_vencimiento_tributario: e.target.value.replace(/[^0-9]/g, "") })}
                 className={inputClass}
+                placeholder="Ej. 7"
+                autoComplete="off"
               />
+              <p className="mt-1 text-[11px] text-slate-500">Día del mes en que vence habitualmente la obligación tributaria.</p>
             </div>
           </div>
 
@@ -256,12 +277,14 @@ export function ClientePerfilTributarioForm({
 export function buildPerfilTributarioPutBody(f: TributarioFormState): Record<string, unknown> {
   const honorM = f.honorario_mensual.trim() ? parseFloat(f.honorario_mensual) : null;
   const honorA = f.honorario_anual.trim() ? parseFloat(f.honorario_anual) : null;
+  const diaS = f.dia_vencimiento_tributario.trim();
+  const diaN = diaS === "" ? null : parseInt(diaS, 10);
 
   const body: Record<string, unknown> = {
     perfil_activo: f.perfil_activo,
     dv: f.dv.trim() || null,
     razon_social_fiscal: f.razon_social_fiscal.trim() || null,
-    fecha_vencimiento_tributario: f.fecha_vencimiento_tributario.trim() || null,
+    dia_vencimiento_tributario: Number.isFinite(diaN) ? diaN : null,
     honorario_mensual: Number.isFinite(honorM) ? honorM : null,
     honorario_anual: Number.isFinite(honorA) ? honorA : null,
     notas_tributarias: f.notas_tributarias.trim() || null,

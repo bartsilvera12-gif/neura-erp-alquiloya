@@ -14,6 +14,7 @@ import {
   ClientePerfilTributarioForm,
   buildPerfilTributarioPutBody,
   emptyTributarioForm,
+  getErrorDiaVencimientoTributario,
   type TributarioFormState,
 } from "@/components/clientes/ClientePerfilTributarioForm";
 import { getProspecto, updateProspecto } from "@/lib/crm/storage";
@@ -201,6 +202,8 @@ function NuevoClienteForm() {
     }
 
     if (gestionTributariaEmpresa && formTributario.perfil_activo) {
+      const eDia = getErrorDiaVencimientoTributario(formTributario);
+      if (eDia) return setError(eDia);
       const otro = catalogoObligaciones.find((c) => c.slug === "otro");
       if (otro && formTributario.obligacion_catalogo_ids.includes(otro.id) && !formTributario.obligacion_otro_detalle.trim()) {
         return setError('Completá el detalle cuando seleccionás la obligación "Otro".');

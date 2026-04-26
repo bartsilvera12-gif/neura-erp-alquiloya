@@ -53,6 +53,7 @@ import {
   buildPerfilTributarioPutBody,
   emptyTributarioForm,
   formStateFromPerfil,
+  getErrorDiaVencimientoTributario,
   type TributarioFormState,
 } from "@/components/clientes/ClientePerfilTributarioForm";
 // ── Estilos ────────────────────────────────────────────────────────────────────
@@ -493,6 +494,8 @@ export default function ClienteDetailPage() {
     }
 
     if (gestionTributariaEmpresa && formTributario.perfil_activo) {
+      const eDia = getErrorDiaVencimientoTributario(formTributario);
+      if (eDia) return setFormError(eDia);
       const otro = catalogoObligacionesTrib.find((c) => c.slug === "otro");
       if (otro && formTributario.obligacion_catalogo_ids.includes(otro.id) && !formTributario.obligacion_otro_detalle.trim()) {
         return setFormError('Completá el detalle cuando seleccionás la obligación "Otro".');

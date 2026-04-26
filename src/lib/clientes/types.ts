@@ -95,7 +95,8 @@ export interface PerfilTributarioCliente {
   perfil_activo: boolean;
   dv: string | null;
   razon_social_fiscal: string | null;
-  fecha_vencimiento: string | null;
+  /** 1-31, día fijo de vencimiento mensual; `null` si no aplica. */
+  dia_vencimiento_tributario: number | null;
   honorario_mensual: number | null;
   honorario_anual: number | null;
   notas_tributarias: string | null;
