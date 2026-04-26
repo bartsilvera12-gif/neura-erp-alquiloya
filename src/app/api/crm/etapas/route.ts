@@ -6,6 +6,7 @@ import { API_ERRORS } from "@/lib/api/errors";
 import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
+import { CRM_ETAPAS_INICIALES } from "@/lib/crm/crm-etapas-defaults";
 import {
   ensureDefaultCrmEtapasPg,
   listCrmEtapasActivasPg,
@@ -71,13 +72,14 @@ export async function GET(request: NextRequest) {
       .eq("empresa_id", empresaId);
 
     if ((etapaCount ?? 0) === 0) {
-      const defaults = [
-        { empresa_id: empresaId, codigo: "LEAD", nombre: "Lead", color: "gray", orden: 1, activo: true },
-        { empresa_id: empresaId, codigo: "CONTACTADO", nombre: "Contactado", color: "blue", orden: 2, activo: true },
-        { empresa_id: empresaId, codigo: "NEGOCIACION", nombre: "Negociación", color: "amber", orden: 3, activo: true },
-        { empresa_id: empresaId, codigo: "GANADO", nombre: "Ganado", color: "green", orden: 4, activo: true },
-        { empresa_id: empresaId, codigo: "PERDIDO", nombre: "Perdido", color: "red", orden: 5, activo: true },
-      ];
+      const defaults = CRM_ETAPAS_INICIALES.map((r) => ({
+        empresa_id: empresaId,
+        codigo: r.codigo,
+        nombre: r.nombre,
+        color: r.color,
+        orden: r.orden,
+        activo: true,
+      }));
       const { error: seedErr } = await supabase.from("crm_etapas").insert(defaults);
       if (seedErr) {
         console.warn("[crm-funnel]", "crm_etapas_seed_postgrest_failed", seedErr.message);

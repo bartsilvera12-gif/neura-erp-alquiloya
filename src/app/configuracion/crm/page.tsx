@@ -14,7 +14,8 @@ import {
 } from "@/lib/crm/etapas";
 import type { ClienteTipoServicioRow } from "@/lib/clientes/tipo-servicio-catalogo";
 
-const FUENTE_ETAPAS_CONFIG = "GET /api/crm/etapas?config=1 (Postgres o PostgREST, mismo origen que el Kanban)";
+const FUENTE_ETAPAS_CONFIG =
+  "GET /api/crm/etapas?config=1 → tabla crm_etapas (misma capa de datos que el Funnel; el dashboard no define etapas)";
 
 export default function ConfiguracionCrmPipelinePage() {
   const [rolCargado, setRolCargado] = useState(false);

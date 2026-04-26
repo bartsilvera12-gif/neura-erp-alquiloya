@@ -32,6 +32,7 @@ import {
   toCalendarDateStr,
 } from "@/lib/fechas/calendario";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { getEtapas, getEtapaClasses, normalizeEtapaCodigo, type EtapaCrm } from "@/lib/crm/etapas";
 import {
   isDashboardTabSlug,
   type DashboardTabSlug,
@@ -179,44 +180,43 @@ function listarDiasCalendarioYmd(desde: Date, hasta: Date): string[] {
 
 // ── Componentes de gráficos ───────────────────────────────────────────────────
 
-const ETAPA_COLORS: Record<string, string> = {
-  LEAD:        "bg-slate-400",
-  CONTACTADO:  "bg-[#0EA5E9]",
-  NEGOCIACION: "bg-amber-400",
-  GANADO:      "bg-[#0EA5E9]",
-  PERDIDO:     "bg-red-400",
-};
+/** Fila de pipeline: etiquetas y colores vienen de `crm_etapas` (getEtapas), no de listas fijas en el dashboard. */
+type PipelineBarRowZ = { rowKey: string; label: string; count: number; valor: number; dotClass: string; barClass: string };
 
-const ETAPA_LABELS: Record<string, string> = {
-  LEAD: "Lead", CONTACTADO: "Contactado", NEGOCIACION: "Negociación",
-  GANADO: "Ganado", PERDIDO: "Perdido",
-};
-
-function PipelineBar({
-  data,
-  tone = "light",
-}: { data: { etapa: string; count: number; valor: number }[]; tone?: "light" | "zentra" }) {
-  const maxC = Math.max(...data.map(d => d.count), 1);
+function PipelineBar({ data, tone = "light" }: { data: PipelineBarRowZ[]; tone?: "light" | "zentra" }) {
+  const maxC = Math.max(...data.map((d) => d.count), 1);
   const z = tone === "zentra";
   return (
     <div className="space-y-3">
       {data.map((d) => (
-        <div key={d.etapa}>
+        <div key={d.rowKey}>
           <div className="mb-1 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${ETAPA_COLORS[d.etapa] ?? "bg-gray-400"}`} />
-              <span className={`text-xs font-medium ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>
-                {ETAPA_LABELS[d.etapa] ?? d.etapa}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`h-2 w-2 shrink-0 rounded-full ${d.dotClass}`} />
+              <span
+                className={`text-xs font-medium truncate ${z ? "" : "text-gray-700"}`}
+                style={z ? { color: Z.text } : undefined}
+                title={d.label}
+              >
+                {d.label}
               </span>
             </div>
-            <div className={`flex items-center gap-4 text-xs ${z ? "" : "text-gray-500"}`} style={z ? { color: Z.muted } : undefined}>
-              <span className={`tabular-nums font-semibold ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>{d.count}</span>
+            <div
+              className={`ml-2 flex shrink-0 items-center gap-4 text-xs ${z ? "" : "text-gray-500"}`}
+              style={z ? { color: Z.muted } : undefined}
+            >
+              <span className={`tabular-nums font-semibold ${z ? "" : "text-gray-700"}`} style={z ? { color: Z.text } : undefined}>
+                {d.count}
+              </span>
               <span className="w-20 text-right tabular-nums">Gs. {formatGsM(d.valor)}</span>
             </div>
           </div>
-          <div className={`h-5 overflow-hidden rounded-full ${z ? "" : "bg-gray-100"}`} style={z ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}>
+          <div
+            className={`h-5 overflow-hidden rounded-full ${z ? "" : "bg-gray-100"}`}
+            style={z ? { backgroundColor: "rgba(255,255,255,0.08)" } : undefined}
+          >
             <div
-              className={`h-full rounded-full transition-all ${ETAPA_COLORS[d.etapa] ?? "bg-gray-400"}`}
+              className={`h-full rounded-full transition-all ${d.barClass}`}
               style={{ width: `${d.count > 0 ? Math.max((d.count / maxC) * 100, 4) : 0}%` }}
             />
           </div>
@@ -600,6 +600,11 @@ function DashComercial({
   void _tipificaciones;
   const { desde, hasta } = useMemo(() => getRango(periodo), [periodo]);
 
+  const [etapasCrmCatalog, setEtapasCrmCatalog] = useState<EtapaCrm[]>([]);
+  useEffect(() => {
+    void getEtapas().then(setEtapasCrmCatalog);
+  }, []);
+
   const ncPorFactura = useMemo(() => buildMontoNcAprobadaPorFacturaId(notasCredito), [notasCredito]);
 
   const isSupervisor = usuario?.nivel === "supervisor";
@@ -616,22 +621,56 @@ function DashComercial({
   );
 
   const leadsNuevos = prospectosFilt.filter((p) => enRango(p.fecha_creacion, desde, hasta)).length;
-  const enNegociacion = prospectosFilt.filter((p) => p.etapa === "NEGOCIACION").length;
+  const enNegociacion = prospectosFilt.filter(
+    (p) => normalizeEtapaCodigo(p.etapa) === "NEGOCIACION"
+  ).length;
   const clientesGanados = prospectosFilt.filter(
-    (p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
+    (p) => normalizeEtapaCodigo(p.etapa) === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
   ).length;
   const totalLeadsPeriodo = prospectosFilt.filter((p) => enRango(p.fecha_creacion, desde, hasta)).length;
   const tasaConversion = totalLeadsPeriodo > 0 ? (clientesGanados / totalLeadsPeriodo) * 100 : 0;
 
-  const ETAPAS = ["LEAD", "CONTACTADO", "NEGOCIACION", "GANADO", "PERDIDO"];
-  const pipeline = ETAPAS.map((etapa) => ({
-    etapa,
-    count: prospectosFilt.filter((p) => p.etapa === etapa).length,
-    valor: prospectosFilt.filter((p) => p.etapa === etapa).reduce((s, p) => s + (p.valor_estimado ?? 0), 0),
-  }));
+  /** Misma fuente que el CRM Funnel: columnas = etapas activas en `crm_etapas` (orden + nombre a mostrar). */
+  const pipeline: PipelineBarRowZ[] = useMemo(() => {
+    const inFil = (cod: string) =>
+      prospectosFilt.filter((p) => normalizeEtapaCodigo(p.etapa) === normalizeEtapaCodigo(cod));
+    const actives = [...etapasCrmCatalog]
+      .filter((e) => e.activo)
+      .sort((a, b) => a.orden - b.orden);
+    const fromCatalog: PipelineBarRowZ[] = actives.map((e) => {
+      const { dot, headerBg } = getEtapaClasses(e.color);
+      const list = inFil(e.codigo);
+      return {
+        rowKey: e.id,
+        label: e.nombre,
+        count: list.length,
+        valor: list.reduce((s, p) => s + (p.valor_estimado ?? 0), 0),
+        dotClass: dot,
+        barClass: headerBg,
+      };
+    });
+    const catalogNorm = new Set(actives.map((e) => normalizeEtapaCodigo(e.codigo)));
+    const extraCodes = new Set<string>();
+    for (const p of prospectosFilt) {
+      const c = normalizeEtapaCodigo(p.etapa);
+      if (c && !catalogNorm.has(c)) extraCodes.add(c);
+    }
+    const fromExtras: PipelineBarRowZ[] = [...extraCodes].sort().map((code) => {
+      const list = inFil(code);
+      return {
+        rowKey: `x-${code}`,
+        label: code,
+        count: list.length,
+        valor: list.reduce((s, p) => s + (p.valor_estimado ?? 0), 0),
+        dotClass: "bg-gray-400",
+        barClass: "bg-gray-400",
+      };
+    });
+    return [...fromCatalog, ...fromExtras];
+  }, [etapasCrmCatalog, prospectosFilt]);
 
   const topPlanesEnNegociacion = useMemo(() => {
-    const enNeg = prospectosFilt.filter((p) => p.etapa === "NEGOCIACION");
+    const enNeg = prospectosFilt.filter((p) => normalizeEtapaCodigo(p.etapa) === "NEGOCIACION");
     const porPlan: Record<string, number> = {};
     for (const p of enNeg) {
       const plan = (p.servicio ?? "").trim() || "Otros";
@@ -645,7 +684,7 @@ function DashComercial({
 
   const topPlanesVendidos = useMemo(() => {
     const ganadosPeriodo = prospectosFilt.filter(
-      (p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
+      (p) => normalizeEtapaCodigo(p.etapa) === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
     );
     const porPlan: Record<string, number> = {};
     for (const p of ganadosPeriodo) {
@@ -664,7 +703,9 @@ function DashComercial({
   const rendimiento = useMemo(() => {
     const map: Record<string, number> = {};
     prospectosFilt
-      .filter((p) => p.etapa === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta))
+      .filter(
+        (p) => normalizeEtapaCodigo(p.etapa) === "GANADO" && enRango(p.fecha_actualizacion, desde, hasta)
+      )
       .forEach((p) => {
         const v = p.responsable ?? "Sin asignar";
         map[v] = (map[v] ?? 0) + 1;

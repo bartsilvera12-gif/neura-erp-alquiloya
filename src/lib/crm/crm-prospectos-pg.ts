@@ -7,6 +7,7 @@ import { assertAllowedChatDataSchema } from "@/lib/supabase/chat-data-schema";
 import { SUPABASE_APP_SCHEMA } from "@/lib/supabase/schema";
 import { nextNumeroControlFromLast } from "@/lib/crm/numero-control";
 import type { Nota, Prospecto } from "@/lib/crm/types";
+import { sqlCrmEtapasDefaultsValuesBlock } from "@/lib/crm/crm-etapas-defaults";
 import { normalizeEtapaCodigo } from "@/lib/crm/etapas";
 
 const LOG_LIST = "[crm-prospectos-pg][list]";
@@ -463,8 +464,8 @@ export async function prospectoExistsForEmpresaPg(
 const LOG_BOARD = "[crm-funnel]";
 
 /**
- * Schemas tenant clonados suelen tener `crm_etapas` vacío: el Kanban no renderiza columnas
- * aunque `crm_prospectos.etapa` tenga text (p. ej. LEAD). Idempotente.
+ * Schemas tenant clonados suelen tener `crm_etapas` vacío: el funnel no renderiza columnas
+ * aunque `crm_prospectos.etapa` tenga text (p. ej. LEAD). Idempotente; el catálogo maestro sigue siendo `crm_etapas`.
  */
 export async function ensureDefaultCrmEtapasForCrmSchemaClient(
   client: PoolClient,
@@ -484,11 +485,7 @@ export async function ensureDefaultCrmEtapasForCrmSchemaClient(
       `INSERT INTO ${ce} (empresa_id, codigo, nombre, color, orden, activo)
        SELECT $1::uuid, v.codigo, v.nombre, v.color, v.orden, true
        FROM (VALUES
-         ('LEAD'::text, 'Lead'::text, 'gray'::text, 1),
-         ('CONTACTADO', 'Contactado', 'blue', 2),
-         ('NEGOCIACION', 'Negociación', 'amber', 3),
-         ('GANADO', 'Ganado', 'green', 4),
-         ('PERDIDO', 'Perdido', 'red', 5)
+         ${sqlCrmEtapasDefaultsValuesBlock()}
        ) AS v(codigo, nombre, color, orden)
        ON CONFLICT (empresa_id, codigo) DO NOTHING`,
       [empresaId]
@@ -529,11 +526,7 @@ export async function ensureDefaultCrmEtapasPg(
       `INSERT INTO ${ce} (empresa_id, codigo, nombre, color, orden, activo)
        SELECT $1::uuid, v.codigo, v.nombre, v.color, v.orden, true
        FROM (VALUES
-         ('LEAD'::text, 'Lead'::text, 'gray'::text, 1),
-         ('CONTACTADO', 'Contactado', 'blue', 2),
-         ('NEGOCIACION', 'Negociación', 'amber', 3),
-         ('GANADO', 'Ganado', 'green', 4),
-         ('PERDIDO', 'Perdido', 'red', 5)
+         ${sqlCrmEtapasDefaultsValuesBlock()}
        ) AS v(codigo, nombre, color, orden)
        ON CONFLICT (empresa_id, codigo) DO NOTHING`,
       [empresaId]

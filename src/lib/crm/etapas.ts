@@ -1,3 +1,7 @@
+/**
+ * Etapas CRM: lectura/escritura vía `crm_etapas`. Configuración es la UI de administración;
+ * el Kanban y el resumen del dashboard leen con GET /api/crm/etapas (misma fuente).
+ */
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import { getBrowserSupabaseForEmpresaData } from "@/lib/supabase/browser-data-client";
 import { getCurrentUser } from "@/lib/auth";
