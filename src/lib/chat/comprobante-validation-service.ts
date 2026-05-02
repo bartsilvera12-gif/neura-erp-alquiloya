@@ -40,6 +40,12 @@ function ocrFingerprint(fullText: string): string {
   return createHash("sha256").update(n, "utf8").digest("hex");
 }
 
+/**
+ * Huellas sobre texto OCR muy corto colisionan entre comprobantes distintos (mismo encabezado de banco).
+ * Solo tiene sentido bloquear por fingerprint si hay suficiente texto distintivo.
+ */
+const MIN_CHARS_FOR_OCR_FINGERPRINT_DUPLICATE = 64;
+
 export type ExtractedReceiptFields = {
   monto: string;
   referencia: string;
@@ -171,11 +177,15 @@ async function existsOcrRefDuplicate(
   return Boolean(data?.id);
 }
 
+/**
+ * Igual que referencia: solo bloquea reuso entre **otras** sesiones de flujo (`flow_session_id`).
+ * Antes se pasaba `flow_session_id` como `excludeId` pero se comparaba con `row.id` → la exclusión nunca aplicaba.
+ */
 async function existsOcrFingerprintDuplicate(
   supabase: AppSupabaseClient,
   empresaId: string,
   fp: string,
-  excludeId?: string
+  sameFlowSessionId: string
 ): Promise<boolean> {
   if (!fp) return false;
   const { data, error } = await supabase
@@ -184,14 +194,11 @@ async function existsOcrFingerprintDuplicate(
     .eq("empresa_id", empresaId)
     .eq("ocr_fingerprint", fp)
     .in("estado_validacion", ["valido", "revision_manual"])
-    .limit(5);
-  if (error || !data?.length) return false;
-  for (const row of data) {
-    const id = (row as { id: string }).id;
-    if (excludeId && id === excludeId) continue;
-    return true;
-  }
-  return false;
+    .neq("flow_session_id", sameFlowSessionId)
+    .limit(1)
+    .maybeSingle();
+  if (error) return false;
+  return Boolean(data?.id);
 }
 
 export type ComprobantePipelineResult =
@@ -507,8 +514,12 @@ export async function runComprobanteValidationPipeline(ctx: PipelineCtx): Promis
 
   const bankFlowResult = validateReceiptBankDataAgainstExpected(settings, fullText);
 
+  const fpLongEnough =
+    extracted.texto_completo.length >= MIN_CHARS_FOR_OCR_FINGERPRINT_DUPLICATE;
   const fp =
-    settings.ocr_fields.texto_completo.use_duplicate_detection && extracted.texto_completo
+    settings.ocr_fields.texto_completo.use_duplicate_detection &&
+    fpLongEnough &&
+    extracted.texto_completo
       ? ocrFingerprint(extracted.texto_completo)
       : null;
 
