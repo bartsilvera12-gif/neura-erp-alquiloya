@@ -2,6 +2,7 @@ import { fetchDataSchemaForEmpresaId, createServiceRoleClientWithDbSchema } from
 import { SUPABASE_APP_SCHEMA, type AppSupabaseClient } from "@/lib/supabase/schema";
 import {
   ensureSorteoOrderViaDirectPostgres,
+  fetchSorteoRowTicketFieldsFromPg,
   getSupabaseDirectPgConnectionString,
   type DirectPgSorteoOk,
 } from "@/lib/sorteos/sorteo-order-direct-pg";
@@ -1163,13 +1164,17 @@ export async function ensureSorteoOrderFromChat(
     .select("nombre")
     .eq("id", sorteoId)
     .maybeSingle();
-  if (sorteoNomErr) {
+  let sorteoNombre = String((sorteoRow as { nombre?: string } | null)?.nombre ?? "").trim();
+  if (!sorteoNombre) {
+    const pgNom = await fetchSorteoRowTicketFieldsFromPg(dataSchema, sorteoId);
+    sorteoNombre = String(pgNom?.nombre ?? "").trim();
+  }
+  if (!sorteoNombre && sorteoNomErr) {
     console.warn(FLOW_SORTEO_LOG, "sorteo_nombre_lookup_failed", {
       sorteoId,
       message: sorteoNomErr.message,
     });
   }
-  const sorteoNombre = String((sorteoRow as { nombre?: string } | null)?.nombre ?? "").trim();
 
   console.info(FLOW_SORTEO_LOG, "ensureSorteoOrderFromChat_outcome", {
     path: "success",

@@ -403,3 +403,40 @@ export async function ensureSorteoOrderViaDirectPostgres(
     client.release();
   }
 }
+
+/** Lectura de metadatos del sorteo vía SQL directo (tenant sin PostgREST expuesto). */
+export async function fetchSorteoRowTicketFieldsFromPg(
+  schema: string,
+  sorteoId: string
+): Promise<{
+  nombre: string | null;
+  ticket_delivery_mode: string | null;
+  ticket_image_config: unknown;
+} | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const schemaSql = quoteIdent(schema);
+  try {
+    const r = await pool.query<{
+      nombre: string | null;
+      ticket_delivery_mode: string | null;
+      ticket_image_config: unknown;
+    }>(
+      `SELECT nombre, ticket_delivery_mode, ticket_image_config
+       FROM ${schemaSql}.sorteos
+       WHERE id = $1::uuid
+       LIMIT 1`,
+      [sorteoId]
+    );
+    if (!r.rows.length) return null;
+    return r.rows[0];
+  } catch (err: unknown) {
+    const e = err as { message?: string };
+    console.warn("[flow-sorteo] fetchSorteoRowTicketFieldsFromPg_failed", {
+      schema,
+      sorteoId: String(sorteoId).slice(0, 8),
+      message: e.message,
+    });
+    return null;
+  }
+}

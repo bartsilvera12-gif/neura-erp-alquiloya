@@ -1,10 +1,9 @@
 import "server-only";
 
-import {
-  createServiceRoleClientForEmpresa,
-  fetchDataSchemaForEmpresaId,
-} from "@/lib/supabase/empresa-data-schema";
+import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
+import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { fetchSorteoRowTicketFieldsFromPg } from "@/lib/sorteos/sorteo-order-direct-pg";
 import { persistOutgoingChatMessage } from "@/lib/chat/outgoing-message-persist";
 import { resolveOutboundTextContextFromIds } from "@/lib/chat/outbound-send-dispatch";
 import { sendWhatsAppImage } from "@/lib/chat/whatsapp-send-service";
@@ -48,17 +47,57 @@ function safeErr(e: unknown): string {
   return "error_desconocido";
 }
 
-async function loadEmpresaNombre(
-  supabase: AppSupabaseClient,
-  empresaId: string
-): Promise<string> {
-  const { data } = await supabase
+async function loadEmpresaNombre(empresaId: string): Promise<string> {
+  const catalog = createServiceRoleClient();
+  const { data } = await catalog
     .from("empresas")
     .select("nombre")
     .eq("id", empresaId)
     .maybeSingle();
   const n = (data as { nombre?: string } | null)?.nombre;
   return (typeof n === "string" && n.trim() ? n.trim() : "Empresa");
+}
+
+/** Shim del webhook (`sorteos` por PG) o catálogo; si PostgREST falla en tenant, fallback SQL directo. */
+async function loadSorteoRowForTicket(input: {
+  supabase: AppSupabaseClient;
+  empresaId: string;
+  sorteoId: string;
+}): Promise<{
+  nombre: string;
+  ticket_delivery_mode: SorteoTicketDeliveryMode | undefined;
+  ticket_image_config: unknown;
+} | null> {
+  const { data, error } = await input.supabase
+    .from("sorteos")
+    .select("id, nombre, ticket_delivery_mode, ticket_image_config")
+    .eq("id", input.sorteoId)
+    .maybeSingle();
+  if (!error && data) {
+    return {
+      nombre: String((data as { nombre?: string }).nombre ?? "").trim(),
+      ticket_delivery_mode: (data as { ticket_delivery_mode?: string }).ticket_delivery_mode as
+        | SorteoTicketDeliveryMode
+        | undefined,
+      ticket_image_config: (data as { ticket_image_config?: unknown }).ticket_image_config,
+    };
+  }
+  const schema = await fetchDataSchemaForEmpresaId(input.empresaId);
+  const pg = await fetchSorteoRowTicketFieldsFromPg(schema, input.sorteoId);
+  if (!pg) {
+    if (error) {
+      console.warn("[sorteo-ticket] sorteo_row_pg_fallback_miss", {
+        sorteoId: String(input.sorteoId).slice(0, 8),
+        message: error.message,
+      });
+    }
+    return null;
+  }
+  return {
+    nombre: String(pg.nombre ?? "").trim(),
+    ticket_delivery_mode: pg.ticket_delivery_mode as SorteoTicketDeliveryMode | undefined,
+    ticket_image_config: pg.ticket_image_config,
+  };
 }
 
 export type MaybeGenerateAndSendSorteoTicketDeliveryInput = {
@@ -96,32 +135,24 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
   } = input;
 
   const schema = await fetchDataSchemaForEmpresaId(empresaId);
-  const sb = await createServiceRoleClientForEmpresa(empresaId);
+  const db = supabase;
 
-  const { data: sorteoRow, error: se } = await sb
-    .from("sorteos")
-    .select("id, nombre, ticket_delivery_mode, ticket_image_config")
-    .eq("id", sorteoId)
-    .maybeSingle();
-  if (se || !sorteoRow) {
+  const sorteoRow = await loadSorteoRowForTicket({ supabase, empresaId, sorteoId });
+  if (!sorteoRow) {
     console.warn("[sorteo-ticket] sorteo_not_found", { sorteoId: String(sorteoId).slice(0, 8) });
     return { ok: true, skipped: true, reason: "sorteo_not_found" };
   }
 
-  const mode = (sorteoRow as { ticket_delivery_mode?: string }).ticket_delivery_mode as
-    | SorteoTicketDeliveryMode
-    | undefined;
+  const mode = sorteoRow.ticket_delivery_mode;
   const effectiveMode: SorteoTicketDeliveryMode = mode ?? "text_only";
   if (effectiveMode === "text_only") {
     return { ok: true, skipped: true, reason: "text_only" };
   }
 
-  const config = normalizeTicketImageConfig(
-    (sorteoRow as { ticket_image_config?: unknown }).ticket_image_config
-  );
-  const sorteoNombre = String((sorteoRow as { nombre?: string }).nombre ?? "").trim() || "Sorteo";
+  const config = normalizeTicketImageConfig(sorteoRow.ticket_image_config);
+  const sorteoNombre = sorteoRow.nombre || "Sorteo";
 
-  const { data: existList } = await sb
+  const { data: existList } = await db
     .from("sorteo_ticket_deliveries")
     .select("id, status, template_revision, is_current")
     .eq("entrada_id", entradaId)
@@ -132,7 +163,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
     return { ok: true, skipped: true, reason: "already_sent" };
   }
 
-  const { data: maxRows } = await sb
+  const { data: maxRows } = await db
     .from("sorteo_ticket_deliveries")
     .select("template_revision")
     .eq("entrada_id", entradaId)
@@ -164,7 +195,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
 
   let rowId = deliveryId ?? "";
   if (!rowId) {
-    const ins = await sb
+    const ins = await db
       .from("sorteo_ticket_deliveries")
       .insert({
         empresa_id: empresaId,
@@ -193,7 +224,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
     }
     rowId = (ins.data as { id: string }).id;
   } else if (current?.status === "error") {
-    await sb
+    await db
       .from("sorteo_ticket_deliveries")
       .update({
         status: "pending",
@@ -204,16 +235,20 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
   }
 
   try {
-    await ensureTicketBucketsExist(sb);
+    await ensureTicketBucketsExist(supabase);
 
-    const empresaNombre = await loadEmpresaNombre(sb, empresaId);
+    const empresaNombre = await loadEmpresaNombre(empresaId);
     const logoPath = sorteoTicketAssetLogoPath(empresaId, sorteoId);
     const bgPath = sorteoTicketAssetBackgroundPath(empresaId, sorteoId);
-    let logoDl = await downloadAssetIfExists(sb, SORTEO_TICKET_ASSETS_BUCKET, logoPath);
+    let logoDl = await downloadAssetIfExists(supabase, SORTEO_TICKET_ASSETS_BUCKET, logoPath);
     if (!logoDl) {
-      logoDl = await downloadAssetIfExists(sb, SORTEO_TICKET_ASSETS_BUCKET, `${empresaId}/${sorteoId}/logo.webp`);
+      logoDl = await downloadAssetIfExists(
+        supabase,
+        SORTEO_TICKET_ASSETS_BUCKET,
+        `${empresaId}/${sorteoId}/logo.webp`
+      );
     }
-    const bgDl = await downloadAssetIfExists(sb, SORTEO_TICKET_ASSETS_BUCKET, bgPath);
+    const bgDl = await downloadAssetIfExists(supabase, SORTEO_TICKET_ASSETS_BUCKET, bgPath);
 
     const fechaHora = new Date().toLocaleString("es-PY", {
       dateStyle: "short",
@@ -239,12 +274,12 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
     const svg = buildSorteoTicketSvg(renderInput);
     const { png, hash } = await renderSorteoTicketPng(svg);
     const genPath = sorteoTicketGeneratedPath(empresaId, sorteoId, entradaId, templateRevision);
-    const up = await uploadGeneratedTicketPng(sb, genPath, png);
+    const up = await uploadGeneratedTicketPng(supabase, genPath, png);
     if (up.error) {
       throw new Error(up.error);
     }
 
-    await sb
+    await db
       .from("sorteo_ticket_deliveries")
       .update({
         status: "generated",
@@ -260,7 +295,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
       return { ok: true };
     }
 
-    const signed = await createSignedUrlForTicket(sb, genPath, 600);
+    const signed = await createSignedUrlForTicket(supabase, genPath, 600);
     if (!signed.url) {
       throw new Error(signed.error ?? "signed_url");
     }
@@ -310,7 +345,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
         ? sendResult.waMessageId
         : null;
 
-    await sb
+    await db
       .from("sorteo_ticket_deliveries")
       .update({
         status: "sent",
@@ -341,7 +376,7 @@ export async function maybeGenerateAndSendSorteoTicketDelivery(
       entradaId: String(entradaId).slice(0, 8),
       reason: msg.slice(0, 120),
     });
-    await sb
+    await db
       .from("sorteo_ticket_deliveries")
       .update({
         status: "error",
@@ -372,16 +407,18 @@ export async function runSorteoTicketPreClose(params: {
   flowData: Record<string, string>;
   trigger: SorteoTicketTrigger;
 }): Promise<SorteoTicketPhaseResult> {
-  const sb = await createServiceRoleClientForEmpresa(params.empresaId);
-  const { data: sorteoRow } = await sb
-    .from("sorteos")
-    .select("ticket_delivery_mode")
-    .eq("id", params.orderResult.sorteoId)
-    .maybeSingle();
-  const mode = (sorteoRow as { ticket_delivery_mode?: string } | null)?.ticket_delivery_mode as
-    | SorteoTicketDeliveryMode
-    | undefined;
-  const effectiveMode: SorteoTicketDeliveryMode = mode ?? "text_only";
+  const meta = await loadSorteoRowForTicket({
+    supabase: params.supabase,
+    empresaId: params.empresaId,
+    sorteoId: params.orderResult.sorteoId,
+  });
+  if (!meta) {
+    console.warn("[sorteo-ticket] pre_close_sorteo_meta_miss", {
+      sorteoId: String(params.orderResult.sorteoId).slice(0, 8),
+    });
+    return { suppressPlainTextBody: false, needsPostFlowImage: false };
+  }
+  const effectiveMode: SorteoTicketDeliveryMode = meta.ticket_delivery_mode ?? "text_only";
 
   if (effectiveMode === "text_only") {
     return { suppressPlainTextBody: false, needsPostFlowImage: false };
@@ -424,16 +461,12 @@ export async function runSorteoTicketAfterBuyerText(params: {
   flowData: Record<string, string>;
   trigger: SorteoTicketTrigger;
 }): Promise<void> {
-  const sb = await createServiceRoleClientForEmpresa(params.empresaId);
-  const { data: sorteoRow } = await sb
-    .from("sorteos")
-    .select("ticket_delivery_mode")
-    .eq("id", params.orderResult.sorteoId)
-    .maybeSingle();
-  const mode = (sorteoRow as { ticket_delivery_mode?: string } | null)?.ticket_delivery_mode as
-    | SorteoTicketDeliveryMode
-    | undefined;
-  if ((mode ?? "text_only") !== "text_and_image") return;
+  const meta = await loadSorteoRowForTicket({
+    supabase: params.supabase,
+    empresaId: params.empresaId,
+    sorteoId: params.orderResult.sorteoId,
+  });
+  if ((meta?.ticket_delivery_mode ?? "text_only") !== "text_and_image") return;
 
   await maybeGenerateAndSendSorteoTicketDelivery({
     supabase: params.supabase,
@@ -464,9 +497,9 @@ export async function resendSorteoTicketByDeliveryId(input: {
   deliveryId: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const schema = await fetchDataSchemaForEmpresaId(input.empresaId);
-  const sb = await createServiceRoleClientForEmpresa(input.empresaId);
+  const db = input.supabase;
 
-  const { data: row, error: r0 } = await sb
+  const { data: row, error: r0 } = await db
     .from("sorteo_ticket_deliveries")
     .select(
       "id, entrada_id, sorteo_id, conversation_id, channel_id, storage_path, empresa_id, numero_orden, payload_snapshot"
@@ -483,7 +516,7 @@ export async function resendSorteoTicketByDeliveryId(input: {
   const channelId = (row as { channel_id?: string | null }).channel_id;
   if (!convId || !channelId) return { ok: false, error: "no_conversation" };
 
-  const { data: conv } = await sb
+  const { data: conv } = await db
     .from("chat_conversations")
     .select("contact_id")
     .eq("id", convId)
@@ -492,11 +525,15 @@ export async function resendSorteoTicketByDeliveryId(input: {
   if (!contactId) return { ok: false, error: "no_contact" };
 
   const sorteoId = (row as { sorteo_id: string }).sorteo_id;
-  const { data: sr } = await sb.from("sorteos").select("nombre, ticket_image_config").eq("id", sorteoId).maybeSingle();
-  const cfg = normalizeTicketImageConfig((sr as { ticket_image_config?: unknown } | null)?.ticket_image_config);
-  const sorteoNombre = String((sr as { nombre?: string } | null)?.nombre ?? "").trim();
+  const sr = await loadSorteoRowForTicket({
+    supabase: input.supabase,
+    empresaId: input.empresaId,
+    sorteoId,
+  });
+  const cfg = normalizeTicketImageConfig(sr?.ticket_image_config);
+  const sorteoNombre = String(sr?.nombre ?? "").trim();
 
-  const signed = await createSignedUrlForTicket(sb, storagePath, 600);
+  const signed = await createSignedUrlForTicket(input.supabase, storagePath, 600);
   if (!signed.url) return { ok: false, error: signed.error ?? "signed_url" };
 
   let outbound: Awaited<ReturnType<typeof resolveOutboundTextContextFromIds>>;
@@ -543,7 +580,7 @@ export async function resendSorteoTicketByDeliveryId(input: {
       ? sendResult.waMessageId
       : null;
 
-  await sb
+  await db
     .from("sorteo_ticket_deliveries")
     .update({
       whatsapp_message_id: waId,

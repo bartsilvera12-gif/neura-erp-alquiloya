@@ -2950,7 +2950,20 @@ export function createFlowEngine(ctx: FlowEngineContext) {
           trigger: "comprobante_imagen",
         },
       });
+      console.info("[sorteo-ticket] image_path_order_created_detected", {
+        conversationId: state.id,
+        flowSessionId: imgFlowSid,
+        sorteoId: finImg.sorteoId,
+        entradaId: finImg.entradaId,
+        numeroOrden: finImg.numeroOrden,
+        cuponesCount: finImg.cupones.length,
+        trigger: "comprobante_imagen",
+      });
       try {
+        console.info("[sorteo-ticket] image_path_ticket_pre_close_start", {
+          conversationId: state.id,
+          flowSessionId: imgFlowSid,
+        });
         const pre = await runSorteoTicketPreClose({
           supabase,
           empresaId: state.empresa_id,
@@ -2965,7 +2978,17 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         sorteoImgTicketPostAfterText = pre.needsPostFlowImage;
         sorteoImgTicketSuppressPlain = pre.suppressPlainTextBody;
         sorteoImgTicketPackage = { fin: finImg, flowData: hydFdImg };
+        console.info("[sorteo-ticket] image_path_ticket_pre_close_result", {
+          conversationId: state.id,
+          needsPostFlowImage: pre.needsPostFlowImage,
+          suppressPlainTextBody: pre.suppressPlainTextBody,
+        });
       } catch (e) {
+        console.warn("[sorteo-ticket] image_path_ticket_error", {
+          phase: "pre_close",
+          conversationId: state.id,
+          err: e instanceof Error ? e.message : String(e),
+        });
         console.warn("[flow-engine] sorteo_ticket_pre_close_image", {
           conversationId: state.id,
           err: e instanceof Error ? e.message : String(e),
@@ -2976,6 +2999,10 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     if (!currentNode.next_node_code) {
       if (sorteoImgTicketPackage) {
         try {
+          console.info("[sorteo-ticket] image_path_after_text_start", {
+            conversationId: state.id,
+            path: "no_next_node",
+          });
           await runSorteoTicketAfterBuyerText({
             supabase,
             empresaId: state.empresa_id,
@@ -2987,7 +3014,17 @@ export function createFlowEngine(ctx: FlowEngineContext) {
             flowData: sorteoImgTicketPackage.flowData,
             trigger: "comprobante_imagen",
           });
+          console.info("[sorteo-ticket] image_path_after_text_result", {
+            conversationId: state.id,
+            path: "no_next_node",
+            ok: true,
+          });
         } catch (e) {
+          console.warn("[sorteo-ticket] image_path_ticket_error", {
+            phase: "after_text_no_next",
+            conversationId: state.id,
+            err: e instanceof Error ? e.message : String(e),
+          });
           console.warn("[flow-engine] sorteo_ticket_after_image_no_next", {
             conversationId: state.id,
             err: e instanceof Error ? e.message : String(e),
@@ -3035,6 +3072,11 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     }
     if (sorteoImgTicketPostAfterText && sorteoImgTicketPackage) {
       try {
+        console.info("[sorteo-ticket] image_path_after_text_start", {
+          conversationId: state.id,
+          path: "after_next_node",
+          nextNodeCode: currentNode.next_node_code,
+        });
         await runSorteoTicketAfterBuyerText({
           supabase,
           empresaId: state.empresa_id,
@@ -3046,7 +3088,17 @@ export function createFlowEngine(ctx: FlowEngineContext) {
           flowData: sorteoImgTicketPackage.flowData,
           trigger: "comprobante_imagen",
         });
+        console.info("[sorteo-ticket] image_path_after_text_result", {
+          conversationId: state.id,
+          path: "after_next_node",
+          ok: true,
+        });
       } catch (e) {
+        console.warn("[sorteo-ticket] image_path_ticket_error", {
+          phase: "after_text_next_node",
+          conversationId: state.id,
+          err: e instanceof Error ? e.message : String(e),
+        });
         console.warn("[flow-engine] sorteo_ticket_after_image_node", {
           conversationId: state.id,
           err: e instanceof Error ? e.message : String(e),
