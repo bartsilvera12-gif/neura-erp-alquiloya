@@ -44,7 +44,7 @@ export async function POST(
       .update({ is_current: false, updated_at: new Date().toISOString() })
       .eq("entrada_id", entradaId);
 
-    const orderResult = await buildOrderResultFromEntradaId(sb, entradaId);
+    const orderResult = await buildOrderResultFromEntradaId(sb, entradaId, empresaId);
     const fd = await flowDataStubFromEntrada(sb, entradaId);
     if (!orderResult) {
       return NextResponse.json(errorResponse("entrada_not_found"), { status: 400 });

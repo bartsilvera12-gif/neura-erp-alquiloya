@@ -36,8 +36,10 @@ export default function SorteosTicketsPage() {
       const res = await fetchWithSupabaseSession(`/api/sorteos/tickets?${sp.toString()}`, {
         cache: "no-store",
       });
-      const json = (await res.json()) as { success?: boolean; data?: TicketRow[] };
-      if (!res.ok || !json.success) throw new Error("No se pudo cargar");
+      const json = (await res.json()) as { success?: boolean; data?: TicketRow[]; error?: string };
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.trim() || `No se pudo cargar (${res.status})`);
+      }
       setRows(Array.isArray(json.data) ? json.data : []);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");

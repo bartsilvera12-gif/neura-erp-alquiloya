@@ -34,7 +34,12 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query;
     if (error) {
-      return NextResponse.json(errorResponse(error.message), { status: 400 });
+      const hint =
+        /sorteo_ticket_deliveries|does not exist|relation/i.test(error.message)
+          ? " Verificá que la migración sorteo_ticket_deliveries esté aplicada en el schema tenant (erp_*)."
+          : "";
+      console.error("[api/sorteos/tickets] list_error", { empresaId, message: error.message });
+      return NextResponse.json(errorResponse(`${error.message}${hint}`), { status: 400 });
     }
     let rows = data ?? [];
     if (q) {

@@ -5,15 +5,19 @@ import type { EnsureSorteoOrderCreatedData } from "@/lib/sorteos/sorteo-order-fr
 
 export async function buildOrderResultFromEntradaId(
   sb: AppSupabaseClient,
-  entradaId: string
+  entradaId: string,
+  empresaId?: string
 ): Promise<EnsureSorteoOrderCreatedData | null> {
-  const { data: ent, error: e1 } = await sb
+  let q = sb
     .from("sorteo_entradas")
     .select(
       "id, sorteo_id, empresa_id, numero_orden, cantidad_boletos, monto_total, nombre_participante, documento, whatsapp_numero"
     )
-    .eq("id", entradaId)
-    .maybeSingle();
+    .eq("id", entradaId);
+  if (empresaId?.trim()) {
+    q = q.eq("empresa_id", empresaId.trim());
+  }
+  const { data: ent, error: e1 } = await q.maybeSingle();
   if (e1 || !ent) return null;
 
   const { data: sorteo } = await sb

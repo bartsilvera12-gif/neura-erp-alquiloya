@@ -25,6 +25,7 @@ import {
   buildChatFlowDataUpsertsForSorteoOrder,
   buildSorteoOrderFlowVarOverrides,
   explainParseSorteoParticipantFailure,
+  CHAT_FLOW_SORTEO_CONTEXT_FIELDS,
   finalizeSorteoOrderFromConfirmedFlowData,
   getSorteoDatosIncompletosMessage,
   getSorteoIdForChatFlow,
@@ -35,6 +36,7 @@ import {
   SORTEO_COMPROBANTE_URL_FIELD,
   type EnsureSorteoOrderCreatedData,
 } from "@/lib/sorteos/sorteo-order-from-chat";
+import { buildOrderResultFromEntradaId } from "@/lib/sorteos/sorteo-ticket-admin";
 import { parseMoneyPy } from "@/lib/sorteos/parse-money-py";
 import {
   runSorteoTicketAfterBuyerText,
@@ -397,7 +399,7 @@ export function createFlowEngine(ctx: FlowEngineContext) {
         .maybeSingle();
       sid = (crow as { active_flow_session_id?: string | null } | null)?.active_flow_session_id?.trim() || null;
     }
-    const { error } = await supabase.from("chat_flow_events").insert({
+    const row = {
       empresa_id: input.empresaId,
       conversation_id: input.conversationId,
       flow_code: input.flowCode ?? null,
@@ -407,8 +409,36 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       meta_button_id: input.metaButtonId ?? null,
       payload: input.payload ?? {},
       flow_session_id: sid,
-    });
-    if (error) {
+    };
+    const firstIns = await supabase.from("chat_flow_events").insert(row);
+    const error = firstIns.error;
+    const errCode = (error as { code?: string } | null)?.code;
+    const errMsg = (error?.message ?? "").toLowerCase();
+    if (
+      error &&
+      input.selectedOptionId &&
+      (errCode === "23503" ||
+        errMsg.includes("chat_flow_events_selected_option_id_fkey") ||
+        (errMsg.includes("foreign key") && errMsg.includes("selected_option")))
+    ) {
+      const { error: e2 } = await supabase.from("chat_flow_events").insert({
+        ...row,
+        selected_option_id: null,
+        payload: {
+          ...(row.payload as Record<string, unknown>),
+          selected_option_id_omitted: true,
+          selected_option_id_omission_reason: "fk_invalid_option_id",
+        },
+      });
+      if (e2) {
+        console.error("[flow-engine] event insert retry:", e2.message);
+      } else {
+        console.warn("[flow-engine] chat_flow_events: omitió selected_option_id (FK inválida)", {
+          conversationId: input.conversationId,
+          optionId: input.selectedOptionId,
+        });
+      }
+    } else if (error) {
       console.error("[flow-engine] event insert:", error.message);
     }
   }
@@ -1755,6 +1785,8 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       fin: EnsureSorteoOrderCreatedData;
       flowData: Record<string, string>;
     } | null = null;
+    /** Paquete armado desde sorteo_entrada_id en flow_data (orden ya persistida; botón no es finalize). */
+    let sorteoTicketFromExistingFlowData = false;
     const wantsSorteoFinalize = isSorteoFinalizeClick;
 
     if (wantsSorteoFinalize) {
@@ -1891,6 +1923,76 @@ export function createFlowEngine(ctx: FlowEngineContext) {
       }
     }
 
+    /**
+     * Orden ya creada en DB y variables en chat_flow_data, pero el botón actual no tiene
+     * confirmar_orden_sorteo (solo avanza al nodo final). Misma lógica de ticket que finalize.
+     */
+    if (!wantsSorteoFinalize && sorteoLinked && flowSidInteractive && !sorteoTicketPackage) {
+      try {
+        const rawFdEx = await getConversationFlowDataMap({
+          empresaId: state.empresa_id,
+          conversationId: state.id,
+          flowCode: state.flow_code,
+          flowSessionId: flowSidInteractive,
+          traceReadContext: "existing_order_ticket_hook",
+        });
+        const hydFdEx = await hydrateFlowDataFromSessionEvents(
+          state.id,
+          state.flow_code as string,
+          rawFdEx,
+          flowSidInteractive
+        );
+        const F = CHAT_FLOW_SORTEO_CONTEXT_FIELDS;
+        const entradaRaw = (hydFdEx[F.sorteo_entrada_id] ?? hydFdEx.sorteo_entrada_id ?? "").trim();
+        if (entradaRaw && /^[0-9a-f-]{36}$/i.test(entradaRaw)) {
+          const orderFromDb = await buildOrderResultFromEntradaId(supabase, entradaRaw, state.empresa_id);
+          if (orderFromDb && orderFromDb.sorteoId === sorteoLinked) {
+            console.info("[sorteo-ticket] post_node_existing_order_detected", {
+              conversationId: state.id,
+              entradaId: `${entradaRaw.slice(0, 8)}…`,
+              sorteoId: orderFromDb.sorteoId,
+            });
+            const pre = await runSorteoTicketPreClose({
+              supabase,
+              empresaId: state.empresa_id,
+              conversationId: state.id,
+              contactId: state.contact_id,
+              channelId: state.channel_id,
+              flowSessionId: flowSidInteractive,
+              orderResult: orderFromDb,
+              flowData: hydFdEx,
+              trigger: "confirmacion_final",
+            });
+            sorteoTicketPostAfterText = pre.needsPostFlowImage;
+            sorteoTicketSuppressPlain = sorteoTicketSuppressPlain || pre.suppressPlainTextBody;
+            sorteoTicketPackage = { fin: orderFromDb, flowData: hydFdEx };
+            sorteoTicketFromExistingFlowData = true;
+            if (pre.suppressPlainTextBody && !pre.needsPostFlowImage) {
+              console.info("[sorteo-ticket] post_node_existing_order_sent", {
+                conversationId: state.id,
+                path: "pre_close_image_only",
+              });
+            }
+          } else {
+            console.info("[sorteo-ticket] post_node_existing_order_skipped", {
+              reason: orderFromDb ? "sorteo_id_mismatch" : "entrada_not_found",
+              conversationId: state.id,
+            });
+          }
+        } else {
+          console.info("[sorteo-ticket] post_node_existing_order_skipped", {
+            reason: "no_sorteo_entrada_id_in_flow_data",
+            conversationId: state.id,
+          });
+        }
+      } catch (e) {
+        console.error("[sorteo-ticket] post_node_existing_order_error", {
+          conversationId: state.id,
+          err: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
     if (!selected.next_node_code) {
       await insertFlowEvent({
         empresaId: state.empresa_id,
@@ -1932,9 +2034,16 @@ export function createFlowEngine(ctx: FlowEngineContext) {
                 flowData: sorteoTicketPackage.flowData,
                 trigger: "confirmacion_final",
               });
+              if (sorteoTicketFromExistingFlowData) {
+                console.info("[sorteo-ticket] post_node_existing_order_sent", {
+                  conversationId: state.id,
+                  path: "after_buyer_text_no_next_node",
+                });
+              }
             } catch (e) {
               console.warn("[flow-engine] sorteo_ticket_after_summary", {
                 conversationId: state.id,
+                fromExistingFlowData: sorteoTicketFromExistingFlowData,
                 err: e instanceof Error ? e.message : String(e),
               });
             }
@@ -2001,9 +2110,16 @@ export function createFlowEngine(ctx: FlowEngineContext) {
           flowData: sorteoTicketPackage.flowData,
           trigger: "confirmacion_final",
         });
+        if (sorteoTicketFromExistingFlowData) {
+          console.info("[sorteo-ticket] post_node_existing_order_sent", {
+            conversationId: state.id,
+            path: "after_buyer_text_advanced",
+          });
+        }
       } catch (e) {
         console.warn("[flow-engine] sorteo_ticket_after_node", {
           conversationId: state.id,
+          fromExistingFlowData: sorteoTicketFromExistingFlowData,
           err: e instanceof Error ? e.message : String(e),
         });
       }
