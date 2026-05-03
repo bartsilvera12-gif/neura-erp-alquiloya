@@ -1,8 +1,10 @@
 import type { Pool } from "pg";
 import {
+  buildActiveFlowMatchSet,
   buildFlowSessionMap,
   conversationBelongsToBotTab,
   explainConversationBotClassification,
+  flowTokenMatchesActiveCatalog,
   maskPhonePartialForLog,
   type FlowSessionRowMin,
 } from "@/lib/chat/inbox-bot-tab-classification";
@@ -42,28 +44,128 @@ function isoPg(v: unknown): string | null {
   return String(v);
 }
 
-async function pgActiveFlowCodes(pool: Pool, schema: string, empresaId: string): Promise<Set<string>> {
+type ActiveFlowCatalogRow = {
+  id: string;
+  flow_code: string;
+  name: string;
+  activo: boolean;
+};
+
+async function pgLoadActiveFlowsForClassification(
+  pool: Pool,
+  schema: string,
+  empresaId: string
+): Promise<{ rows: ActiveFlowCatalogRow[]; matchSet: Set<string> }> {
   try {
     const qt = quoteSchemaTable(schema, "chat_flows");
-    /** Misma regla que PostgREST en `fetchChatConversations`: todos los flujos activos de la empresa. */
+    /** Misma regla que PostgREST en `fetchChatConversations`: flujos activos; incluye id para coincidir sesiones que guardan UUID. */
     const q = `
-      SELECT flow_code::text AS flow_code FROM ${qt}
+      SELECT id::text AS id, flow_code::text AS flow_code,
+             COALESCE(label, '')::text AS name,
+             COALESCE(activo, false) AS activo
+      FROM ${qt}
       WHERE empresa_id = $1::uuid
         AND COALESCE(activo, false) = true
     `;
     const r = await pool.query(q, [empresaId]);
-    return new Set(
-      (r.rows ?? [])
-        .map((row: { flow_code?: string }) => String(row.flow_code ?? "").trim())
-        .filter(Boolean)
-    );
+    const rows: ActiveFlowCatalogRow[] = (r.rows ?? []).map((row: Record<string, unknown>) => ({
+      id: String(row.id ?? "").trim(),
+      flow_code: String(row.flow_code ?? "").trim(),
+      name: String(row.name ?? "").trim(),
+      activo: Boolean(row.activo),
+    }));
+    return { rows, matchSet: buildActiveFlowMatchSet(rows) };
   } catch (e) {
-    console.warn("[bot-routing]", "pgActiveFlowCodes_failed", {
+    console.warn("[bot-routing]", "pgLoadActiveFlowsForClassification_failed", {
       empresa_id: empresaId,
       schema,
       message: e instanceof Error ? e.message : String(e),
     });
-    return new Set();
+    return { rows: [], matchSet: new Set() };
+  }
+}
+
+async function logBotTabClassificationSampleTenantPg(
+  pool: Pool,
+  schema: string,
+  empresaId: string,
+  vista: ConversacionesVista,
+  listBeforeSplit: Record<string, unknown>[],
+  botTabCount: number,
+  activeSessionsSize: number,
+  classifyCtx: {
+    activeFlowCodeSet: Set<string>;
+    sessionById: Map<string, FlowSessionRowMin>;
+    activeSessionByConversationId: Map<string, FlowSessionRowMin>;
+  },
+  activeFlowCatalogRowCount: number
+): Promise<void> {
+  if (vista !== "bot" || botTabCount > 0 || activeSessionsSize === 0) return;
+
+  const withMappedSession = listBeforeSplit.filter((row) => {
+    const cid = String(row.id ?? "").trim();
+    return cid.length > 0 && classifyCtx.activeSessionByConversationId.has(cid);
+  });
+  const pick = (withMappedSession.length > 0 ? withMappedSession : listBeforeSplit).slice(0, 5);
+  if (pick.length === 0) return;
+
+  const chIds = [
+    ...new Set(
+      pick
+        .map((row) => String((row as { channel_id?: string | null }).channel_id ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  const chById: Record<string, { type: string; nombre: string | null }> = {};
+  if (chIds.length > 0) {
+    try {
+      const chQt = quoteSchemaTable(schema, "chat_channels");
+      const chr = await pool.query(
+        `SELECT id::text, type::text, nombre::text FROM ${chQt}
+         WHERE empresa_id = $1::uuid AND id = ANY($2::uuid[])`,
+        [empresaId, chIds]
+      );
+      for (const r of chr.rows ?? []) {
+        const row = r as { id?: string; type?: string; nombre?: string | null };
+        const id = String(row.id ?? "").trim();
+        if (!id) continue;
+        chById[id] = { type: String(row.type ?? "").trim() || "unknown", nombre: row.nombre ?? null };
+      }
+    } catch {
+      /* sin metadatos de canal */
+    }
+  }
+
+  for (const row of pick) {
+    const ex = explainConversationBotClassification(row, classifyCtx);
+    const cid = String(row.id ?? "").trim();
+    const ptr = String((row as { active_flow_session_id?: string | null }).active_flow_session_id ?? "").trim();
+    const mapped = classifyCtx.activeSessionByConversationId.get(cid);
+    const resolvedId = ex.resolvedSessionId ?? mapped?.id ?? null;
+    const resolvedRow = resolvedId ? classifyCtx.sessionById.get(resolvedId) ?? mapped : mapped;
+    const sessFlow = resolvedRow ? String(resolvedRow.flow_code ?? "").trim() : "";
+    const chId = String((row as { channel_id?: string | null }).channel_id ?? "").trim();
+    const ch = chId ? chById[chId] : undefined;
+
+    console.info("[chat-list][classification-sample]", {
+      conversation_id: cid,
+      status: String(row.status ?? ""),
+      human_taken_over: Boolean(row.human_taken_over),
+      flow_status: String(row.flow_status ?? ""),
+      active_flow_session_id: ptr || null,
+      resolved_session_id: resolvedId,
+      resolved_session_status: resolvedRow ? String(resolvedRow.status ?? "") : null,
+      resolved_session_flow_code: sessFlow || null,
+      channel_id: chId || null,
+      channel_provider: ch?.type ?? null,
+      channel_name: ch?.nombre ?? null,
+      has_channel_flow: ex.flags.hasChannelFlow,
+      active_flow_codes: activeFlowCatalogRowCount,
+      flow_code_in_active_set: flowTokenMatchesActiveCatalog(sessFlow, classifyCtx.activeFlowCodeSet),
+      result_is_bot: ex.isBot,
+      reason_not_bot: ex.isBot ? null : ex.reason,
+      flags: ex.flags,
+    });
   }
 }
 
@@ -157,8 +259,13 @@ export async function fetchChatConversationsFromTenantPg(
 ): Promise<InboxConversation[]> {
   const { supabase, catalogSr, empresa_id, usuario_id } = ctx;
 
-  const activeFlowCodeSet = await pgActiveFlowCodes(pool, dataSchema, empresa_id);
-  if (vista === "bot" && activeFlowCodeSet.size === 0) {
+  const { rows: activeFlowRows, matchSet: activeFlowCodeSet } = await pgLoadActiveFlowsForClassification(
+    pool,
+    dataSchema,
+    empresa_id
+  );
+  const activeFlowCatalogRowCount = activeFlowRows.length;
+  if (vista === "bot" && activeFlowCatalogRowCount === 0) {
     return [];
   }
 
@@ -322,6 +429,8 @@ export async function fetchChatConversationsFromTenantPg(
     activeSessionByConversationId,
   };
 
+  const listBeforeBotTabSplit = [...list];
+
   const rowsSnapshotForLogs = (
     String(process.env.CHAT_LIST_CLASSIFICATION_VERBOSE ?? "")
       .trim()
@@ -347,10 +456,35 @@ export async function fetchChatConversationsFromTenantPg(
     total_fetched: totalAfterQuery,
     after_tab_split: list.length,
     bot_like_count: botTabCount,
-    active_flow_codes: activeFlowCodeSet.size,
+    active_flow_codes: activeFlowCatalogRowCount,
+    active_flow_match_tokens: activeFlowCodeSet.size,
     session_map_size: flowSessionById.size,
     active_sessions_by_conversation: activeSessionByConversationId.size,
   });
+
+  console.info("[chat-list][active-flows]", {
+    schema: dataSchema,
+    empresa_id,
+    count: activeFlowCatalogRowCount,
+    sample: activeFlowRows.slice(0, 12).map((r) => ({
+      id: r.id,
+      flow_code: r.flow_code,
+      name: r.name.trim() ? r.name : null,
+      active: r.activo,
+    })),
+  });
+
+  await logBotTabClassificationSampleTenantPg(
+    pool,
+    dataSchema,
+    empresa_id,
+    vista,
+    listBeforeBotTabSplit,
+    botTabCount,
+    activeSessionByConversationId.size,
+    classifyCtx,
+    activeFlowCatalogRowCount
+  );
 
   if (rowsSnapshotForLogs.length > 0) {
     const contactIds = [

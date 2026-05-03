@@ -37,6 +37,10 @@ function debugForceNoBotTab(): boolean {
 }
 
 export type InboxBotClassificationInput = {
+  /**
+   * Tokens que identifican flujos activos en catálogo: `chat_flows.flow_code` y `chat_flows.id` (texto),
+   * en forma original y en minúsculas (coincidencia con sesiones que guardan UUID o slug distinto).
+   */
   activeFlowCodeSet: Set<string>;
   sessionById: Map<string, FlowSessionRowMin>;
   /**
@@ -67,6 +71,35 @@ export type BotClassificationExplanation = {
 
 /** Estados que cuentan como sesión “en ejecución” para la pestaña Bot (además de `active`). */
 const SESSION_STATUS_BOT_ACTIVE = new Set(["active", "running"]);
+
+/** `flow_status` en conversación que indica automatización cuando no hay puntero/sesión resuelta. */
+const FLOW_STATUS_BOTISH = new Set(["bot", "active", "running"]);
+
+export function buildActiveFlowMatchSet(
+  rows: { id?: string | null; flow_code?: string | null }[] | null | undefined
+): Set<string> {
+  const s = new Set<string>();
+  for (const r of rows ?? []) {
+    const id = String(r.id ?? "").trim();
+    const fc = String(r.flow_code ?? "").trim();
+    if (id) {
+      s.add(id);
+      s.add(id.toLowerCase());
+    }
+    if (fc) {
+      s.add(fc);
+      s.add(fc.toLowerCase());
+    }
+  }
+  return s;
+}
+
+export function flowTokenMatchesActiveCatalog(token: string | null | undefined, matchSet: Set<string>): boolean {
+  const t = String(token ?? "").trim();
+  if (!t) return false;
+  if (matchSet.has(t)) return true;
+  return matchSet.has(t.toLowerCase());
+}
 
 function normalizeSessionStatus(s: string): string {
   return String(s ?? "")
@@ -104,6 +137,11 @@ export function resolveFlowSessionForClassification(
   return { session: null, resolutionPath: "none" };
 }
 
+function activeSessionInMap(conv: Record<string, unknown>, ctx: InboxBotClassificationInput): boolean {
+  const cid = String(conv.id ?? "").trim();
+  return Boolean(cid && ctx.activeSessionByConversationId?.has(cid));
+}
+
 function emptyFlags(partial?: Partial<BotClassificationExplanation["flags"]>): BotClassificationExplanation["flags"] {
   return {
     humanTakenOver: partial?.humanTakenOver ?? false,
@@ -131,7 +169,8 @@ function evaluateBotConversation(
   const pointerId = String(conv.active_flow_session_id ?? "").trim();
   const convFlow = String(conv.flow_code ?? "").trim();
   const hasCompanyFlows = ctx.activeFlowCodeSet.size > 0;
-  const hasChannelFlow = hasCompanyFlows && Boolean(convFlow) && ctx.activeFlowCodeSet.has(convFlow);
+  const hasChannelFlow =
+    hasCompanyFlows && Boolean(convFlow) && flowTokenMatchesActiveCatalog(convFlow, ctx.activeFlowCodeSet);
 
   const baseFlags = emptyFlags({
     humanTakenOver,
@@ -162,13 +201,25 @@ function evaluateBotConversation(
   const { session, resolutionPath } = resolveFlowSessionForClassification(conv, ctx);
 
   if (!session) {
+    if (FLOW_STATUS_BOTISH.has(flowStatus) && hasChannelFlow) {
+      return {
+        isBot: true,
+        reason: "ok_bot_tab_flow_status_channel_no_resolved_session",
+        resolvedSessionId: null,
+        flags: emptyFlags({
+          ...baseFlags,
+          hasActiveSessionInTable: activeSessionInMap(conv, ctx),
+          resolutionPath,
+        }),
+      };
+    }
     return {
       isBot: false,
       reason: pointerId ? "active_flow_session_row_missing_or_mismatch" : "no_active_flow_session_for_conversation",
       resolvedSessionId: null,
       flags: emptyFlags({
         ...baseFlags,
-        hasActiveSessionInTable: false,
+        hasActiveSessionInTable: activeSessionInMap(conv, ctx),
         resolutionPath,
       }),
     };
@@ -187,7 +238,7 @@ function evaluateBotConversation(
     sessionMatchesConversation,
     sessionStatus: sessStatus,
     resolutionPath,
-    runningFlowInCatalog: Boolean(runningFlow && ctx.activeFlowCodeSet.has(runningFlow)),
+    runningFlowInCatalog: Boolean(runningFlow && flowTokenMatchesActiveCatalog(runningFlow, ctx.activeFlowCodeSet)),
   });
 
   if (!sessionMatchesConversation) {
@@ -203,7 +254,7 @@ function evaluateBotConversation(
     };
   }
 
-  if (!runningFlow || !ctx.activeFlowCodeSet.has(runningFlow)) {
+  if (!runningFlow || !flowTokenMatchesActiveCatalog(runningFlow, ctx.activeFlowCodeSet)) {
     return { isBot: false, reason: "running_flow_not_in_active_catalog", resolvedSessionId: session.id, flags };
   }
 

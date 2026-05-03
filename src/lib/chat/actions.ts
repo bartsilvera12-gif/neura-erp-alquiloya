@@ -1,9 +1,11 @@
 "use server";
 
 import {
+  buildActiveFlowMatchSet,
   buildFlowSessionMap,
   conversationBelongsToBotTab,
   explainConversationBotClassification,
+  flowTokenMatchesActiveCatalog,
   maskPhonePartialForLog,
   type FlowSessionRowMin,
 } from "@/lib/chat/inbox-bot-tab-classification";
@@ -165,6 +167,90 @@ export async function fetchChatConversations(
   }
 }
 
+type BotTabClassifyCtx = {
+  activeFlowCodeSet: Set<string>;
+  sessionById: Map<string, FlowSessionRowMin>;
+  activeSessionByConversationId: Map<string, FlowSessionRowMin>;
+};
+
+async function logBotTabClassificationSamplePostgrest(
+  supabase: AppSupabaseClient,
+  empresa_id: string,
+  vista: ConversacionesVista,
+  listBeforeSplit: Record<string, unknown>[],
+  botLikeCount: number,
+  activeSessionsSize: number,
+  classifyCtx: BotTabClassifyCtx,
+  activeFlowCatalogRowCount: number
+): Promise<void> {
+  if (vista !== "bot" || botLikeCount > 0 || activeSessionsSize === 0) return;
+
+  const withMappedSession = listBeforeSplit.filter((row) => {
+    const cid = String(row.id ?? "").trim();
+    return cid.length > 0 && classifyCtx.activeSessionByConversationId.has(cid);
+  });
+  const pick = (withMappedSession.length > 0 ? withMappedSession : listBeforeSplit).slice(0, 5);
+  if (pick.length === 0) return;
+
+  const chIds = [
+    ...new Set(
+      pick
+        .map((row) => String((row as { channel_id?: string | null }).channel_id ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  const chById: Record<string, { type: string; nombre: string | null }> = {};
+  if (chIds.length > 0) {
+    const { data: chRows, error: chErr } = await supabase
+      .from("chat_channels")
+      .select("id, type, nombre")
+      .eq("empresa_id", empresa_id)
+      .in("id", chIds);
+    if (chErr) {
+      console.warn("[chat-list][classification-sample] chat_channels:", chErr.message);
+    } else {
+      for (const r of chRows ?? []) {
+        const row = r as { id?: string; type?: string; nombre?: string | null };
+        const id = String(row.id ?? "").trim();
+        if (!id) continue;
+        chById[id] = { type: String(row.type ?? "").trim() || "unknown", nombre: row.nombre ?? null };
+      }
+    }
+  }
+
+  for (const row of pick) {
+    const ex = explainConversationBotClassification(row, classifyCtx);
+    const cid = String(row.id ?? "").trim();
+    const ptr = String((row as { active_flow_session_id?: string | null }).active_flow_session_id ?? "").trim();
+    const mapped = classifyCtx.activeSessionByConversationId.get(cid);
+    const resolvedId = ex.resolvedSessionId ?? mapped?.id ?? null;
+    const resolvedRow = resolvedId ? classifyCtx.sessionById.get(resolvedId) ?? mapped : mapped;
+    const sessFlow = resolvedRow ? String(resolvedRow.flow_code ?? "").trim() : "";
+    const chId = String((row as { channel_id?: string | null }).channel_id ?? "").trim();
+    const ch = chId ? chById[chId] : undefined;
+
+    console.info("[chat-list][classification-sample]", {
+      conversation_id: cid,
+      status: String(row.status ?? ""),
+      human_taken_over: Boolean(row.human_taken_over),
+      flow_status: String(row.flow_status ?? ""),
+      active_flow_session_id: ptr || null,
+      resolved_session_id: resolvedId,
+      resolved_session_status: resolvedRow ? String(resolvedRow.status ?? "") : null,
+      resolved_session_flow_code: sessFlow || null,
+      channel_id: chId || null,
+      channel_provider: ch?.type ?? null,
+      channel_name: ch?.nombre ?? null,
+      has_channel_flow: ex.flags.hasChannelFlow,
+      active_flow_codes: activeFlowCatalogRowCount,
+      flow_code_in_active_set: flowTokenMatchesActiveCatalog(sessFlow, classifyCtx.activeFlowCodeSet),
+      result_is_bot: ex.isBot,
+      reason_not_bot: ex.isBot ? null : ex.reason,
+      flags: ex.flags,
+    });
+  }
+}
+
 async function fetchChatConversationsUnsafe(
   vista: ConversacionesVista = "inbox",
   filters?: ChatInboxFilters
@@ -183,19 +269,16 @@ async function fetchChatConversationsUnsafe(
 
   const { data: activeFlowRows, error: activeFlowsErr } = await supabase
     .from("chat_flows")
-    .select("flow_code")
+    .select("id, flow_code, label")
     .eq("empresa_id", empresa_id)
     .eq("activo", true);
   if (activeFlowsErr) {
     console.warn("[fetchChatConversations] chat_flows activos:", activeFlowsErr.message);
   }
-  const activeFlowCodeSet = new Set(
-    (activeFlowRows ?? [])
-      .map((r) => String((r as { flow_code?: string | null }).flow_code ?? "").trim())
-      .filter((c) => c.length > 0)
-  );
+  const activeFlowCodeSet = buildActiveFlowMatchSet(activeFlowRows ?? []);
+  const activeFlowCatalogRowCount = (activeFlowRows ?? []).length;
 
-  if (vista === "bot" && activeFlowCodeSet.size === 0) {
+  if (vista === "bot" && activeFlowCatalogRowCount === 0) {
     return [];
   }
 
@@ -453,6 +536,7 @@ async function fetchChatConversationsUnsafe(
     sessionById: flowSessionById,
     activeSessionByConversationId,
   };
+  const listBeforeBotTabSplit = [...list];
   const rowsSnapshotForLogs = (
     String(process.env.CHAT_LIST_CLASSIFICATION_VERBOSE ?? "")
       .trim()
@@ -480,10 +564,38 @@ async function fetchChatConversationsUnsafe(
     total_fetched: totalAfterQuery,
     after_tab_split: list.length,
     bot_like_count: botLikeCount,
-    active_flow_codes: activeFlowCodeSet.size,
+    active_flow_codes: activeFlowCatalogRowCount,
+    active_flow_match_tokens: activeFlowCodeSet.size,
     session_map_size: flowSessionById.size,
     active_sessions_by_conversation: activeSessionByConversationId.size,
   });
+
+  console.info("[chat-list][active-flows]", {
+    schema: dataSchema,
+    empresa_id,
+    count: activeFlowCatalogRowCount,
+    sample: (activeFlowRows ?? []).slice(0, 12).map((r) => {
+      const row = r as { id?: string; flow_code?: string; label?: string | null; activo?: boolean };
+      return {
+        id: String(row.id ?? "").trim(),
+        flow_code: String(row.flow_code ?? "").trim(),
+        name: String(row.label ?? "").trim() || null,
+        active: row.activo !== false,
+      };
+    }),
+  });
+
+  await logBotTabClassificationSamplePostgrest(
+    supabase,
+    empresa_id,
+    vista,
+    listBeforeBotTabSplit,
+    botLikeCount,
+    activeSessionByConversationId.size,
+    classifyCtx,
+    activeFlowCatalogRowCount
+  );
+
   if (vista === "inbox") {
     console.info("[chat-list][inbox]", {
       empresa_id,
