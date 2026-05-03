@@ -15,6 +15,11 @@ import { buildOrderResultFromEntradaId } from "@/lib/sorteos/sorteo-ticket-admin
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
 import type { EnsureSorteoOrderCreatedData } from "@/lib/sorteos/sorteo-order-from-chat";
 import { fetchDataSchemaForEmpresaId } from "@/lib/supabase/empresa-data-schema";
+import { createTenantPgChatSupabaseShim } from "@/lib/chat/tenant-pg-chat-supabase-shim";
+import type { SupabaseAdmin } from "@/lib/chat/types";
+import { createServiceRoleClient } from "@/lib/supabase/service-admin";
+import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
+import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
 
 export type ManualSorteoApprovalResult =
   | {
@@ -54,14 +59,41 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
   const note = (input.approvalNote ?? "").trim().slice(0, 2000);
   const dataSchema = await fetchDataSchemaForEmpresaId(input.empresaId);
 
+  /**
+   * PostgREST rechaza `db.schema = erp_*` si el schema no está en "Exposed schemas".
+   * Para esos tenants, todas las lecturas/escrituras `chat_*` / `sorteos*` van por PG directo (shim).
+   */
+  const pool = getChatPostgresPool();
+  const useTenantPgShim = Boolean(pool && isLikelyUnexposedTenantChatSchema(dataSchema));
+  if (isLikelyUnexposedTenantChatSchema(dataSchema) && !pool) {
+    logManual("error", { code: "no_pg_pool", schema: dataSchema, empresa_id: input.empresaId });
+    return {
+      ok: false,
+      code: "no_pg_pool",
+      message:
+        "Este tenant no está expuesto en la API y falta pool Postgres en el servidor (SUPABASE_DB_URL). Contactá soporte.",
+    };
+  }
+
+  const catalogSr = createServiceRoleClient();
+  const tenantSb: AppSupabaseClient = useTenantPgShim
+    ? (createTenantPgChatSupabaseShim({
+        pool: pool!,
+        schema: dataSchema,
+        storageDelegate: catalogSr as SupabaseAdmin,
+        rpcDelegate: catalogSr,
+      }) as unknown as AppSupabaseClient)
+    : input.supabase;
+
   logManual("start", {
     schema: dataSchema,
     empresa_id: input.empresaId,
     validation_id: vid,
     approved_by: input.usuarioId,
+    data_client: useTenantPgShim ? "tenant_pg_shim" : "postgrest",
   });
 
-  const { data: vRow, error: vErr } = await input.supabase
+  const { data: vRow, error: vErr } = await tenantSb
     .from("chat_comprobante_validaciones")
     .select(
       "id, estado_validacion, motivo_validacion, conversation_id, flow_session_id, flow_code, sorteo_entrada_id"
@@ -87,7 +119,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
     tiene_entrada: Boolean(row.sorteo_entrada_id),
   });
 
-  const { data: conv, error: cErr } = await input.supabase
+  const { data: conv, error: cErr } = await tenantSb
     .from("chat_conversations")
     .select("id, contact_id, channel_id")
     .eq("id", row.conversation_id)
@@ -111,7 +143,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
   /** Idempotencia: ya linked entrada */
   if (row.sorteo_entrada_id) {
     const existing = await buildOrderResultFromEntradaId(
-      input.supabase,
+      tenantSb,
       row.sorteo_entrada_id,
       input.empresaId
     );
@@ -130,7 +162,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
         flowSessionId,
       });
       const sendOut = await deliverSorteoPostOrderToCustomer({
-        supabase: input.supabase,
+        supabase: tenantSb,
         empresaId: input.empresaId,
         conversationId: row.conversation_id,
         contactId,
@@ -163,7 +195,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
     }
   }
 
-  let hydFd = await loadHydratedFlowSessionData(input.supabase, {
+  let hydFd = await loadHydratedFlowSessionData(tenantSb, {
     empresaId: input.empresaId,
     conversationId: row.conversation_id,
     flowCode,
@@ -177,7 +209,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
     [SORTEO_COMPROBANTE_MOTIVO_VALIDACION_FIELD]: "asesor_aprobo_comprobante",
   };
 
-  const { data: contactRow } = await input.supabase
+  const { data: contactRow } = await tenantSb
     .from("chat_contacts")
     .select("phone_number")
     .eq("id", contactId)
@@ -196,7 +228,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
     validation_id: row.id,
   });
 
-  const fin = await finalizeSorteoOrderFromConfirmedFlowData(input.supabase, {
+  const fin = await finalizeSorteoOrderFromConfirmedFlowData(tenantSb, {
     empresaId: input.empresaId,
     conversationId: row.conversation_id,
     flowCode,
@@ -237,7 +269,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
     flowSessionId,
     orderData
   );
-  const { error: ctxErr } = await input.supabase.from("chat_flow_data").upsert(ctxUpserts, {
+  const { error: ctxErr } = await tenantSb.from("chat_flow_data").upsert(ctxUpserts, {
     onConflict: "flow_session_id,field_name",
   });
   if (ctxErr) {
@@ -248,7 +280,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
   const prevEst = row.estado_validacion;
   const prevMot = row.motivo_validacion;
 
-  const { error: upErr } = await input.supabase
+  const { error: upErr } = await tenantSb
     .from("chat_comprobante_validaciones")
     .update({
       estado_validacion: "aprobado_manual",
@@ -293,11 +325,11 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
       field_value: "asesor_aprobo_comprobante",
     },
   ];
-  await input.supabase.from("chat_flow_data").upsert(estadoUpserts, {
+  await tenantSb.from("chat_flow_data").upsert(estadoUpserts, {
     onConflict: "flow_session_id,field_name",
   });
 
-  await input.supabase.from("chat_flow_events").insert({
+  await tenantSb.from("chat_flow_events").insert({
     empresa_id: input.empresaId,
     conversation_id: row.conversation_id,
     flow_code: flowCode,
@@ -334,7 +366,7 @@ export async function approveComprobanteAndCloseSorteoPurchase(input: {
   };
 
   const sendOut = await deliverSorteoPostOrderToCustomer({
-    supabase: input.supabase,
+    supabase: tenantSb,
     empresaId: input.empresaId,
     conversationId: row.conversation_id,
     contactId,

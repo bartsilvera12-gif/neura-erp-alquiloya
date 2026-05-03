@@ -2125,17 +2125,25 @@ export async function approveComprobanteValidacion(
   validacionId: string,
   approvalNote?: string | null
 ): Promise<ManualSorteoApprovalResult> {
-  const { supabase, empresa_id, usuario_id } = await requireEmpresaTenantServiceRole();
+  const { supabase, empresa_id, usuario_id, dataSchema } = await requireEmpresaTenantServiceRole();
   const id = validacionId.trim();
   if (!id) return { ok: false, code: "invalid", message: "ID de validación inválido" };
 
-  return approveComprobanteAndCloseSorteoPurchase({
+  const res = await approveComprobanteAndCloseSorteoPurchase({
     supabase,
     empresaId: empresa_id,
     usuarioId: usuario_id,
     validacionId: id,
     approvalNote,
   });
+  if (!res.ok && isLikelyUnexposedTenantChatSchema(dataSchema) && isInvalidPostgrestSchemaError(res.message)) {
+    return {
+      ...res,
+      message:
+        "No se pudo acceder a los datos del chat por la API. La operación debería usar base directa; si ves este mensaje, contactá soporte.",
+    };
+  }
+  return res;
 }
 
 export async function deleteChatChannel(id: string): Promise<void> {
