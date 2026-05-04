@@ -7,7 +7,8 @@ import type { SorteosVentasKpis } from "@/lib/sorteos/ventas-kpis";
 import type { Sorteo } from "@/lib/sorteos/types";
 
 function formatGs(n: number) {
-  return `${Math.round(n).toLocaleString("es-PY")} ₲`;
+  const s = Math.round(n).toLocaleString("es-PY", { maximumFractionDigits: 0 });
+  return `Gs. ${s}`;
 }
 
 function formatFecha(iso: string | null) {
@@ -89,10 +90,10 @@ export default function SorteosListClient({ ventasKpis }: { ventasKpis: SorteosV
       </nav>
 
       <div className="flex flex-wrap gap-3">
-        <KpiCard label="Boletos hoy" value={ventasKpis.boletosHoy.toLocaleString("es-PY")} sub="Suma cantidad_boletos" />
-        <KpiCard label="Boletos mes" value={ventasKpis.boletosMes.toLocaleString("es-PY")} sub="Mes calendario · PY" />
-        <KpiCard label="Monto hoy" value={formatGs(ventasKpis.montoHoy)} sub="Σ monto_total" />
-        <KpiCard label="Monto mes" value={formatGs(ventasKpis.montoMes)} sub="Σ monto_total" />
+        <KpiCard label="Boletos hoy" value={ventasKpis.boletosHoy.toLocaleString("es-PY")} sub="Vendidos hoy" />
+        <KpiCard label="Boletos mes" value={ventasKpis.boletosMes.toLocaleString("es-PY")} sub="Vendidos este mes" />
+        <KpiCard label="Monto hoy" value={formatGs(ventasKpis.montoHoy)} sub="Ingresos de hoy" />
+        <KpiCard label="Monto mes" value={formatGs(ventasKpis.montoMes)} sub="Ingresos del mes" />
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
