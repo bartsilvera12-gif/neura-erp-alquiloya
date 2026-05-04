@@ -2061,6 +2061,11 @@ export default function FlowEditorPage() {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-500 mb-1">Va a</label>
+                        {node.node_type === "buttons" && (
+                          <p className="text-[10px] text-slate-500 mb-1 leading-snug">
+                            Destino al pulsar <strong>este</strong> botón (por opción); no depende del grupo.
+                          </p>
+                        )}
                         <select
                           className={`border rounded-lg px-2 py-1.5 text-sm w-full ${optionSaveError[opt.id] ? "border-amber-400 ring-1 ring-amber-300" : "border-slate-200"}`}
                           value={opt.next_node_code ?? ""}

@@ -1,4 +1,10 @@
--- Papu_store: opciones de combos_populares agrupadas; desactivar combos_explosivos_2; reapuntar referencias.
+-- Papu_store (DATOS históricos / migración puntual, no reglas del motor):
+-- - Desactiva nodo combos_explosivos_2 y reapunta referencias que apuntaban a ese nodo hacia combos_populares.
+-- - Opciones de combos_populares: group_* por cantidad en option_payload cuando coincide el catálogo.
+--
+-- NO modifica la lógica del runtime: cada opción sigue usando chat_flow_options.next_node_code
+-- configurado en el editor (esta migración solo escribe group_title/group_order/sort_order cuando matchea cantidad).
+
 -- Idempotente: solo afecta filas que coincidan con flow_code / node_code.
 
 CREATE OR REPLACE FUNCTION pg_temp.neura_papu_group_combos(schema_name text)

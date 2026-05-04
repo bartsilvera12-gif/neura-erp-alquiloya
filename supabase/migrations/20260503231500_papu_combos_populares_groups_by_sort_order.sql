@@ -1,4 +1,8 @@
--- Papu_store / combos_populares: grupos por sort_order actual (1–3) cuando el catálogo no coincide con cantidades fijas.
+-- Papu_store / combos_populares: únicamente group_title y group_order por sort_order (1–3)
+-- cuando el catálogo real no coincide con cantidades fijas en la migración anterior.
+--
+-- IMPORTANTE (producto): NO se modifica chat_flow_options.next_node_code aquí.
+-- El destino de cada botón lo define el usuario en el editor (next_node_code por opción).
 -- Idempotente: re-ejecutar restablece títulos/orden de grupo esperados.
 
 CREATE OR REPLACE FUNCTION pg_temp.neura_papu_groups_by_sort(schema_name text)
@@ -25,27 +29,6 @@ BEGIN
        AND n.flow_code = ''Papu_store''
        AND n.node_code = ''combos_populares''
        AND o.sort_order IN (1, 2, 3)',
-    schema_name,
-    schema_name
-  );
-
-  EXECUTE format(
-    'UPDATE %I.chat_flow_options o
-       SET next_node_code = ''cedula''
-     FROM %I.chat_flow_nodes n
-     WHERE o.node_id = n.id
-       AND n.flow_code = ''Papu_store''
-       AND n.node_code = ''combos_populares''
-       AND o.sort_order IN (1, 2, 3)
-       AND EXISTS (
-         SELECT 1
-         FROM %I.chat_flow_nodes c
-         WHERE c.empresa_id = n.empresa_id
-           AND c.flow_code = ''Papu_store''
-           AND c.node_code = ''cedula''
-           AND c.is_active = true
-       )',
-    schema_name,
     schema_name,
     schema_name
   );
