@@ -11,6 +11,60 @@ function digitsOnly(s: string): string {
 }
 
 /**
+ * Un solo número marcable por canal para wa.me (no mezclar Graph Phone Number ID con E.164).
+ * Alineado con la tarjeta operativa en Configuración → Canales: `activo` + `config_status === active`.
+ *
+ * - Meta Cloud: solo `config.display_phone_number` (nunca `provider_channel_id` / phone_number_id de Graph).
+ * - YCloud: `ycloud_sender_id` → `display_phone_number` → `provider_channel_id` si aplica.
+ */
+function canonicalWaMeDigitsFromChannel(ch: {
+  provider?: string | null;
+  config?: unknown;
+  provider_channel_id?: string | null;
+}): string | null {
+  const prov = String(ch.provider ?? "").trim().toLowerCase();
+  const cfg =
+    ch.config && typeof ch.config === "object" && !Array.isArray(ch.config)
+      ? (ch.config as Record<string, unknown>)
+      : {};
+
+  if (prov === "meta") {
+    const disp = cfg.display_phone_number;
+    if (typeof disp === "string") {
+      const d = digitsOnly(disp);
+      if (d.length >= 8) return d;
+    }
+    return null;
+  }
+
+  if (prov === "ycloud") {
+    for (const key of ["ycloud_sender_id", "display_phone_number"] as const) {
+      const raw = cfg[key];
+      if (typeof raw === "string") {
+        const d = digitsOnly(raw);
+        if (d.length >= 8) return d;
+      }
+    }
+    if (typeof ch.provider_channel_id === "string" && ch.provider_channel_id.trim()) {
+      const d = digitsOnly(ch.provider_channel_id);
+      if (d.length >= 8) return d;
+    }
+    return null;
+  }
+
+  const disp = cfg.display_phone_number;
+  if (typeof disp === "string") {
+    const d = digitsOnly(disp);
+    if (d.length >= 8) return d;
+  }
+  if (typeof ch.provider_channel_id === "string" && ch.provider_channel_id.trim()) {
+    const d = digitsOnly(ch.provider_channel_id);
+    if (d.length >= 8) return d;
+  }
+  return null;
+}
+
+/**
  * Resuelve el número E.164 (solo dígitos) para wa.me usando `chat_channels` en el
  * schema de la empresa. Debe usarse con `getChatServiceClientForEmpresa` (PG shim
  * en tenants no expuestos en PostgREST), nunca con `db.schema` directo a erp_*.
@@ -27,10 +81,11 @@ async function resolveRedirectPhoneForEmpresa(
 
   const { data: channels, error: chErr } = await supabase
     .from("chat_channels")
-    .select("id, activo, config, provider_channel_id")
+    .select("id, activo, config_status, provider, config, provider_channel_id")
     .eq("empresa_id", empresaId)
     .eq("type", "whatsapp")
-    .eq("activo", true);
+    .eq("activo", true)
+    .eq("config_status", "active");
 
   if (chErr) {
     console.error("[sorteo-r] chat_channels query:", chErr.message);
@@ -42,21 +97,14 @@ async function resolveRedirectPhoneForEmpresa(
 
   const numbers = new Set<string>();
   for (const ch of channels ?? []) {
-    const row = ch as { config?: unknown; provider_channel_id?: string | null };
-    const cfg = row.config;
-    if (cfg && typeof cfg === "object" && !Array.isArray(cfg)) {
-      const c = cfg as Record<string, unknown>;
-      for (const key of ["display_phone_number", "ycloud_sender_id"] as const) {
-        const raw = c[key];
-        if (typeof raw !== "string") continue;
-        const d = digitsOnly(raw);
-        if (d.length >= 8) numbers.add(d);
+    const d = canonicalWaMeDigitsFromChannel(
+      ch as {
+        provider?: string | null;
+        config?: unknown;
+        provider_channel_id?: string | null;
       }
-    }
-    if (typeof row.provider_channel_id === "string" && row.provider_channel_id.trim()) {
-      const d = digitsOnly(row.provider_channel_id);
-      if (d.length >= 8) numbers.add(d);
-    }
+    );
+    if (d) numbers.add(d);
   }
 
   if (numbers.size === 0) {
