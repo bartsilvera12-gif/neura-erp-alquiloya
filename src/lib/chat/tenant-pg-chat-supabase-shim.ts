@@ -39,6 +39,14 @@ const ALLOWED_TABLES = new Set([
   "sorteo_revendedor_clicks",
   "sorteo_revendedores",
   "sorteos",
+  "clientes",
+  "proyecto_tipos",
+  "proyecto_estados",
+  "proyectos",
+  "proyecto_tareas",
+  "proyecto_comentarios",
+  "proyecto_archivos",
+  "proyecto_estado_historial",
 ]);
 
 function pgErr(message: string, code?: string): { message: string; code?: string } {
@@ -81,7 +89,9 @@ function serializeCell(col: string, val: unknown, params: unknown[]): string {
     lower.includes("routing_config") ||
     lower === "cupones" ||
     lower.includes("json") ||
-    lower.includes("raw_payload");
+    lower.includes("raw_payload") ||
+    lower === "brief_data" ||
+    lower === "metadata";
   if (jsonbCol) {
     /** Evita "invalid input syntax for type json" al pasar objetos con casting manual ::jsonb */
     let serialized: string;

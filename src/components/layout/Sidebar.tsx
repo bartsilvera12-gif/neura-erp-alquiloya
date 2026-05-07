@@ -31,6 +31,7 @@ import {
   Activity,
   ScrollText,
   ListChecks,
+  FolderKanban,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
@@ -155,6 +156,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     label: "Campañas",
     href: "/dashboard/campanas",
     icon: SendHorizontal,
+  },
+  {
+    key: "proyectos",
+    slug: "proyectos",
+    label: "Proyectos",
+    href: "/dashboard/proyectos",
+    icon: FolderKanban,
   },
   {
     key: "sorteos",
