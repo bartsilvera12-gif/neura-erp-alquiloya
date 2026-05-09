@@ -3,7 +3,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
 import { isBootstrapSuperAdminEmail } from "@/lib/auth/super-admin-bootstrap-email";
-import { resolveEffectiveModules } from "@/lib/modulos/resolve-effective-modules";
+import {
+  esRolAdminEmpresa,
+  resolveEffectiveModules,
+} from "@/lib/modulos/resolve-effective-modules";
 import { esRolAdminEmpresaOGlobal } from "@/lib/auth/rol-empresa";
 
 export type ComisionesApiAuth =
@@ -36,6 +39,14 @@ export async function requireComisionesModuleAccess(request: Request): Promise<C
     return { ok: true, empresaId: usuario.empresa_id, usuarioCatalogId: usuario.id, rol };
   }
 
+  /**
+   * Admin / administrador de empresa gestiona módulos habilitados en `empresa_modulos`;
+   * ese listado puede no incluir `configuracion` ni `comisiones` aun así entren a Configuración.
+   */
+  if (esRolAdminEmpresa(usuario.rol)) {
+    return { ok: true, empresaId: usuario.empresa_id, usuarioCatalogId: usuario.id, rol };
+  }
+
   const modulos = await resolveEffectiveModules(catalog, {
     id: usuario.id,
     empresa_id: usuario.empresa_id,
@@ -49,6 +60,12 @@ export async function requireComisionesModuleAccess(request: Request): Promise<C
    */
   const puedeComisionesOConfig = slugs.has("comisiones") || slugs.has("configuracion");
   if (!puedeComisionesOConfig) {
+    const emp = usuario.empresa_id;
+    console.warn("[comisiones-auth] acceso denegado", {
+      rol: usuario.rol ?? null,
+      slugs_sample: [...slugs].slice(0, 12),
+      empresa_id_prefix: typeof emp === "string" && emp.length >= 8 ? emp.slice(0, 8) : null,
+    });
     return {
       ok: false,
       status: 403,

@@ -55,6 +55,13 @@ export async function GET(request: Request) {
     return NextResponse.json(successResponse({ politica, escalas: escalas ?? [] }));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
+    console.warn("[api/comisiones/politica] GET error", {
+      message: msg.slice(0, 240),
+      empresa_id_prefix:
+        typeof auth.empresaId === "string" && auth.empresaId.length >= 8
+          ? auth.empresaId.slice(0, 8)
+          : null,
+    });
     return NextResponse.json(errorResponse(msg), { status: 500 });
   }
 }
