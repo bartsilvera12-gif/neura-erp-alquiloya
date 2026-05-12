@@ -6,6 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import { ClienteSearchSelect } from "@/app/dashboard/proyectos/components/ClienteSearchSelect";
 import {
+  ProyectoModuloSelector,
+  type ProyectoModuloCatalogo as ModuloCatalogo,
+} from "@/app/dashboard/proyectos/components/ProyectoModuloSelector";
+import {
   PROYECTO_DATOS_BRIEF_FIELDS,
   applySaasFormToExisting,
   type ProyectoModuloSnapshot,
@@ -15,7 +19,6 @@ type Tipo = { id: string; nombre: string; codigo: string };
 type Estado = { id: string; nombre: string };
 type Cliente = { id: string; empresa?: string | null; nombre_contacto?: string | null };
 type Usuario = { id: string; nombre?: string | null };
-type ModuloCatalogo = { id: string; nombre: string; slug: string };
 
 export default function ProyectoNuevoClient() {
   const router = useRouter();
@@ -318,24 +321,16 @@ export default function ProyectoNuevoClient() {
                   onChange={(e) => setSaasWhatsapp(e.target.value)}
                 />
               </label>
-              <label className="block text-sm sm:col-span-2">
+              <div className="block text-sm sm:col-span-2">
                 <span className="text-slate-700">Módulos necesarios</span>
-                <select
-                  multiple
-                  className="mt-1 h-40 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={saasModuloIds}
-                  onChange={(e) =>
-                    setSaasModuloIds(Array.from(e.currentTarget.selectedOptions).map((option) => option.value))
-                  }
-                >
-                  {modulosCatalogo.map((modulo) => (
-                    <option key={modulo.id} value={modulo.id}>
-                      {modulo.nombre}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">Podés seleccionar varios módulos con Ctrl/Cmd o Shift.</p>
-              </label>
+                <div className="mt-1">
+                  <ProyectoModuloSelector
+                    modulos={modulosCatalogo}
+                    selectedIds={saasModuloIds}
+                    onChange={setSaasModuloIds}
+                  />
+                </div>
+              </div>
               <label className="block text-sm sm:col-span-2">
                 <span className="text-slate-700">Observaciones</span>
                 <textarea

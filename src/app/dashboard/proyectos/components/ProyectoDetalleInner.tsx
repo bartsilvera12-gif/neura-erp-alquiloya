@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import {
+  ProyectoModuloSelector,
+  type ProyectoModuloCatalogo as ModuloCatalogo,
+} from "@/app/dashboard/proyectos/components/ProyectoModuloSelector";
+import {
   PROYECTO_DATOS_BRIEF_FIELDS,
   applyBriefFormToExisting,
   applySaasFormToExisting,
@@ -33,7 +37,6 @@ export type DetalleResp = {
 };
 
 type UsuarioActivo = { id: string; nombre?: string | null; email?: string | null };
-type ModuloCatalogo = { id: string; nombre: string; slug: string };
 
 const TAB_IDS = ["resumen", "datos", "tareas", "comentarios", "archivos", "historial"] as const;
 export type TabId = (typeof TAB_IDS)[number];
@@ -617,24 +620,17 @@ export default function ProyectoDetalleInner({
                     onChange={(e) => updateSaasField("whatsapp_contacto", e.target.value)}
                   />
                 </label>
-                <label className="block text-sm sm:col-span-2">
+                <div className="block text-sm sm:col-span-2">
                   <span className={labelCls}>Módulos necesarios</span>
-                  <select
-                    multiple
-                    className={`${inputCls} h-44`}
-                    value={saasModuloIds}
-                    onChange={(e) =>
-                      updateSaasModulos(Array.from(e.currentTarget.selectedOptions).map((option) => option.value))
-                    }
-                  >
-                    {modulosCatalogo.map((modulo) => (
-                      <option key={modulo.id} value={modulo.id}>
-                        {modulo.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500">Podés seleccionar varios módulos con Ctrl/Cmd o Shift.</p>
-                </label>
+                  <div className="mt-1">
+                    <ProyectoModuloSelector
+                      modulos={modulosCatalogo}
+                      selectedIds={saasModuloIds}
+                      onChange={updateSaasModulos}
+                      variant="dark"
+                    />
+                  </div>
+                </div>
                 <label className="block text-sm sm:col-span-2">
                   <span className={labelCls}>Observaciones</span>
                   <textarea
