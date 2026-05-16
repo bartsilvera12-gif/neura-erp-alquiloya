@@ -51,11 +51,10 @@ export async function GET(request: NextRequest) {
     const schema = await fetchDataSchemaForEmpresaId(ctx.auth.empresa_id);
     const empresaId = ctx.auth.empresa_id;
 
-    const [provs, cats, rels] = await Promise.all([
-      listProveedores(schema, empresaId),
-      listCategoriasMin(schema, empresaId),
-      listRelaciones(schema, empresaId),
-    ]);
+    // Serializado para no agotar pool (session mode max 15 conexiones).
+    const provs = await listProveedores(schema, empresaId);
+    const cats = await listCategoriasMin(schema, empresaId);
+    const rels = await listRelaciones(schema, empresaId);
 
     const catById = new Map<string, Pick<ProveedorCategoria, "id" | "nombre" | "activo">>();
     for (const c of cats) catById.set(c.id, { id: c.id, nombre: c.nombre, activo: c.activo });

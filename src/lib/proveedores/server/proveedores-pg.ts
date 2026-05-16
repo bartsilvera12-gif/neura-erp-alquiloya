@@ -278,11 +278,37 @@ export async function listRelaciones(
 ): Promise<RelRow[]> {
   const schema = assertAllowedChatDataSchema(schemaRaw);
   const t = quoteSchemaTable(schema, "proveedor_categoria_rel");
-  const { rows } = await pool().query<RelRow>(
-    `SELECT id, proveedor_id, categoria_id FROM ${t} WHERE empresa_id = $1::uuid`,
-    [empresaId]
-  );
-  return rows;
+  try {
+    const { rows } = await pool().query<RelRow>(
+      `SELECT id, proveedor_id, categoria_id FROM ${t} WHERE empresa_id = $1::uuid`,
+      [empresaId]
+    );
+    return rows;
+  } catch (err) {
+    // Si la tabla no existe en este tenant, devolver vacio en vez de tirar 500.
+    const msg = err instanceof Error ? err.message : "";
+    if (/does not exist/i.test(msg)) return [];
+    throw err;
+  }
+}
+
+export async function listCategoriasMin(
+  schemaRaw: string,
+  empresaId: string
+): Promise<{ id: string; nombre: string; activo: boolean }[]> {
+  const schema = assertAllowedChatDataSchema(schemaRaw);
+  const t = quoteSchemaTable(schema, "proveedor_categorias");
+  try {
+    const { rows } = await pool().query<{ id: string; nombre: string; activo: boolean }>(
+      `SELECT id, nombre, activo FROM ${t} WHERE empresa_id = $1::uuid`,
+      [empresaId]
+    );
+    return rows;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (/does not exist/i.test(msg)) return [];
+    throw err;
+  }
 }
 
 export async function listRelacionesDeProveedor(
@@ -334,15 +360,3 @@ export async function replaceRelacionesProveedor(
   }
 }
 
-export async function listCategoriasMin(
-  schemaRaw: string,
-  empresaId: string
-): Promise<{ id: string; nombre: string; activo: boolean }[]> {
-  const schema = assertAllowedChatDataSchema(schemaRaw);
-  const t = quoteSchemaTable(schema, "proveedor_categorias");
-  const { rows } = await pool().query<{ id: string; nombre: string; activo: boolean }>(
-    `SELECT id, nombre, activo FROM ${t} WHERE empresa_id = $1::uuid`,
-    [empresaId]
-  );
-  return rows;
-}

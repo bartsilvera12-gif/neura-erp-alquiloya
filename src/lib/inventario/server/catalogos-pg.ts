@@ -74,13 +74,22 @@ export async function listCategoriasProducto(
   opts: { soloActivas?: boolean } = {}
 ): Promise<CategoriaProductoRow[]> {
   const schema = assertAllowedChatDataSchema(schemaRaw);
-  // Sync rubros de proveedor antes de listar — best-effort, no bloquea.
-  await seedCategoriasFromProveedor(schema, empresaId);
-
   const t = quoteSchemaTable(schema, "categorias_productos");
+  const p = pool();
+
+  // Sync una sola vez por empresa: si ya hay rows, no corremos el INSERT.
+  // Evita gastar conexiones del pool (limite 15 en session mode) en cada GET.
+  const probe = await p.query<{ c: string }>(
+    `SELECT count(*)::text AS c FROM ${t} WHERE empresa_id = $1::uuid LIMIT 1`,
+    [empresaId]
+  );
+  if (Number(probe.rows[0]?.c ?? 0) === 0) {
+    await seedCategoriasFromProveedor(schema, empresaId);
+  }
+
   const where = ["empresa_id = $1::uuid"];
   if (opts.soloActivas !== false) where.push("activo = true");
-  const { rows } = await pool().query<CategoriaProductoRow>(
+  const { rows } = await p.query<CategoriaProductoRow>(
     `SELECT id, empresa_id, nombre, codigo, descripcion, parent_id, activo, created_at, updated_at
        FROM ${t}
       WHERE ${where.join(" AND ")}
