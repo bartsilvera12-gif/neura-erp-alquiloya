@@ -24,12 +24,74 @@ export default function NuevoProductoPage() {
     metodo_valuacion: "CPP" as MetodoValuacion,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [generandoCodigo, setGenerandoCodigo] = useState(false);
+  const [codigoGeneradoInterno, setCodigoGeneradoInterno] = useState(false);
+
+  // Imagen pendiente de subir (se sube luego de crear el producto, con su ID).
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [imagenPreview, setImagenPreview] = useState<string | null>(null);
+  const [imagenError, setImagenError] = useState<string | null>(null);
+
+  const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_IMG_BYTES = 5 * 1024 * 1024;
+
+  function handleImagenChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setImagenError(null);
+    const f = e.target.files?.[0] ?? null;
+    if (!f) {
+      setImagenFile(null);
+      setImagenPreview(null);
+      return;
+    }
+    if (!ALLOWED_MIME.includes(f.type)) {
+      setImagenError("Formato no permitido. Usá JPG, PNG o WebP.");
+      e.target.value = "";
+      return;
+    }
+    if (f.size > MAX_IMG_BYTES) {
+      setImagenError("Imagen demasiado grande (máx. 5 MB).");
+      e.target.value = "";
+      return;
+    }
+    setImagenFile(f);
+    setImagenPreview(URL.createObjectURL(f));
+  }
+
+  function quitarImagen() {
+    setImagenFile(null);
+    setImagenPreview(null);
+    setImagenError(null);
+  }
+
+  async function handleGenerarCodigoInterno() {
+    if (generandoCodigo) return;
+    setGenerandoCodigo(true);
+    setErrorDuplicado(null);
+    try {
+      const res = await fetch("/api/productos/codigo-interno", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (res.ok && json?.success && json.data?.codigo) {
+        setForm((prev) => ({ ...prev, codigo_barras: json.data.codigo as string }));
+        setCodigoGeneradoInterno(true);
+      } else {
+        setErrorDuplicado(json?.error ?? "No se pudo generar el código.");
+      }
+    } catch (err) {
+      setErrorDuplicado(err instanceof Error ? err.message : "Error de red");
+    } finally {
+      setGenerandoCodigo(false);
+    }
+  }
 
   // Campos sin lógica reactiva
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) {
     setErrorDuplicado(null);
+    if (e.target.name === "codigo_barras") setCodigoGeneradoInterno(false);
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
@@ -122,9 +184,10 @@ export default function NuevoProductoPage() {
 
     setSubmitting(true);
     try {
-      // Si no hay codigo manual, pedir uno interno al backend (atomico, unico por empresa)
+      // Si no hay codigo manual, pedir uno interno al backend (atomico, unico por empresa).
+      // Si el usuario ya generó uno con el botón "Generar código interno", reutilizamos esa marca.
       let codigo: string | null = codigoManual || null;
-      let interno = false;
+      let interno = codigoGeneradoInterno && !!codigoManual;
       if (!codigo) {
         try {
           const res = await fetch("/api/productos/codigo-interno", {
@@ -137,7 +200,6 @@ export default function NuevoProductoPage() {
             interno = true;
           }
         } catch {
-          // si falla, continuamos sin codigo (queda en NULL)
           codigo = null;
         }
       }
@@ -155,10 +217,35 @@ export default function NuevoProductoPage() {
         codigo_barras_interno: interno,
       });
 
-      if (guardado) {
-        // Si quiere subir imagen, ir directo a editar
-        router.push(`/inventario/${guardado.id}/editar`);
+      if (!guardado) return;
+
+      // Subir imagen (post-creacion, con producto_id real)
+      if (imagenFile) {
+        try {
+          const fd = new FormData();
+          fd.append("file", imagenFile);
+          const up = await fetch(`/api/productos/${guardado.id}/imagen`, {
+            method: "POST",
+            body: fd,
+            credentials: "include",
+          });
+          const upJson = await up.json();
+          if (!up.ok || !upJson?.success) {
+            // Producto creado, imagen falló. No perder el producto: ir a editar con aviso.
+            const msg = upJson?.error ?? "No se pudo subir la imagen.";
+            alert(`Producto creado correctamente, pero la imagen no pudo subirse: ${msg}\n\nPodés intentar subirla nuevamente desde la edición del producto.`);
+            router.push(`/inventario/${guardado.id}/editar`);
+            return;
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Error de red";
+          alert(`Producto creado correctamente, pero la imagen no pudo subirse: ${msg}\n\nPodés intentar subirla nuevamente desde la edición del producto.`);
+          router.push(`/inventario/${guardado.id}/editar`);
+          return;
+        }
       }
+
+      router.push("/inventario");
     } finally {
       setSubmitting(false);
     }
@@ -253,7 +340,14 @@ export default function NuevoProductoPage() {
 
           {/* Código de barras */}
           <div>
-            <label className={labelClass}>Código de barras</label>
+            <label className={labelClass}>
+              Código de barras
+              {codigoGeneradoInterno && form.codigo_barras && (
+                <span className="ml-2 align-middle text-[10px] uppercase tracking-wider bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded">
+                  Interno
+                </span>
+              )}
+            </label>
             <input
               type="text"
               name="codigo_barras"
@@ -263,11 +357,65 @@ export default function NuevoProductoPage() {
               className={inputClass}
               autoComplete="off"
             />
-            <p className="mt-1.5 text-xs text-gray-500">
-              Si dejás vacío este campo, el sistema generará un código interno automáticamente
-              (formato <code className="font-mono">INT-XXX-YYYYMM-NNNNNN</code>).
-              El prefijo <code className="font-mono">INT-</code> queda reservado para códigos internos.
-            </p>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={handleGenerarCodigoInterno}
+                disabled={generandoCodigo}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700 hover:text-sky-900 border border-sky-200 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                  <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0v2.431l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clipRule="evenodd" />
+                </svg>
+                {generandoCodigo ? "Generando..." : "Generar código interno"}
+              </button>
+              <span className="ml-2 text-xs text-gray-400">(opcional)</span>
+            </div>
+          </div>
+
+          {/* Imagen del producto */}
+          <div>
+            <label className={labelClass}>Imagen del producto</label>
+            <div className="flex items-start gap-4">
+              <div className="w-28 h-28 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                {imagenPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imagenPreview} alt="Vista previa" className="w-full h-full object-cover" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-8 h-8 text-slate-300">
+                    <path fillRule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 0 0 .75-.75v-2.69l-2.22-2.219a.75.75 0 0 0-1.06 0l-1.91 1.909.47.47a.75.75 0 1 1-1.06 1.06L6.53 8.091a.75.75 0 0 0-1.06 0L2.5 11.06ZM12 6.5a1 1 0 1 1 2 0 1 1 0 0 1-2 0Z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors">
+                    {imagenFile ? "Cambiar imagen" : "Seleccionar imagen"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleImagenChange}
+                    />
+                  </label>
+                  {imagenFile && (
+                    <button
+                      type="button"
+                      onClick={quitarImagen}
+                      className="text-sm text-red-600 hover:text-red-800 px-3 py-2 rounded-lg border border-slate-200 hover:bg-red-50"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs text-slate-400">
+                  JPG, PNG o WebP — máx. 5 MB. Se asociará al producto al guardarlo.
+                </p>
+                {imagenError && (
+                  <p className="mt-1.5 text-xs text-red-600">{imagenError}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Costo + Markup + Precio — bloque reactivo */}
