@@ -1281,27 +1281,101 @@ function DashFinanciero({
   /** Caja de consulta (inline-size) para `cqi`; alinea al fondo y estira con la card. */
   const finKpiValueWrap =
     "flex min-h-0 w-full min-w-0 flex-1 [container-type:inline-size] items-end";
-  const finKpiCard = `${finCard} flex h-full min-h-[9.5rem] flex-col`;
   const finAccent = "#4FAEB2";
+
+  const finKpiBase =
+    "group relative flex h-full min-h-[10rem] flex-col overflow-hidden rounded-2xl p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-6";
+  const finKpiLabel =
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+  const finKpiSub = "text-[11px] text-slate-500";
+
+  // Gauge data
+  const pctCobranzaSafe = pctCobranzaCohort ?? 0;
+  const gaugePct = Math.max(0, Math.min(100, pctCobranzaSafe));
+  const gaugeRadius = 30;
+  const gaugeCirc = 2 * Math.PI * gaugeRadius;
+  const gaugeOffset = gaugeCirc - (gaugePct / 100) * gaugeCirc;
+  const gaugeColor =
+    pctCobranzaCohort == null
+      ? "#CBD5E1"
+      : gaugePct >= 80
+        ? "#10B981"
+        : gaugePct >= 50
+          ? finAccent
+          : gaugePct >= 25
+            ? "#F59E0B"
+            : "#EF4444";
 
   return (
     <div className="space-y-6 rounded-2xl border border-[#4FAEB2]/45 bg-gradient-to-b from-slate-50 to-white p-4 sm:space-y-8 sm:p-6 md:p-8">
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
-        <motion.div whileHover={{ y: -2 }} className={finKpiCard}>
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Facturado del período</p>
-          <div className={finKpiValueWrap}>
-            <FinMontoGs kpi monto={facturadoCohortPeriodo} />
+        {/* Facturado */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className={`${finKpiBase} border border-[#4FAEB2]/45 bg-white`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className={finKpiLabel}>Facturado del período</p>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M8 13h8M8 17h6" />
+              </svg>
+            </span>
           </div>
-        </motion.div>
-        <motion.div whileHover={{ y: -2 }} className={finKpiCard}>
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cobrado del período</p>
-          <div className={finKpiValueWrap}>
-            <FinMontoGs kpi monto={recaudadoCohortPeriodo} className="text-[#4FAEB2]" />
+          <div className={`mt-auto ${finKpiValueWrap}`}>
+            <FinMontoGs kpi monto={facturadoCohortPeriodo} className="text-slate-900" />
           </div>
+          <p className={`mt-1 ${finKpiSub}`}>Total emitido</p>
         </motion.div>
-        <motion.div whileHover={{ y: -2 }} className={finKpiCard}>
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pendiente del período</p>
-          <div className={finKpiValueWrap}>
+
+        {/* Cobrado — card destacada */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className={`${finKpiBase} border border-[#4FAEB2]/60 bg-gradient-to-br from-white via-white to-[#4FAEB2]/12 shadow-[0_4px_20px_rgba(79,174,178,0.10)]`}
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#4FAEB2] via-[#4FAEB2]/70 to-[#4FAEB2]/30"
+          />
+          <div className="flex items-start justify-between gap-2">
+            <p className={finKpiLabel}>Cobrado del período</p>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#4FAEB2]/30 bg-[#4FAEB2]/12 text-[#4FAEB2]">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <path d="m9 11 3 3L22 4" />
+              </svg>
+            </span>
+          </div>
+          <div className={`mt-auto ${finKpiValueWrap}`}>
+            <FinMontoGs kpi monto={recaudadoCohortPeriodo} className="text-[#3F8E91]" />
+          </div>
+          <p className={`mt-1 ${finKpiSub}`}>
+            <span className="font-medium text-[#3F8E91]">
+              {facturadoCohortPeriodo > 0
+                ? `${((recaudadoCohortPeriodo / facturadoCohortPeriodo) * 100).toFixed(0)}%`
+                : "—"}
+            </span>{" "}
+            de lo facturado
+          </p>
+        </motion.div>
+
+        {/* Pendiente */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className={`${finKpiBase} border border-amber-200 bg-gradient-to-br from-white via-white to-amber-50/40`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className={finKpiLabel}>Pendiente del período</p>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-600">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+            </span>
+          </div>
+          <div className={`mt-auto ${finKpiValueWrap}`}>
             <FinMontoGs
               kpi
               monto={carteraPendienteCohort}
@@ -1315,16 +1389,61 @@ function DashFinanciero({
               }
             />
           </div>
+          <p className={`mt-1 ${finKpiSub}`}>Por cobrar</p>
         </motion.div>
-        <motion.div whileHover={{ y: -2 }} className={finKpiCard}>
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">% de cobranza</p>
-          <div className={finKpiValueWrap}>
-            <p
-              className="min-w-0 w-full text-left font-bold tabular-nums leading-none text-slate-900 whitespace-nowrap [font-size:clamp(0.7rem,5.5cqi+0.15rem,1.5rem)]"
-              title={pctCobranzaCohort == null ? "—" : `${pctCobranzaCohort.toFixed(1)}%`}
-            >
-              {pctCobranzaCohort == null ? "—" : `${pctCobranzaCohort.toFixed(1)}%`}
-            </p>
+
+        {/* % de cobranza — con gauge */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className={`${finKpiBase} border border-[#4FAEB2]/45 bg-white`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className={finKpiLabel}>% de cobranza</p>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <line x1="19" y1="5" x2="5" y2="19" />
+                <circle cx="6.5" cy="6.5" r="2.5" />
+                <circle cx="17.5" cy="17.5" r="2.5" />
+              </svg>
+            </span>
+          </div>
+          <div className="mt-auto flex items-center gap-4">
+            <div className="relative h-[72px] w-[72px] shrink-0">
+              <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
+                <circle cx="36" cy="36" r={gaugeRadius} fill="none" stroke="#E2E8F0" strokeWidth="7" />
+                <circle
+                  cx="36"
+                  cy="36"
+                  r={gaugeRadius}
+                  fill="none"
+                  stroke={gaugeColor}
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeDasharray={gaugeCirc}
+                  strokeDashoffset={gaugeOffset}
+                  style={{ transition: "stroke-dashoffset 0.5s ease, stroke 0.3s ease" }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-base font-bold tabular-nums text-slate-900">
+                  {pctCobranzaCohort == null ? "—" : `${Math.round(gaugePct)}%`}
+                </span>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium text-slate-600">
+                {pctCobranzaCohort == null
+                  ? "Sin datos"
+                  : gaugePct >= 80
+                    ? "Excelente"
+                    : gaugePct >= 50
+                      ? "Buena"
+                      : gaugePct >= 25
+                        ? "A mejorar"
+                        : "Crítica"}
+              </p>
+              <p className={`mt-0.5 ${finKpiSub}`}>cobrado / facturado</p>
+            </div>
           </div>
         </motion.div>
       </div>
