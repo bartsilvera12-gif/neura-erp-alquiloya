@@ -19,11 +19,7 @@ import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session"
 import { readSaasBriefData } from "@/lib/proyectos/brief-data";
 import ProyectoDetalleModal from "./components/ProyectoDetalleModal";
 import ProyectoNuevoModal from "./components/ProyectoNuevoModal";
-
-const TURQUOISE_CHEVRON_BG =
-  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234FAEB2' stroke-width='2.5'><path stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/></svg>\")";
-const FILTER_SELECT_CLS =
-  "shrink-0 appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px_14px] bg-[right_0.85rem_center] bg-no-repeat px-3.5 py-2.5 pr-9 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20";
+import { FancySelect } from "./components/FancySelect";
 
 type EstadoRow = {
   id: string;
@@ -499,58 +495,56 @@ export default function ProyectosKanbanClient() {
         >
           Buscar
         </button>
-        <select
-          className={`min-w-[160px] ${FILTER_SELECT_CLS}`}
-          style={{ backgroundImage: TURQUOISE_CHEVRON_BG }}
+        <FancySelect
+          className="min-w-[180px] shrink-0"
+          ariaLabel="Filtrar por estado"
+          placeholder="Todos los estados"
           value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-        >
-          <option value="">Todos los estados</option>
-          {estados.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`min-w-[140px] ${FILTER_SELECT_CLS}`}
-          style={{ backgroundImage: TURQUOISE_CHEVRON_BG }}
+          onChange={setFiltroEstado}
+          options={[
+            { value: "", label: "Todos los estados" },
+            ...estados.map((e) => ({ value: e.id, label: e.nombre })),
+          ]}
+        />
+        <FancySelect
+          className="min-w-[160px] shrink-0"
+          ariaLabel="Filtrar por tipo"
+          placeholder="Todos los tipos"
           value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-        >
-          <option value="">Todos los tipos</option>
-          {tipoOpts.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`min-w-[170px] ${FILTER_SELECT_CLS}`}
-          style={{ backgroundImage: TURQUOISE_CHEVRON_BG }}
+          onChange={setFiltroTipo}
+          options={[
+            { value: "", label: "Todos los tipos" },
+            ...tipoOpts.map((t) => ({ value: t.id, label: t.nombre })),
+          ]}
+        />
+        <FancySelect
+          className="min-w-[190px] shrink-0"
+          ariaLabel="Filtrar por responsable comercial"
+          placeholder="Resp. comercial"
           value={filtroRc}
-          onChange={(e) => setFiltroRc(e.target.value)}
-        >
-          <option value="">Resp. comercial</option>
-          {userOpts.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.nombre ?? u.id.slice(0, 8)}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`min-w-[170px] ${FILTER_SELECT_CLS}`}
-          style={{ backgroundImage: TURQUOISE_CHEVRON_BG }}
+          onChange={setFiltroRc}
+          options={[
+            { value: "", label: "Resp. comercial" },
+            ...userOpts.map((u) => ({
+              value: u.id,
+              label: u.nombre ?? u.id.slice(0, 8),
+            })),
+          ]}
+        />
+        <FancySelect
+          className="min-w-[190px] shrink-0"
+          ariaLabel="Filtrar por responsable técnico"
+          placeholder="Resp. técnico"
           value={filtroRt}
-          onChange={(e) => setFiltroRt(e.target.value)}
-        >
-          <option value="">Resp. técnico</option>
-          {userOpts.map((u) => (
-            <option key={`t-${u.id}`} value={u.id}>
-              {u.nombre ?? u.id.slice(0, 8)}
-            </option>
-          ))}
-        </select>
+          onChange={setFiltroRt}
+          options={[
+            { value: "", label: "Resp. técnico" },
+            ...userOpts.map((u) => ({
+              value: u.id,
+              label: u.nombre ?? u.id.slice(0, 8),
+            })),
+          ]}
+        />
         {(q || filtroEstado || filtroTipo || filtroRc || filtroRt) ? (
           <button
             type="button"
@@ -775,25 +769,34 @@ function ProjectCardView({
               Abrir en página completa
             </Link>
           </div>
-          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2" onClick={(e) => e.stopPropagation()}>
-            <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Mover a</label>
-            <select
-              className="mt-1 w-full appearance-none rounded-lg border border-slate-200 bg-white bg-[length:12px_12px] bg-[right_0.6rem_center] bg-no-repeat px-3 py-1.5 pr-7 text-xs font-medium text-slate-700 shadow-sm outline-none transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:ring-2 focus:ring-[#4FAEB2]/20"
-              style={{ backgroundImage: TURQUOISE_CHEVRON_BG }}
-              value={p.estado_id}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onMove(p.id, e.target.value)}
-            >
-              {!estadoActivoIds.has(p.estado_id) ? (
-                <option value={p.estado_id}>Estado actual oculto / no usado</option>
-              ) : null}
-              {estados.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre}
-                </option>
-              ))}
-            </select>
+          <div
+            className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Mover a
+            </label>
+            <div className="mt-1">
+              <FancySelect
+                size="sm"
+                ariaLabel="Mover a otro estado"
+                value={p.estado_id}
+                onChange={(v) => onMove(p.id, v)}
+                options={[
+                  ...(!estadoActivoIds.has(p.estado_id)
+                    ? [
+                        {
+                          value: p.estado_id,
+                          label: "Estado actual oculto / no usado",
+                          disabled: true,
+                        },
+                      ]
+                    : []),
+                  ...estados.map((e) => ({ value: e.id, label: e.nombre })),
+                ]}
+              />
+            </div>
           </div>
         </>
       ) : null}

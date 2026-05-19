@@ -7,6 +7,7 @@ import {
   ProyectoModuloSelector,
   type ProyectoModuloCatalogo as ModuloCatalogo,
 } from "@/app/dashboard/proyectos/components/ProyectoModuloSelector";
+import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
 import {
   PROYECTO_DATOS_BRIEF_FIELDS,
   applySaasFormToExisting,
@@ -26,13 +27,7 @@ export type ProyectoNuevoFormProps = {
 
 const INPUT_CLS =
   "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20";
-const SELECT_CLS =
-  "mt-1.5 w-full appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px_14px] bg-[right_0.85rem_center] bg-no-repeat px-3.5 py-2.5 pr-9 text-sm text-slate-900 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20";
 const LABEL_CLS = "text-xs font-medium uppercase tracking-wide text-slate-500";
-const CHEVRON_STYLE = {
-  backgroundImage:
-    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234FAEB2' stroke-width='2.5'><path stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/></svg>\")",
-} as const;
 
 export default function ProyectoNuevoForm({
   variant = "page",
@@ -109,6 +104,14 @@ export default function ProyectoNuevoForm({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!tipoId) {
+      setErr("Seleccioná un tipo de proyecto.");
+      return;
+    }
+    if (!titulo.trim()) {
+      setErr("El título es requerido.");
+      return;
+    }
     setSaving(true);
     setErr(null);
     const brief_data = esWeb
@@ -212,86 +215,88 @@ export default function ProyectoNuevoForm({
                 placeholder="Nombre del proyecto"
               />
             </label>
-            <label className="block text-sm">
-              <span className={LABEL_CLS}>Tipo</span>
-              <select
-                required
-                className={SELECT_CLS}
-                style={CHEVRON_STYLE}
-                value={tipoId}
-                onChange={(e) => setTipoId(e.target.value)}
-              >
-                <option value="">Seleccionar…</option>
-                {tipos.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
+            <div className="block text-sm">
+              <span className={LABEL_CLS}>
+                Tipo <span className="text-rose-500">*</span>
+              </span>
+              <div className="mt-1.5">
+                <FancySelect
+                  ariaLabel="Tipo de proyecto"
+                  placeholder="Seleccionar…"
+                  value={tipoId}
+                  onChange={setTipoId}
+                  options={tipos.map((t) => ({ value: t.id, label: t.nombre }))}
+                />
+              </div>
+            </div>
+            <div className="block text-sm">
               <span className={LABEL_CLS}>Estado inicial (opcional)</span>
-              <select
-                className={SELECT_CLS}
-                style={CHEVRON_STYLE}
-                value={estadoId}
-                onChange={(e) => setEstadoId(e.target.value)}
-              >
-                <option value="">Predeterminado de empresa</option>
-                {estados.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div className="mt-1.5">
+                <FancySelect
+                  ariaLabel="Estado inicial"
+                  placeholder="Predeterminado de empresa"
+                  value={estadoId}
+                  onChange={setEstadoId}
+                  options={[
+                    { value: "", label: "Predeterminado de empresa" },
+                    ...estados.map((s) => ({ value: s.id, label: s.nombre })),
+                  ]}
+                />
+              </div>
+            </div>
             <ClienteSearchSelect clientes={clientes} value={clienteId} onChange={setClienteId} />
-            <label className="block text-sm">
+            <div className="block text-sm">
               <span className={LABEL_CLS}>Prioridad</span>
-              <select
-                className={SELECT_CLS}
-                style={CHEVRON_STYLE}
-                value={prioridad}
-                onChange={(e) => setPrioridad(e.target.value)}
-              >
-                <option value="baja">Baja</option>
-                <option value="normal">Media</option>
-                <option value="alta">Alta</option>
-                <option value="urgente">Urgente</option>
-              </select>
-            </label>
-            <label className="block text-sm">
+              <div className="mt-1.5">
+                <FancySelect
+                  ariaLabel="Prioridad"
+                  value={prioridad}
+                  onChange={setPrioridad}
+                  options={[
+                    { value: "baja", label: "Baja" },
+                    { value: "normal", label: "Media" },
+                    { value: "alta", label: "Alta" },
+                    { value: "urgente", label: "Urgente" },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="block text-sm">
               <span className={LABEL_CLS}>Resp. comercial</span>
-              <select
-                className={SELECT_CLS}
-                style={CHEVRON_STYLE}
-                value={rc}
-                onChange={(e) => setRc(e.target.value)}
-              >
-                <option value="">—</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre ?? u.id.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
+              <div className="mt-1.5">
+                <FancySelect
+                  ariaLabel="Responsable comercial"
+                  placeholder="—"
+                  value={rc}
+                  onChange={setRc}
+                  options={[
+                    { value: "", label: "—" },
+                    ...usuarios.map((u) => ({
+                      value: u.id,
+                      label: u.nombre ?? u.id.slice(0, 8),
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="block text-sm">
               <span className={LABEL_CLS}>Resp. técnico</span>
-              <select
-                className={SELECT_CLS}
-                style={CHEVRON_STYLE}
-                value={rt}
-                onChange={(e) => setRt(e.target.value)}
-              >
-                <option value="">—</option>
-                {usuarios.map((u) => (
-                  <option key={`t-${u.id}`} value={u.id}>
-                    {u.nombre ?? u.id.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div className="mt-1.5">
+                <FancySelect
+                  ariaLabel="Responsable técnico"
+                  placeholder="—"
+                  value={rt}
+                  onChange={setRt}
+                  options={[
+                    { value: "", label: "—" },
+                    ...usuarios.map((u) => ({
+                      value: u.id,
+                      label: u.nombre ?? u.id.slice(0, 8),
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
             <label className="block text-sm">
               <span className={LABEL_CLS}>Fecha ingreso</span>
               <input

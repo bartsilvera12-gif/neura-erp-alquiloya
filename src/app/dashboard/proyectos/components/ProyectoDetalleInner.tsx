@@ -8,6 +8,7 @@ import {
   ProyectoModuloSelector,
   type ProyectoModuloCatalogo as ModuloCatalogo,
 } from "@/app/dashboard/proyectos/components/ProyectoModuloSelector";
+import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
 import {
   PROYECTO_DATOS_BRIEF_FIELDS,
   applyBriefFormToExisting,
@@ -330,12 +331,6 @@ export default function ProyectoDetalleInner({
   const labelCls = "text-xs font-medium uppercase tracking-wide text-slate-500";
   const inputCls =
     "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20";
-  const selectCls =
-    "mt-1.5 w-full appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px_14px] bg-[right_0.85rem_center] bg-no-repeat px-3.5 py-2.5 pr-9 text-sm text-slate-900 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20";
-  const chevronStyle = {
-    backgroundImage:
-      "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234FAEB2' stroke-width='2.5'><path stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/></svg>\")",
-  } as const;
 
   const rootClass =
     variant === "modal"
@@ -384,21 +379,13 @@ export default function ProyectoDetalleInner({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <select
-              className={selectCls}
-              style={chevronStyle}
-              value={String(proyecto.estado_id ?? "")}
-              onChange={(e) => void cambiarEstado(e.target.value)}
-              aria-label="Cambiar estado"
-            >
-              {estados.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FancySelect
+            className="min-w-[180px]"
+            ariaLabel="Cambiar estado del proyecto"
+            value={String(proyecto.estado_id ?? "")}
+            onChange={(v) => void cambiarEstado(v)}
+            options={estados.map((e) => ({ value: e.id, label: e.nombre }))}
+          />
           {variant === "modal" ? (
             <button
               type="button"
@@ -604,22 +591,24 @@ export default function ProyectoDetalleInner({
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
+              <div className="block text-sm">
                 <span className={labelCls}>Técnico responsable</span>
-                <select
-                  className={selectCls}
-                  style={chevronStyle}
-                  value={responsableTecnicoId}
-                  onChange={(e) => setResponsableTecnicoId(e.target.value)}
-                >
-                  <option value="">—</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nombre || u.email || u.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="mt-1.5">
+                  <FancySelect
+                    ariaLabel="Técnico responsable"
+                    placeholder="—"
+                    value={responsableTecnicoId}
+                    onChange={setResponsableTecnicoId}
+                    options={[
+                      { value: "", label: "—" },
+                      ...usuarios.map((u) => ({
+                        value: u.id,
+                        label: u.nombre || u.email || u.id.slice(0, 8),
+                      })),
+                    ]}
+                  />
+                </div>
+              </div>
               {esWeb ? (
                 <label className="block text-sm sm:col-span-2">
                   <span className={labelCls}>Observaciones comerciales</span>
@@ -744,17 +733,19 @@ export default function ProyectoDetalleInner({
                 return (
                   <li key={tid} className="flex flex-wrap items-center gap-2 py-3 text-sm">
                     <span className="flex-1 font-medium text-slate-800">{String(t.titulo ?? "")}</span>
-                    <select
-                      className="appearance-none rounded-lg border border-slate-200 bg-white bg-[length:12px_12px] bg-[right_0.6rem_center] bg-no-repeat px-3 py-1.5 pr-7 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20"
-                      style={chevronStyle}
+                    <FancySelect
+                      size="sm"
+                      className="min-w-[150px]"
+                      ariaLabel="Estado de la tarea"
                       value={estado}
-                      onChange={(e) => void patchTarea(tid, { estado: e.target.value })}
-                    >
-                      <option value="pendiente">pendiente</option>
-                      <option value="en_proceso">en_proceso</option>
-                      <option value="completada">completada</option>
-                      <option value="bloqueada">bloqueada</option>
-                    </select>
+                      onChange={(v) => void patchTarea(tid, { estado: v })}
+                      options={[
+                        { value: "pendiente", label: "Pendiente" },
+                        { value: "en_proceso", label: "En proceso" },
+                        { value: "completada", label: "Completada" },
+                        { value: "bloqueada", label: "Bloqueada" },
+                      ]}
+                    />
                   </li>
                 );
               })}
