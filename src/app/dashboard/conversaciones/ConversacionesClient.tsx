@@ -2306,172 +2306,268 @@ export function ConversacionesClient({
             </div>
           ) : (
             <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="px-2 py-1 border-b border-slate-200 bg-white shrink-0">
+              <div className="px-4 py-3 border-b border-slate-200 bg-white shrink-0">
                 {selected ? (
-                  <div className="flex flex-col gap-0.5 min-w-0 w-full">
-                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0 min-w-0">
-                          <span className="font-semibold text-slate-900 text-sm leading-tight truncate max-w-[min(100%,14rem)]">
-                            {selected.contact.name?.trim() ? selected.contact.name.trim() : "Sin nombre"}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono tabular-nums shrink-0">
-                            {selected.contact.phone_number || "—"}
-                          </span>
+                  (() => {
+                    const contactDisplayName = selected.contact.name?.trim()
+                      ? selected.contact.name.trim()
+                      : "Sin nombre";
+                    const contactInitial = (() => {
+                      const n = contactDisplayName.replace(/^[^A-Za-z0-9]+/, "");
+                      const first = n.match(/[A-Za-z0-9]/);
+                      return (first?.[0] ?? "?").toUpperCase();
+                    })();
+                    const hasName = Boolean(selected.contact.name?.trim());
+                    return (
+                      <div className="flex flex-col gap-2.5 min-w-0 w-full">
+                        {/* Row 1: identidad + acciones primarias */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 min-w-0">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span
+                              aria-hidden="true"
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ring-2 ring-white shadow-sm ${
+                                hasName
+                                  ? "bg-[#4FAEB2]/12 text-[#3F8E91] border border-[#4FAEB2]/30"
+                                  : "bg-slate-100 text-slate-500 border border-slate-200"
+                              }`}
+                            >
+                              {contactInitial}
+                            </span>
+                            <div className="min-w-0 leading-tight">
+                              <p className="truncate text-sm font-semibold text-slate-900 max-w-[min(100%,18rem)]">
+                                {contactDisplayName}
+                              </p>
+                              <p className="mt-0.5 truncate font-mono text-[11px] tabular-nums text-slate-500">
+                                {selected.contact.phone_number || "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {vista !== "bot" ? (
+                              <button
+                                type="button"
+                                disabled={opsBusy}
+                                onClick={() => {
+                                  setTransferAgentSearch("");
+                                  setTransferQueueTarget(selected.queue_id?.trim() ? selected.queue_id : "");
+                                  setTransferModalOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-[#4FAEB2]/25 transition-colors hover:bg-[#3F8E91] disabled:opacity-50"
+                              >
+                                <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                Transferir
+                              </button>
+                            ) : null}
+                            {selected.status !== "closed" && mode === "inbox" ? (
+                              <button
+                                type="button"
+                                disabled={opsBusy || finalizeSaving}
+                                onClick={() => void openFinalizeModal()}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91] disabled:opacity-50"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-3.5 w-3.5 shrink-0"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                  <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg>
+                                Finalizar
+                              </button>
+                            ) : selected.status === "closed" ? (
+                              <button
+                                type="button"
+                                disabled={opsBusy}
+                                onClick={() =>
+                                  void runConversationOp(() =>
+                                    changeConversationStatus(selected.id, "open")
+                                  )
+                                }
+                                className="inline-flex items-center rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                              >
+                                Reabrir
+                              </button>
+                            ) : null}
+                            {isHumanActive ? (
+                              <button
+                                type="button"
+                                disabled={releasingBot}
+                                onClick={() => void handleReleaseToBot()}
+                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91] disabled:opacity-50"
+                              >
+                                {releasingBot ? "…" : "Modo bot"}
+                              </button>
+                            ) : null}
+                            {canResendCurrentFlowStep ? (
+                              <button
+                                type="button"
+                                disabled={resendFlowStepLoading || opsBusy}
+                                onClick={() => void handleResendCurrentFlowStep()}
+                                title='Vuelve a enviar la pregunta o mensaje del nodo actual sin avanzar el flujo. Útil si el bot quedó trabado o el cliente no recibió el último paso.'
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:opacity-50"
+                              >
+                                <RefreshCw
+                                  className={`h-3.5 w-3.5 shrink-0 ${resendFlowStepLoading ? "animate-spin" : ""}`}
+                                  aria-hidden
+                                />
+                                {resendFlowStepLoading ? "Enviando…" : "Reenviar paso"}
+                              </button>
+                            ) : null}
+                            {listColumnHidden ? (
+                              <button
+                                type="button"
+                                onClick={() => setListColumnHidden(false)}
+                                title="Mostrar lista de chats"
+                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91]"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                >
+                                  <line x1="8" y1="6" x2="21" y2="6" />
+                                  <line x1="8" y1="12" x2="21" y2="12" />
+                                  <line x1="8" y1="18" x2="21" y2="18" />
+                                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                                </svg>
+                                Chats
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-0.5 shrink-0">
+
+                        {/* Row 2: meta chips uniformes */}
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                           <ChannelBadge type={selected.channel.type} nombre={selected.channel.nombre} />
                           {vista === "bot" ? (
-                            <span className="text-[9px] font-semibold text-violet-800 bg-violet-50 border border-violet-200 px-1 py-0.5 rounded shrink-0">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-800">
+                              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-violet-500" />
                               Bot
                             </span>
                           ) : isHumanActive ? (
-                            <span className="text-[9px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded shrink-0">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-emerald-500" />
                               Humano
                             </span>
                           ) : null}
                           <span
-                            className={`text-[9px] font-semibold uppercase px-1 py-0.5 rounded border shrink-0 ${badgeEstadoClass(selected.status)}`}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeEstadoClass(selected.status)}`}
                           >
                             {labelEstado(selected.status)}
                           </span>
-                          {listColumnHidden ? (
-                            <button
-                              type="button"
-                              onClick={() => setListColumnHidden(false)}
-                              className="shrink-0 text-[9px] font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-1 py-0.5 bg-white"
-                              title="Mostrar lista de chats"
-                            >
-                              Chats
-                            </button>
+
+                          {vista !== "bot" ? (
+                            <>
+                              <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-slate-200" />
+                              {selected.queue_name ? (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700 truncate max-w-[12rem]"
+                                  title="Cola de enrutamiento"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-3 w-3 shrink-0 text-slate-400"
+                                    aria-hidden="true"
+                                  >
+                                    <rect x="3" y="6" width="18" height="12" rx="2" />
+                                    <path d="M7 10h10M7 14h6" />
+                                  </svg>
+                                  {selected.queue_name}
+                                </span>
+                              ) : mode === "inbox" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                  Sin cola
+                                </span>
+                              ) : null}
+                              <InboxReplyTurnBadges c={selected} dense />
+                              {selected.assigned_agent_name ? (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 truncate max-w-[11rem]"
+                                  title="Agente asignado"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-3 w-3 shrink-0"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                  </svg>
+                                  {selected.assigned_agent_name}
+                                </span>
+                              ) : mode === "inbox" ? (
+                                (() => {
+                                  const w = assignmentWaitBadge(
+                                    selected.assignment_wait_code,
+                                    Boolean(selected.queue_id)
+                                  );
+                                  return (
+                                    <span
+                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${assignmentWaitBadgeClass(w.tone)}`}
+                                      title="Aún sin agente asignado"
+                                    >
+                                      <UserRound className="h-3 w-3 shrink-0" aria-hidden />
+                                      Sin agente · {w.label}
+                                    </span>
+                                  );
+                                })()
+                              ) : null}
+                            </>
+                          ) : null}
+
+                          {selected.contact.cliente_id || selected.contact.crm_prospecto_id ? (
+                            <>
+                              <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-slate-200" />
+                              {selected.contact.cliente_id ? (
+                                <Link
+                                  href={`/clientes/${selected.contact.cliente_id}`}
+                                  className="inline-flex items-center gap-1 rounded-full border border-[#4FAEB2]/30 bg-[#4FAEB2]/8 px-2 py-0.5 text-[10px] font-semibold text-[#3F8E91] transition-colors hover:bg-[#4FAEB2]/12"
+                                >
+                                  Cliente →
+                                </Link>
+                              ) : null}
+                              {selected.contact.crm_prospecto_id ? (
+                                <Link
+                                  href={`/crm/${selected.contact.crm_prospecto_id}`}
+                                  className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                                >
+                                  CRM →
+                                </Link>
+                              ) : null}
+                            </>
                           ) : null}
                         </div>
                       </div>
-                    </div>
-
-                    {vista !== "bot" ? (
-                      <div className="flex flex-wrap items-center gap-0.5 min-w-0">
-                        {selected.queue_name ? (
-                          <span
-                            className="text-[9px] font-medium text-indigo-900 bg-indigo-50 border border-indigo-200 rounded px-1 py-0.5 truncate max-w-[10rem]"
-                            title="Cola de enrutamiento"
-                          >
-                            {selected.queue_name}
-                          </span>
-                        ) : mode === "inbox" ? (
-                          <span className="text-[9px] text-slate-600 bg-slate-50 border border-slate-200 rounded px-1 py-0.5">
-                            Sin cola
-                          </span>
-                        ) : null}
-                        <InboxReplyTurnBadges c={selected} dense />
-                        {selected.assigned_agent_name ? (
-                          <span
-                            className="text-[9px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 truncate max-w-[9rem]"
-                            title="Agente asignado"
-                          >
-                            {selected.assigned_agent_name}
-                          </span>
-                        ) : mode === "inbox" ? (
-                          (() => {
-                            const w = assignmentWaitBadge(
-                              selected.assignment_wait_code,
-                              Boolean(selected.queue_id)
-                            );
-                            return (
-                              <span
-                                className={`text-[9px] font-semibold rounded px-1 py-0.5 border ${assignmentWaitBadgeClass(w.tone)}`}
-                                title="Aún sin agente asignado"
-                              >
-                                Sin agente · {w.label}
-                              </span>
-                            );
-                          })()
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <div className="flex flex-wrap items-center justify-end gap-1 pt-0.5 border-t border-slate-100">
-                      {vista !== "bot" ? (
-                        <button
-                          type="button"
-                          disabled={opsBusy}
-                          onClick={() => {
-                            setTransferAgentSearch("");
-                            setTransferQueueTarget(selected.queue_id?.trim() ? selected.queue_id : "");
-                            setTransferModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-lg bg-[#4FAEB2] text-white px-2.5 py-1 text-[11px] font-semibold shadow-sm shadow-[#4FAEB2]/20 hover:bg-[#3F8E91] disabled:opacity-50 transition-colors"
-                        >
-                          <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                          Transferir
-                        </button>
-                      ) : null}
-                      {selected.status !== "closed" && mode === "inbox" ? (
-                        <button
-                          type="button"
-                          disabled={opsBusy || finalizeSaving}
-                          onClick={() => void openFinalizeModal()}
-                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91] disabled:opacity-50"
-                        >
-                          Finalizar
-                        </button>
-                      ) : selected.status === "closed" ? (
-                        <button
-                          type="button"
-                          disabled={opsBusy}
-                          onClick={() =>
-                            void runConversationOp(() =>
-                              changeConversationStatus(selected.id, "open")
-                            )
-                          }
-                          className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                        >
-                          Reabrir
-                        </button>
-                      ) : null}
-                      {isHumanActive ? (
-                        <button
-                          type="button"
-                          disabled={releasingBot}
-                          onClick={() => void handleReleaseToBot()}
-                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91] disabled:opacity-50"
-                        >
-                          {releasingBot ? "…" : "Modo bot"}
-                        </button>
-                      ) : null}
-                      {canResendCurrentFlowStep ? (
-                        <button
-                          type="button"
-                          disabled={resendFlowStepLoading || opsBusy}
-                          onClick={() => void handleResendCurrentFlowStep()}
-                          title='Vuelve a enviar la pregunta o mensaje del nodo actual sin avanzar el flujo. Útil si el bot quedó trabado o el cliente no recibió el último paso.'
-                          className="inline-flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-                        >
-                          <RefreshCw
-                            className={`w-3.5 h-3.5 shrink-0 ${resendFlowStepLoading ? "animate-spin" : ""}`}
-                            aria-hidden
-                          />
-                          {resendFlowStepLoading ? "Enviando…" : "Reenviar paso actual"}
-                        </button>
-                      ) : null}
-                      {selected.contact.cliente_id ? (
-                        <Link
-                          href={`/clientes/${selected.contact.cliente_id}`}
-                          className="inline-flex items-center rounded-md px-2 py-1 text-[11px] font-semibold text-[#4FAEB2] hover:underline"
-                        >
-                          Cliente
-                        </Link>
-                      ) : null}
-                      {selected.contact.crm_prospecto_id ? (
-                        <Link
-                          href={`/crm/${selected.contact.crm_prospecto_id}`}
-                          className="inline-flex items-center rounded-md px-2 py-1 text-[11px] font-semibold text-violet-600 hover:underline"
-                        >
-                          CRM
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
+                    );
+                  })()
                 ) : null}
               </div>
 
