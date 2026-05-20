@@ -7,7 +7,7 @@ import type { AmbienteSifen, EmpresaSifenConfigDTO } from "@/lib/sifen/types";
 
 const fLabel = "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1";
 const fInput =
-  "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-white";
+  "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FAEB2] bg-white";
 const fSelect = fInput;
 
 function Card({ children }: { children: React.ReactNode }) {
@@ -91,7 +91,7 @@ export default function FacturacionElectronicaSifenPage() {
 
   /**
    * Branding KuDE/PDF opcional. NO afecta XML, firma, envío SET ni CDC.
-   * - Vacío → renderer usa logo Neura y color #0EA5E9.
+   * - Vacío → renderer usa logo Neura y color #4FAEB2.
    * - Con color → renderer usa color personalizado para bordes/acentos del PDF.
    * - Con logo → renderer embebe ese PNG en el header.
    */
@@ -454,7 +454,7 @@ export default function FacturacionElectronicaSifenPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
       <div className="flex flex-col gap-1">
-        <Link href="/configuracion" className="text-xs font-medium text-[#0EA5E9] hover:underline w-fit">
+        <Link href="/configuracion" className="text-xs font-medium text-[#4FAEB2] hover:underline w-fit">
           ← Volver a configuración global
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Facturación electrónica (SIFEN)</h1>
@@ -554,7 +554,7 @@ export default function FacturacionElectronicaSifenPage() {
           <span
             className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
               datosMinimosOk && activo
-                ? "bg-sky-50 text-sky-900 border-sky-200"
+                ? "bg-[#4FAEB2]/8 text-[#3F8E91] border-[#4FAEB2]/30"
                 : "bg-slate-100 text-slate-600 border-slate-200"
             }`}
           >
@@ -562,7 +562,7 @@ export default function FacturacionElectronicaSifenPage() {
           </span>
           <span
             className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-              tieneCert ? "bg-indigo-50 text-indigo-900 border-indigo-200" : "bg-slate-100 text-slate-500 border-slate-200"
+              tieneCert ? "bg-[#4FAEB2]/10 text-[#3F8E91] border-[#4FAEB2]/30" : "bg-slate-100 text-slate-500 border-slate-200"
             }`}
           >
             Certificado: {tieneCert ? "Cargado" : "No cargado"}
@@ -904,7 +904,7 @@ export default function FacturacionElectronicaSifenPage() {
                 type="button"
                 disabled={!cfg || saving}
                 onClick={guardarBrandingColores}
-                className="rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                className="rounded-lg bg-[#4FAEB2] hover:bg-[#3F8E91] text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
               >
                 {saving ? "Guardando…" : "Guardar colores"}
               </button>
@@ -919,7 +919,7 @@ export default function FacturacionElectronicaSifenPage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-5 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
+            className="bg-[#4FAEB2] hover:bg-[#3F8E91] text-white px-5 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {saving ? "Guardando…" : cfg ? "Guardar cambios" : "Crear configuración SIFEN"}
           </button>

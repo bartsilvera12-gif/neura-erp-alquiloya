@@ -653,7 +653,7 @@ export default function ConfiguracionComisionesPage() {
             {puedeEditar && (
               <button
                 type="button"
-                className="mt-3 text-sm font-medium text-sky-700 hover:underline"
+                className="mt-3 text-sm font-medium text-[#3F8E91] hover:underline"
                 onClick={() =>
                   setEscalas((prev) => [
                     ...prev,
@@ -672,7 +672,7 @@ export default function ConfiguracionComisionesPage() {
                 type="button"
                 onClick={() => void handleGuardar()}
                 disabled={guardando}
-                className="rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-sky-700 disabled:opacity-60"
+                className="rounded-lg bg-[#4FAEB2] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#3F8E91] disabled:opacity-60"
               >
                 {guardando ? "Guardando…" : "Guardar política"}
               </button>

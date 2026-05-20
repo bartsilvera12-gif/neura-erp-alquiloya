@@ -133,21 +133,32 @@ export default function OmnicanalEquiposPage() {
 
   return (
     <div className="space-y-8 max-w-4xl">
-      <nav className="flex items-center gap-2 text-sm text-slate-500">
-        <Link href="/configuracion" className="hover:text-slate-800">
+      <nav className="flex items-center gap-2 text-xs text-slate-500">
+        <Link href="/configuracion" className="font-medium text-slate-500 transition-colors hover:text-[#4FAEB2]">
           Configuración
         </Link>
-        <span>/</span>
-        <Link href="/configuracion/colas" className="hover:text-slate-800">
+        <span aria-hidden className="text-slate-300">/</span>
+        <Link href="/configuracion/colas" className="font-medium text-slate-500 transition-colors hover:text-[#4FAEB2]">
           Colas
         </Link>
-        <span>/</span>
-        <span className="text-slate-800 font-medium">Equipos y supervisión</span>
+        <span aria-hidden className="text-slate-300">/</span>
+        <span className="font-semibold text-slate-700">Equipos y supervisión</span>
       </nav>
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Equipos y supervisión omnicanal</h1>
-        <p className="text-sm text-slate-500 mt-2 max-w-2xl leading-relaxed">
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+          />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+            Omnicanal · Equipos
+          </p>
+        </div>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          Equipos y supervisión omnicanal
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
           Definí qué usuarios supervisan a qué agentes. Las colas siguen siendo solo distribución de trabajo; la
           supervisión es la jerarquía humana: el supervisor ve inbox, historial y monitoreo únicamente de los agentes
           asignados aquí (por conversaciones asignadas a esos agentes).
@@ -159,7 +170,7 @@ export default function OmnicanalEquiposPage() {
         <p className="text-xs text-slate-500 leading-relaxed">
           Supervisores: solo usuarios con perfil <strong className="text-slate-700">Supervisor</strong> en el ERP.
           Agentes: solo perfil <strong className="text-slate-700">Usuario</strong> y asignados a al menos una cola en{" "}
-          <Link href="/configuracion/colas" className="font-semibold text-[#0EA5E9] hover:underline">
+          <Link href="/configuracion/colas" className="font-semibold text-[#4FAEB2] hover:underline">
             Colas y enrutamiento
           </Link>
           .
@@ -226,7 +237,7 @@ export default function OmnicanalEquiposPage() {
               !supervisorId ||
               !agentId
             }
-            className="rounded-xl bg-[#0EA5E9] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0284C7] disabled:opacity-50"
+            className="rounded-xl bg-[#4FAEB2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#3F8E91] disabled:opacity-50"
           >
             {saving ? "Guardando…" : "Asignar agente al supervisor"}
           </button>

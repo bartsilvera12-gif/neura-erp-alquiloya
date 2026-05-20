@@ -12,7 +12,14 @@ export const dynamic = "force-dynamic";
  */
 export default function ConfiguracionCanalesHubPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-24 text-sm text-slate-400">Cargando…</div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center gap-3 py-24 text-sm text-slate-500">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#4FAEB2]" />
+          Cargando canales…
+        </div>
+      }
+    >
       <CanalesHubInner />
     </Suspense>
   );

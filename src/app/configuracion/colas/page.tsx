@@ -79,12 +79,17 @@ export default function ConfiguracionColasPage() {
   }
 
   if (allowed === null) {
-    return <div className="py-24 text-center text-sm text-slate-400">Cargando…</div>;
+    return (
+      <div className="flex items-center justify-center gap-3 py-24 text-sm text-slate-500">
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#4FAEB2]" />
+        Cargando…
+      </div>
+    );
   }
 
   if (!allowed) {
     return (
-      <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+      <div className="max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
         Módulo no habilitado.{" "}
         <Link href="/configuracion" className="font-semibold underline">
           Volver
@@ -95,21 +100,35 @@ export default function ConfiguracionColasPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Link href="/configuracion" className="hover:text-slate-800">
+      <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <Link href="/configuracion" className="font-medium text-slate-500 transition-colors hover:text-[#4FAEB2]">
           Configuración
         </Link>
-        <span>/</span>
-        <span className="text-slate-800 font-medium">Colas y enrutamiento</span>
-        <span className="text-slate-300">·</span>
-        <Link href="/configuracion/omnicanal-equipos" className="text-[#0EA5E9] hover:underline font-medium">
+        <span aria-hidden className="text-slate-300">/</span>
+        <span className="font-semibold text-slate-700">Colas y enrutamiento</span>
+        <span aria-hidden className="text-slate-300">·</span>
+        <Link
+          href="/configuracion/omnicanal-equipos"
+          className="font-medium text-[#4FAEB2] hover:text-[#3F8E91] hover:underline"
+        >
           Equipos y supervisión
         </Link>
       </nav>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Colas y enrutamiento</h1>
-          <p className="text-sm text-slate-500 mt-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+            />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+              Omnicanal · Routing
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+            Colas y enrutamiento
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-slate-500">
             Definí colas, canales asociados, estrategia de distribución y agentes por cola. El inbox y el webhook
             existentes siguen usando la misma base de datos.
           </p>
@@ -117,8 +136,21 @@ export default function ConfiguracionColasPage() {
         <button
           type="button"
           onClick={() => void handleNew()}
-          className="rounded-xl bg-[#0EA5E9] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0284C7]"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[#4FAEB2]/25 transition-colors hover:bg-[#3F8E91]"
         >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
           Nueva cola
         </button>
       </div>
@@ -156,7 +188,7 @@ export default function ConfiguracionColasPage() {
                   </span>
                   <Link
                     href={`/configuracion/colas/${encodeURIComponent(String(q.id ?? "").trim())}`}
-                    className="text-sm font-semibold text-[#0EA5E9] hover:underline"
+                    className="text-sm font-semibold text-[#4FAEB2] hover:underline"
                   >
                     Editar
                   </Link>
@@ -167,7 +199,7 @@ export default function ConfiguracionColasPage() {
         )}
       </div>
       <p className="text-xs text-slate-400">
-        El módulo <Link href="/dashboard/monitoreo" className="text-[#0EA5E9] hover:underline">Monitoreo</Link> resume
+        El módulo <Link href="/dashboard/monitoreo" className="text-[#4FAEB2] hover:underline">Monitoreo</Link> resume
         carga operativa en tiempo casi real.
       </p>
     </div>

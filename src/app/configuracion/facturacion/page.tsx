@@ -120,7 +120,7 @@ export default function ConfiguracionFacturacionPage() {
             </div>
             <Link
               href="/configuracion/facturacion-electronica"
-              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#0EA5E9] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7]"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#4FAEB2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91]"
             >
               Configurar SIFEN
             </Link>
@@ -130,7 +130,7 @@ export default function ConfiguracionFacturacionPage() {
         <ConfigFormCard>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-800">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#4FAEB2]/30 bg-[#4FAEB2]/10 text-[#4FAEB2]">
                 <Users className="h-5 w-5" aria-hidden />
               </div>
               <div className="min-w-0">
@@ -162,7 +162,7 @@ export default function ConfiguracionFacturacionPage() {
                       disabled={!esAdmin || gestionGuardando || gestionTributaria === null}
                       onClick={() => void toggleGestionTributaria(!gestionTributaria)}
                       className={`relative inline-flex h-8 w-12 shrink-0 rounded-full transition-colors ${
-                        gestionTributaria ? "bg-indigo-600" : "bg-slate-300"
+                        gestionTributaria ? "bg-[#4FAEB2]" : "bg-slate-300"
                       } ${!esAdmin || gestionTributaria === null ? "opacity-50" : ""}`}
                     >
                       <span
@@ -306,7 +306,7 @@ export default function ConfiguracionFacturacionPage() {
           <button
             type="button"
             onClick={handleGuardar}
-            className="rounded-lg bg-[#0EA5E9] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0284C7] active:scale-95"
+            className="rounded-lg bg-[#4FAEB2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91] active:scale-95"
           >
             Guardar configuración
           </button>

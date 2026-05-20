@@ -147,7 +147,7 @@ export default function OmnicanalHorariosPage() {
         <p className="text-sm text-slate-600">
           Tu empresa no tiene activo el módulo omnicanal o no tenés acceso a esta configuración.
         </p>
-        <Link href="/configuracion" className="mt-4 inline-block text-sm font-semibold text-[#0EA5E9] hover:underline">
+        <Link href="/configuracion" className="mt-4 inline-block text-sm font-semibold text-[#4FAEB2] hover:underline">
           Volver a configuración global
         </Link>
       </div>
@@ -156,13 +156,31 @@ export default function OmnicanalHorariosPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 px-4 pb-12 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <Link href="/configuracion" className="font-medium text-slate-500 transition-colors hover:text-[#4FAEB2]">
+          Configuración Global
+        </Link>
+        <span aria-hidden className="text-slate-300">/</span>
+        <span className="font-semibold text-slate-700">Horarios de trabajo</span>
+      </nav>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Horarios de trabajo omnicanal</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+            />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+              Omnicanal · Turnos
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+            Horarios de trabajo omnicanal
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
             Plantillas de franja horaria y días (uso futuro: fuera de turno, métricas dentro del turno). Asignalas a cada
             usuario agente desde{" "}
-            <Link href="/usuarios" className="font-semibold text-[#0EA5E9] hover:underline">
+            <Link href="/usuarios" className="font-semibold text-[#4FAEB2] hover:underline">
               Usuarios
             </Link>
             .
@@ -170,9 +188,23 @@ export default function OmnicanalHorariosPage() {
         </div>
         <Link
           href="/configuracion"
-          className="text-sm font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
         >
-          ← Configuración global
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+            aria-hidden="true"
+          >
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Volver al centro
         </Link>
       </div>
 
@@ -224,7 +256,7 @@ export default function OmnicanalHorariosPage() {
                   onClick={() => toggleDay(d.v)}
                   className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     days.includes(d.v)
-                      ? "border-[#0EA5E9] bg-sky-50 text-sky-900"
+                      ? "border-[#4FAEB2] bg-[#4FAEB2]/8 text-[#3F8E91]"
                       : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
                   }`}
                 >
@@ -241,7 +273,7 @@ export default function OmnicanalHorariosPage() {
             <button
               type="submit"
               disabled={saving || days.length === 0}
-              className="inline-flex items-center gap-1 rounded-xl bg-[#0EA5E9] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#0284C7] disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-xl bg-[#4FAEB2] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3F8E91] disabled:opacity-50"
             >
               <Plus className="h-4 w-4" aria-hidden />
               {draftId ? "Guardar cambios" : "Crear horario"}
@@ -296,7 +328,7 @@ export default function OmnicanalHorariosPage() {
                       <button
                         type="button"
                         onClick={() => editRow(r)}
-                        className="mr-2 text-xs font-semibold text-[#0EA5E9] hover:underline"
+                        className="mr-2 text-xs font-semibold text-[#4FAEB2] hover:underline"
                       >
                         Editar
                       </button>
