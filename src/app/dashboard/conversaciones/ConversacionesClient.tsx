@@ -369,6 +369,29 @@ export function ConversacionesClient({
   const [botFlowsChecked, setBotFlowsChecked] = useState(false);
   const [compValidacionesOpen, setCompValidacionesOpen] = useState(false);
   const [listColumnHidden, setListColumnHidden] = useState(false);
+  /**
+   * Collapsa el encabezado del módulo (eyebrow + nombre + insignia + tabs +
+   * filtros) para maximizar el espacio del chat. Persiste en localStorage.
+   */
+  const [headerCollapsed, setHeaderCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("conversaciones:headerCollapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        "conversaciones:headerCollapsed",
+        headerCollapsed ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [headerCollapsed]);
   /** Filtro local del listado (nombre o teléfono); no altera la carga desde servidor. */
   const [listSearch, setListSearch] = useState("");
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -1879,6 +1902,56 @@ export function ConversacionesClient({
         </div>
       ) : null}
 
+      {/* Toggle "Ocultar / Mostrar barra" — siempre visible. Persiste en
+          localStorage. Permite maximizar el espacio del chat. */}
+      <div className="flex shrink-0 items-center justify-end">
+        <button
+          type="button"
+          onClick={() => setHeaderCollapsed((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
+          title={headerCollapsed ? "Mostrar barra superior" : "Ocultar barra superior"}
+          aria-pressed={headerCollapsed}
+        >
+          {headerCollapsed ? (
+            <>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              Mostrar barra
+            </>
+          ) : (
+            <>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+              Ocultar barra
+            </>
+          )}
+        </button>
+      </div>
+
+      {!headerCollapsed ? (
+      <>
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -2147,6 +2220,8 @@ export function ConversacionesClient({
             </p>
           ) : null}
         </div>
+      ) : null}
+      </>
       ) : null}
 
       {hasActiveChannel === false && (
