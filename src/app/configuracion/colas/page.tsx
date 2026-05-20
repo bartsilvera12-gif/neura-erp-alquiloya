@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import type { ChatQueueAdminRow } from "@/lib/chat/queue-admin-repo";
 import { apiCreateQueueDraft, apiListQueues } from "./queue-admin-api";
+import ColaEditorModal from "./components/ColaEditorModal";
 
 function hasOmnichannelFromModuleAccess(body: {
   superAdmin?: boolean;
@@ -30,6 +31,9 @@ export default function ConfiguracionColasPage() {
   const [rows, setRows] = useState<ChatQueueAdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingIsNew, setEditingIsNew] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,14 +72,31 @@ export default function ConfiguracionColasPage() {
     return () => window.clearTimeout(id);
   }, [colaGuardadaOk, router]);
 
+  useEffect(() => {
+    if (!showSaved) return;
+    const id = window.setTimeout(() => setShowSaved(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [showSaved]);
+
   async function handleNew() {
     setError(null);
     try {
       const id = await apiCreateQueueDraft();
-      router.push(`/configuracion/colas/${encodeURIComponent(id)}`);
+      setEditingIsNew(true);
+      setEditingId(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la cola");
     }
+  }
+
+  function openEdit(id: string) {
+    setEditingIsNew(false);
+    setEditingId(id);
+  }
+
+  function closeEditor() {
+    setEditingId(null);
+    setEditingIsNew(false);
   }
 
   if (allowed === null) {
@@ -154,7 +175,7 @@ export default function ConfiguracionColasPage() {
           Nueva cola
         </button>
       </div>
-      {colaGuardadaOk ? (
+      {colaGuardadaOk || showSaved ? (
         <div
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
           role="status"
@@ -186,12 +207,13 @@ export default function ConfiguracionColasPage() {
                   <span className={`text-xs font-bold uppercase ${q.is_active ? "text-emerald-700" : "text-slate-400"}`}>
                     {q.is_active ? "Activa" : "Inactiva"}
                   </span>
-                  <Link
-                    href={`/configuracion/colas/${encodeURIComponent(String(q.id ?? "").trim())}`}
-                    className="text-sm font-semibold text-[#4FAEB2] hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => openEdit(String(q.id ?? "").trim())}
+                    className="text-sm font-semibold text-[#4FAEB2] transition-colors hover:text-[#3F8E91] hover:underline"
                   >
                     Editar
-                  </Link>
+                  </button>
                 </div>
               </li>
             ))}
@@ -202,6 +224,21 @@ export default function ConfiguracionColasPage() {
         El módulo <Link href="/dashboard/monitoreo" className="text-[#4FAEB2] hover:underline">Monitoreo</Link> resume
         carga operativa en tiempo casi real.
       </p>
+
+      <ColaEditorModal
+        queueId={editingId}
+        isNew={editingIsNew}
+        open={editingId != null}
+        onClose={closeEditor}
+        onSaved={() => {
+          setShowSaved(true);
+          void load();
+        }}
+        onDeleted={() => {
+          setShowSaved(false);
+          void load();
+        }}
+      />
     </div>
   );
 }
