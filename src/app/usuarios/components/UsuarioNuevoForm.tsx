@@ -48,6 +48,10 @@ export default function UsuarioNuevoForm({
     }
   }
 
+  function handleSelectChange(name: string, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value } as UsuarioFormValues));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -152,6 +156,7 @@ export default function UsuarioNuevoForm({
           variant="create"
           form={form}
           onChange={handleChange}
+          onSelectChange={handleSelectChange}
           onSalarioBaseChange={(n) => setForm((prev) => ({ ...prev, salario_base: String(n) }))}
           showPwd={showPwd}
           setShowPwd={setShowPwd}

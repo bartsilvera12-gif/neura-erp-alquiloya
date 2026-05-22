@@ -1,16 +1,15 @@
 "use client";
 
 import MontoInput from "@/components/ui/MontoInput";
+import { FancySelect, type FancySelectOption } from "@/app/dashboard/proyectos/components/FancySelect";
 import type { AreaUsuario, NivelUsuario, TipoContrato } from "@/lib/usuarios/types";
 
 export const usuarioFormLabel =
   "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1";
 export const usuarioFormInput =
-  "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-white";
-export const usuarioFormInputGray =
-  "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/20 bg-white";
-export const usuarioFormSelect =
-  "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-white";
+  "w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white shadow-sm transition-colors hover:border-[#4FAEB2]/60 focus:outline-none focus:border-[#4FAEB2] focus:ring-2 focus:ring-[#4FAEB2]/20";
+export const usuarioFormInputGray = usuarioFormInput;
+export const usuarioFormSelect = usuarioFormInput;
 
 export function SectionCard({
   title,
@@ -22,10 +21,10 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-5 pb-2 border-b border-gray-100">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ring-1 ring-[#4FAEB2]/15">
+      <div className="mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
         <span className="text-base">{icon}</span>
-        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">{title}</h3>
       </div>
       {children}
     </section>
@@ -92,6 +91,8 @@ export type UsuarioFormProps = {
   variant: "create" | "edit";
   form: UsuarioFormValues;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  /** Callback opcional para los FancySelect (tipo_contrato, nivel, area, estado). */
+  onSelectChange?: (name: string, value: string) => void;
   onSalarioBaseChange: (n: number | "") => void;
   /** Clases de campo: create usa focus sky, edit usa gray (misma página detalle). */
   fieldClassName?: typeof usuarioFormInput | string;
@@ -99,16 +100,43 @@ export type UsuarioFormProps = {
   setShowPwd?: (v: boolean | ((p: boolean) => boolean)) => void;
   showPwd2?: boolean;
   setShowPwd2?: (v: boolean | ((p: boolean) => boolean)) => void;
-  /** Debajo de “Accesos”, antes de seguridad / pie (p. ej. módulos en edición). */
+  /** Debajo de "Accesos", antes de seguridad / pie (p. ej. módulos en edición). */
   extraSections?: React.ReactNode;
   /** Solo administradores pueden cambiar nivel (rol ERP). */
   nivelAccesoDisabled?: boolean;
 };
 
+const TIPO_CONTRATO_OPTIONS: FancySelectOption[] = [
+  { value: "salario", label: "Salario fijo" },
+  { value: "comision", label: "Comisión" },
+  { value: "mixto", label: "Mixto (salario + comisión)" },
+  { value: "prestador_servicio", label: "Prestador de servicio" },
+];
+
+const NIVEL_OPTIONS: FancySelectOption[] = [
+  { value: "usuario", label: "Usuario", description: "Acceso operativo estándar." },
+  { value: "supervisor", label: "Supervisor", description: "Supervisión de equipo y reportes acotados." },
+  { value: "administrador", label: "Administrador", description: "Acceso total al sistema." },
+];
+
+const AREA_OPTIONS: FancySelectOption[] = [
+  { value: "ventas", label: "Ventas" },
+  { value: "soporte", label: "Soporte" },
+  { value: "finanzas", label: "Finanzas" },
+  { value: "operaciones", label: "Operaciones" },
+  { value: "administracion", label: "Administración" },
+];
+
+const ESTADO_OPTIONS: FancySelectOption[] = [
+  { value: "activo", label: "Activo" },
+  { value: "inactivo", label: "Inactivo" },
+];
+
 export function UsuarioFormFields({
   variant,
   form,
   onChange,
+  onSelectChange,
   onSalarioBaseChange,
   fieldClassName,
   showPwd = false,
@@ -120,9 +148,19 @@ export function UsuarioFormFields({
 }: UsuarioFormProps) {
   const fLabel = usuarioFormLabel;
   const fInput = fieldClassName ?? usuarioFormInput;
-  const fSelect = usuarioFormSelect;
   const showComision = form.tipo_contrato === "comision" || form.tipo_contrato === "mixto";
   const showSalario = form.tipo_contrato !== "comision";
+
+  const setField = (name: string, value: string) => {
+    if (onSelectChange) {
+      onSelectChange(name, value);
+      return;
+    }
+    // Fallback: sintetiza un evento mínimo para mantener compatibilidad con handleChange existente.
+    onChange({
+      target: { name, value, type: "select-one" },
+    } as unknown as React.ChangeEvent<HTMLSelectElement>);
+  };
 
   return (
     <>
@@ -183,12 +221,12 @@ export function UsuarioFormFields({
             </div>
             <div>
               <label className={fLabel}>Tipo de contrato</label>
-              <select name="tipo_contrato" value={form.tipo_contrato} onChange={onChange} className={fSelect}>
-                <option value="salario">Salario fijo</option>
-                <option value="comision">Comisión</option>
-                <option value="mixto">Mixto (salario + comisión)</option>
-                <option value="prestador_servicio">Prestador de servicio</option>
-              </select>
+              <FancySelect
+                options={TIPO_CONTRATO_OPTIONS}
+                value={form.tipo_contrato}
+                onChange={(v) => setField("tipo_contrato", v)}
+                ariaLabel="Tipo de contrato"
+              />
             </div>
           </div>
 
@@ -230,11 +268,11 @@ export function UsuarioFormFields({
               name="ips"
               checked={form.ips}
               onChange={onChange}
-              className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900/20"
+              className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] focus:ring-[#4FAEB2]/30"
             />
-            <label htmlFor="ips" className="text-sm text-gray-700 font-medium cursor-pointer">
+            <label htmlFor="ips" className="cursor-pointer text-sm font-medium text-slate-700">
               Cotiza IPS
-              <span className="ml-1 text-xs text-gray-400 font-normal">(Instituto de Previsión Social)</span>
+              <span className="ml-1 text-xs font-normal text-slate-400">(Instituto de Previsión Social)</span>
             </label>
           </div>
         </div>
@@ -244,22 +282,17 @@ export function UsuarioFormFields({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={fLabel}>Nivel de acceso</label>
-            <select
-              name="nivel"
+            <FancySelect
+              options={NIVEL_OPTIONS}
               value={form.nivel}
-              onChange={onChange}
-              className={fSelect}
+              onChange={(v) => setField("nivel", v)}
               disabled={nivelAccesoDisabled}
-              aria-disabled={nivelAccesoDisabled}
-            >
-              <option value="usuario">Usuario</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="administrador">Administrador</option>
-            </select>
+              ariaLabel="Nivel de acceso"
+            />
             {nivelAccesoDisabled ? (
-              <p className="text-xs text-amber-700 mt-1">Solo un administrador puede cambiar el nivel de acceso.</p>
+              <p className="mt-1 text-xs text-amber-700">Solo un administrador puede cambiar el nivel de acceso.</p>
             ) : (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="mt-1 text-xs text-slate-400">
                 {form.nivel === "administrador" && "Acceso total al sistema."}
                 {form.nivel === "supervisor" && "Supervisión de equipo y reportes acotados."}
                 {form.nivel === "usuario" && "Acceso operativo estándar."}
@@ -268,20 +301,21 @@ export function UsuarioFormFields({
           </div>
           <div>
             <label className={fLabel}>Área</label>
-            <select name="area" value={form.area} onChange={onChange} className={fSelect}>
-              <option value="ventas">Ventas</option>
-              <option value="soporte">Soporte</option>
-              <option value="finanzas">Finanzas</option>
-              <option value="operaciones">Operaciones</option>
-              <option value="administracion">Administración</option>
-            </select>
+            <FancySelect
+              options={AREA_OPTIONS}
+              value={form.area}
+              onChange={(v) => setField("area", v)}
+              ariaLabel="Área"
+            />
           </div>
           <div>
             <label className={fLabel}>Estado</label>
-            <select name="estado" value={form.estado} onChange={onChange} className={fSelect}>
-              <option value="activo">Activo</option>
-              <option value="inactivo">Inactivo</option>
-            </select>
+            <FancySelect
+              options={ESTADO_OPTIONS}
+              value={form.estado}
+              onChange={(v) => setField("estado", v)}
+              ariaLabel="Estado"
+            />
           </div>
         </div>
       </SectionCard>
@@ -307,7 +341,7 @@ export function UsuarioFormFields({
                   type="button"
                   onClick={() => setShowPwd((v) => !v)}
                   tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#4FAEB2]"
                 >
                   <EyeIcon open={showPwd} />
                 </button>
@@ -329,14 +363,14 @@ export function UsuarioFormFields({
                   type="button"
                   onClick={() => setShowPwd2((v) => !v)}
                   tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#4FAEB2]"
                 >
                   <EyeIcon open={showPwd2} />
                 </button>
               </div>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="mt-3 text-xs text-slate-400">
             La contraseña se gestiona en Supabase Auth (servidor seguro).
           </p>
         </SectionCard>
@@ -347,7 +381,7 @@ export function UsuarioFormFields({
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
       <path
         fillRule="evenodd"
         d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z"
@@ -356,7 +390,7 @@ function EyeIcon({ open }: { open: boolean }) {
       <path d="M10.748 13.93l2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z" />
     </svg>
   ) : (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
       <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
       <path
         fillRule="evenodd"

@@ -14,6 +14,7 @@ import {
   UsuarioFormFields,
   type UsuarioFormValues,
 } from "@/components/usuarios/UsuarioForm";
+import { FancySelect, type FancySelectOption } from "@/app/dashboard/proyectos/components/FancySelect";
 import type { AreaUsuario, TipoContrato } from "@/lib/usuarios/types";
 
 type ModuloOpt = { id: string; nombre: string; slug: string };
@@ -236,6 +237,10 @@ export default function UsuarioDetalleClient({
     if (name === "email" || type === "email") normalized = value.toLowerCase();
     else if (name === "nombre") normalized = value.toUpperCase();
     setForm((prev) => ({ ...prev, [name]: normalized } as UsuarioFormValues));
+  }
+
+  function handleSelectChange(name: string, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value } as UsuarioFormValues));
   }
 
   async function handleGuardar(e: React.FormEvent) {
@@ -729,6 +734,7 @@ export default function UsuarioDetalleClient({
             variant="edit"
             form={form}
             onChange={handleChange}
+            onSelectChange={handleSelectChange}
             onSalarioBaseChange={(n) => setForm((prev) => ({ ...prev, salario_base: String(n) }))}
             fieldClassName={usuarioFormInputGray}
             nivelAccesoDisabled={!usuario.puede_editar_rol}
@@ -854,27 +860,27 @@ export default function UsuarioDetalleClient({
                     {form.dashboard_view_ids.length > 1 ? (
                       <div className="mt-4 max-w-md">
                         <label className={usuarioFormLabel}>Vista por defecto</label>
-                        <select
+                        <FancySelect
+                          ariaLabel="Vista por defecto"
+                          placeholder="— Elegir —"
+                          options={
+                            [
+                              { value: "", label: "— Elegir —" },
+                              ...(usuario.dashboard_views_empresa ?? [])
+                                .filter((m) => form.dashboard_view_ids.includes(m.id))
+                                .map((m) => ({ value: m.id, label: m.nombre })),
+                            ] as FancySelectOption[]
+                          }
                           value={
                             form.default_dashboard_view_id &&
                             form.dashboard_view_ids.includes(form.default_dashboard_view_id)
                               ? form.default_dashboard_view_id
                               : ""
                           }
-                          onChange={(e) =>
-                            setForm((prev) => ({ ...prev, default_dashboard_view_id: e.target.value }))
+                          onChange={(v) =>
+                            setForm((prev) => ({ ...prev, default_dashboard_view_id: v }))
                           }
-                          className={`${usuarioFormInputGray} mt-1 w-full`}
-                        >
-                          <option value="">— Elegir —</option>
-                          {(usuario.dashboard_views_empresa ?? [])
-                            .filter((m) => form.dashboard_view_ids.includes(m.id))
-                            .map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.nombre}
-                              </option>
-                            ))}
-                        </select>
+                        />
                       </div>
                     ) : null}
                   </SectionCard>
@@ -906,21 +912,25 @@ export default function UsuarioDetalleClient({
                     {omniAgent ? (
                       <div className="mt-4 max-w-md">
                         <label className={usuarioFormLabel}>Horario de trabajo</label>
-                        <select
+                        <FancySelect
+                          ariaLabel="Horario de trabajo"
+                          placeholder="— Elegir horario —"
+                          options={
+                            [
+                              { value: "", label: "— Elegir horario —" },
+                              ...usuario.omnicanal.schedules
+                                .filter((s) => s.is_active !== false)
+                                .map((s) => ({
+                                  value: s.id,
+                                  label: `${s.nombre} (${String(s.time_start ?? "").slice(0, 5)} – ${String(
+                                    s.time_end ?? ""
+                                  ).slice(0, 5)})`,
+                                })),
+                            ] as FancySelectOption[]
+                          }
                           value={omniScheduleId}
-                          onChange={(e) => setOmniScheduleId(e.target.value)}
-                          className={`${usuarioFormInputGray} mt-1 w-full`}
-                        >
-                          <option value="">— Elegir horario —</option>
-                          {usuario.omnicanal.schedules
-                            .filter((s) => s.is_active !== false)
-                            .map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.nombre} ({String(s.time_start ?? "").slice(0, 5)} –{" "}
-                                {String(s.time_end ?? "").slice(0, 5)})
-                              </option>
-                            ))}
-                        </select>
+                          onChange={(v) => setOmniScheduleId(v)}
+                        />
                         {usuario.omnicanal.schedules.length === 0 ? (
                           <p className="mt-2 text-xs text-amber-700">
                             No hay plantillas de horario. Creá una en{" "}
