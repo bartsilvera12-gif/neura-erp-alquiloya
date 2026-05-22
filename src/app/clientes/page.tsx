@@ -21,27 +21,80 @@ function formatFecha(iso: string) {
 // ── Badges ────────────────────────────────────────────────────────────────────
 
 function BadgeEstado({ estado }: { estado: Cliente["estado"] }) {
+  const activo = estado === "activo";
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-      estado === "activo"
-        ? "bg-green-100 text-green-700"
-        : "bg-gray-100 text-gray-500"
-    }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${estado === "activo" ? "bg-green-500" : "bg-gray-400"}`} />
-      {estado === "activo" ? "Activo" : "Inactivo"}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+        activo
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-500"
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${activo ? "bg-emerald-500" : "bg-slate-400"}`} />
+      {activo ? "Activo" : "Inactivo"}
     </span>
   );
 }
 
 function BadgeOrigen({ origen }: { origen: Cliente["origen"] }) {
-  const cfg = {
-    CRM:    "bg-violet-100 text-violet-700",
-    VENTA:  "bg-blue-100 text-blue-700",
-    MANUAL: "bg-gray-100 text-gray-600",
+  const cfg: Record<Cliente["origen"], { cls: string; dot: string }> = {
+    CRM: {
+      cls: "border-violet-200 bg-violet-50 text-violet-700",
+      dot: "bg-violet-500",
+    },
+    VENTA: {
+      cls: "border-[#4FAEB2]/30 bg-[#4FAEB2]/10 text-[#3F8E91]",
+      dot: "bg-[#4FAEB2]",
+    },
+    MANUAL: {
+      cls: "border-slate-200 bg-slate-50 text-slate-600",
+      dot: "bg-slate-400",
+    },
   };
+  const it = cfg[origen];
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg[origen]}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${it.cls}`}
+    >
+      <span aria-hidden="true" className={`h-1 w-1 rounded-full ${it.dot}`} />
       {origen}
+    </span>
+  );
+}
+
+// ── Color del avatar según iniciales del nombre (estable, no aleatorio) ───────
+
+const AVATAR_TONES = [
+  { bg: "bg-[#4FAEB2]/12 text-[#3F8E91] border border-[#4FAEB2]/30" },
+  { bg: "bg-violet-50 text-violet-700 border border-violet-200" },
+  { bg: "bg-amber-50 text-amber-700 border border-amber-200" },
+  { bg: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  { bg: "bg-rose-50 text-rose-700 border border-rose-200" },
+  { bg: "bg-sky-50 text-sky-700 border border-sky-200" },
+];
+
+function avatarToneFor(label: string): string {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) | 0;
+  const idx = Math.abs(hash) % AVATAR_TONES.length;
+  return AVATAR_TONES[idx].bg;
+}
+
+function avatarInitial(label: string): string {
+  const cleaned = label.replace(/^[^A-Za-z0-9]+/, "");
+  const m = cleaned.match(/[A-Za-z0-9]/);
+  return (m?.[0] ?? "?").toUpperCase();
+}
+
+// ── Tipo servicio: chip turquesa cuando hay valor ────────────────────────────
+
+function TipoServicioCell({ slug, mapNombreTipo }: { slug: string | null; mapNombreTipo: Record<string, string> }) {
+  const label = etiquetaVisibleTipoServicio(slug, mapNombreTipo);
+  if (!label || label === "—") return <span className="text-xs text-slate-400">—</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+      <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[#4FAEB2]" />
+      {label}
     </span>
   );
 }
@@ -127,8 +180,9 @@ function VendedorResponsableCell({ cliente }: { cliente: Cliente }) {
 }
 
 function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColumnDef[] {
-  const th = "text-left text-xs font-semibold text-slate-600 px-5 py-3 whitespace-nowrap";
-  const td = "px-5 py-3.5";
+  const th =
+    "text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 px-5 py-3 whitespace-nowrap";
+  const td = "px-5 py-4";
   return [
     {
       key: "codigo",
@@ -137,7 +191,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       headerClassName: th,
       className: td,
       render: (c) => (
-        <span className="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+        <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-600">
           {c.codigo_cliente}
         </span>
       ),
@@ -149,37 +203,45 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       required: true,
       headerClassName: th,
       className: td,
-      render: (c) => (
-        <div className="flex items-center gap-2 min-w-56">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${
-            c.tipo_cliente === "empresa" ? "bg-blue-500" : "bg-violet-500"
-          }`}>
-            {c.tipo_cliente === "empresa" ? "E" : "P"}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800 group-hover:text-gray-900">
-                {clienteNombre(c)}
-              </p>
-              {c.perfil_tributario_activo && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  Tributario
-                </span>
-              )}
+      render: (c) => {
+        const nombre = clienteNombre(c);
+        const tone = avatarToneFor(nombre);
+        return (
+          <div className="flex min-w-56 items-center gap-3">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${tone}`}
+            >
+              {avatarInitial(nombre)}
             </div>
-            {c.tipo_cliente === "empresa" && c.ruc && (
-              <p className="text-xs text-gray-400">RUC: {c.ruc}</p>
-            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="truncate text-sm font-semibold text-slate-900 group-hover:text-slate-950">
+                  {nombre}
+                </p>
+                {c.perfil_tributario_activo && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                    Tributario
+                  </span>
+                )}
+              </div>
+              {c.tipo_cliente === "empresa" && c.ruc ? (
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  <span className="font-medium text-slate-400">RUC:</span> {c.ruc}
+                </p>
+              ) : c.tipo_cliente === "persona" ? (
+                <p className="mt-0.5 text-[11px] text-slate-400">Persona física</p>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "contacto",
       label: "Contacto",
       visibleDefault: true,
       headerClassName: th,
-      className: `${td} text-sm text-gray-700 whitespace-nowrap`,
+      className: `${td} text-sm text-slate-700 whitespace-nowrap`,
       render: (c) => (c.tipo_cliente === "empresa" ? c.nombre_contacto : (c.ciudad ?? "—")),
     },
     {
@@ -187,7 +249,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Teléfono",
       visibleDefault: true,
       headerClassName: th,
-      className: `${td} text-sm text-gray-600 whitespace-nowrap`,
+      className: `${td} text-sm tabular-nums text-slate-600 whitespace-nowrap`,
       render: (c) => c.telefono ?? "—",
     },
     {
@@ -196,13 +258,15 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       visibleDefault: true,
       headerClassName: th,
       className: td,
-      render: (c) => c.plan_activo ? (
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 whitespace-nowrap">
-          {c.plan_activo}
-        </span>
-      ) : (
-        <span className="text-xs text-gray-400 whitespace-nowrap">Sin suscripción</span>
-      ),
+      render: (c) =>
+        c.plan_activo ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#4FAEB2]/30 bg-[#4FAEB2]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3F8E91]">
+            <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[#4FAEB2]" />
+            {c.plan_activo}
+          </span>
+        ) : (
+          <span className="whitespace-nowrap text-xs italic text-slate-400">Sin suscripción</span>
+        ),
     },
     {
       key: "origen",
@@ -217,8 +281,8 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Tipo servicio",
       visibleDefault: true,
       headerClassName: th,
-      className: `${td} text-xs text-gray-600 whitespace-nowrap`,
-      render: (c) => etiquetaVisibleTipoServicio(c.tipo_servicio_cliente ?? null, mapNombreTipo),
+      className: `${td} whitespace-nowrap`,
+      render: (c) => <TipoServicioCell slug={c.tipo_servicio_cliente ?? null} mapNombreTipo={mapNombreTipo} />,
     },
     {
       key: "estado",
@@ -233,7 +297,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Desde",
       visibleDefault: true,
       headerClassName: th,
-      className: `${td} text-xs text-gray-400 whitespace-nowrap`,
+      className: `${td} text-xs tabular-nums text-slate-500 whitespace-nowrap`,
       render: (c) => formatFecha(c.created_at),
     },
     {
@@ -241,7 +305,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Creado por",
       visibleDefault: false,
       headerClassName: th,
-      className: `${td} text-xs text-gray-500 whitespace-nowrap`,
+      className: `${td} text-xs text-slate-500 whitespace-nowrap`,
       render: (c) => c.created_by_nombre ?? "—",
     },
     {
@@ -249,7 +313,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "RUC / documento",
       visibleDefault: false,
       headerClassName: th,
-      className: `${td} text-sm text-gray-600 whitespace-nowrap`,
+      className: `${td} text-sm text-slate-600 whitespace-nowrap`,
       render: documentoCliente,
     },
     {
@@ -257,7 +321,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Email",
       visibleDefault: false,
       headerClassName: th,
-      className: `${td} text-sm text-gray-600 whitespace-nowrap`,
+      className: `${td} text-sm text-slate-600 whitespace-nowrap`,
       render: (c) => c.email ?? "—",
     },
     {
@@ -265,7 +329,7 @@ function buildClienteColumns(mapNombreTipo: Record<string, string>): ClienteColu
       label: "Vendedor responsable",
       visibleDefault: false,
       headerClassName: th,
-      className: `${td} text-xs text-gray-500 whitespace-nowrap`,
+      className: `${td} text-xs text-slate-500 whitespace-nowrap`,
       render: (c) => <VendedorResponsableCell cliente={c} />,
     },
   ];
@@ -540,43 +604,59 @@ export default function ClientesPage() {
       </div>
 
       {/* Contador */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-gray-500">
-          <span className="font-semibold text-gray-800">{filtrados.length}</span> de{" "}
-          <span className="font-semibold text-gray-800">{clientes.length}</span> clientes
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-800 tabular-nums">{filtrados.length}</span> de{" "}
+          <span className="font-semibold text-slate-800 tabular-nums">{clientes.length}</span> clientes
         </p>
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex gap-3 text-xs text-gray-400">
-            <span>{clientes.filter((c) => c.estado === "activo").length} activos</span>
-            <span>·</span>
-            <span>{clientes.filter((c) => c.tipo_cliente === "empresa").length} empresas</span>
+          <div className="hidden gap-3 text-xs text-slate-500 sm:flex">
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="tabular-nums">
+                {clientes.filter((c) => c.estado === "activo").length}
+              </span>{" "}
+              activos
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#4FAEB2]" />
+              <span className="tabular-nums">
+                {clientes.filter((c) => c.tipo_cliente === "empresa").length}
+              </span>{" "}
+              empresas
+            </span>
           </div>
           <div className="relative">
             <button
               type="button"
               onClick={() => setColumnasOpen((v) => !v)}
-              className="inline-flex items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-xs font-medium shadow-sm transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91]"
               aria-expanded={columnasOpen}
             >
               <span>Columnas</span>
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+              <span className="rounded-full bg-[#4FAEB2]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#3F8E91] tabular-nums">
                 {visibleColumns.length}/{clienteColumns.length}
               </span>
             </button>
             {columnasOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg">
-                <div className="p-4 border-b border-slate-100">
-                  <p className="text-sm font-semibold text-slate-800">Columnas</p>
-                  <p className="text-xs text-slate-500 mt-1">Personalizá qué información querés ver en esta tabla.</p>
+              <div className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-[#4FAEB2]/15">
+                <div className="border-b border-slate-100 p-4">
+                  <p className="text-sm font-semibold text-slate-800">Columnas visibles</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Personalizá qué información querés ver en esta tabla.
+                  </p>
                 </div>
-                <div className="p-2 max-h-80 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto p-2">
                   {clienteColumns.map((col) => {
                     const checked = visibleColumnSet.has(col.key);
                     return (
                       <label
                         key={col.key}
                         className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          col.required ? "text-slate-500 bg-slate-50" : "text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          col.required
+                            ? "cursor-not-allowed bg-slate-50 text-slate-500"
+                            : "cursor-pointer text-slate-700 hover:bg-[#4FAEB2]/8"
                         }`}
                       >
                         <span>{col.label}</span>
@@ -591,14 +671,14 @@ export default function ClientesPage() {
                     );
                   })}
                 </div>
-                <div className="flex items-center justify-between gap-3 p-3 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3">
                   <p className="text-[11px] text-slate-400">Empresa / Nombre queda siempre visible.</p>
                   <button
                     type="button"
                     onClick={resetColumnas}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    className="text-xs font-semibold text-[#4FAEB2] transition-colors hover:text-[#3F8E91]"
                   >
-                    Restablecer columnas
+                    Restablecer
                   </button>
                 </div>
               </div>
@@ -608,14 +688,39 @@ export default function ClientesPage() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {cargando ? (
-          <div className="py-16 text-center text-gray-400 text-sm animate-pulse">Cargando clientes…</div>
+          <div className="flex items-center justify-center gap-3 py-20 text-sm text-slate-500">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#4FAEB2]" />
+            Cargando clientes…
+          </div>
         ) : filtrados.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
-            <p className="text-4xl mb-3">👥</p>
-            <p className="font-medium text-gray-600">
+          <div className="py-20 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#4FAEB2]/25 bg-[#4FAEB2]/10 text-[#4FAEB2]">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-slate-700">
               {clientes.length === 0 ? "No hay clientes registrados" : "Sin resultados para los filtros aplicados"}
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+              {clientes.length === 0
+                ? "Empezá creando tu primer cliente para construir tu base."
+                : "Probá ajustar la búsqueda o limpiar los filtros."}
             </p>
             {clientes.length === 0 && (
               <button
@@ -630,8 +735,8 @@ export default function ClientesPage() {
         ) : /* tabla */ (
           <div className="overflow-x-auto">
             <table className="w-full min-w-full">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
+              <thead className="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
+                <tr>
                   {visibleColumns.map((col) => (
                     <th key={col.key} className={col.headerClassName}>
                       {col.label}
@@ -639,12 +744,12 @@ export default function ClientesPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {filtrados.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer group"
-                    onClick={() => window.location.href = `/clientes/${c.id}`}
+                    className="group cursor-pointer transition-colors hover:bg-[#4FAEB2]/[0.04]"
+                    onClick={() => (window.location.href = `/clientes/${c.id}`)}
                   >
                     {visibleColumns.map((col) => (
                       <td key={col.key} className={col.className}>
