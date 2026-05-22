@@ -11,14 +11,16 @@ import {
   pathRequiresModuleSlug,
 } from "@/lib/modulos/route-slug-map";
 import ZentraLoader from "@/components/ZentraLoader";
+import { BootProvider, useBoot } from "@/components/BootContext";
 
 const PUBLIC_ROUTES = ["/login"];
 
 type ModuleAccess = { superAdmin: boolean; slugs: Set<string> };
 
-export default function AuthGuard({ children }: { children: React.ReactNode }) {
+function AuthGuardInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { sidebarReady } = useBoot();
   const [loading, setLoading] = useState(true);
   const [access, setAccess] = useState<ModuleAccess | null>(null);
 
@@ -101,9 +103,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, access, loading, isPublic, router]);
 
-  if (loading && !isPublic) {
-    return <ZentraLoader />;
-  }
+  /**
+   * El loader queda visible mientras se chequea sesión (loading) o mientras el
+   * sidebar termina de cargar su menú (sidebarReady). El AppShell se renderiza
+   * debajo desde el primer momento para que el Sidebar pueda hacer su fetch.
+   */
+  const showLoader = !isPublic && (loading || !sidebarReady);
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* Renderizamos los children inmediatamente para que el Sidebar pueda fetch */}
+      {(!loading || isPublic) && children}
+      {showLoader ? <ZentraLoader overlay /> : null}
+    </>
+  );
+}
+
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  return (
+    <BootProvider>
+      <AuthGuardInner>{children}</AuthGuardInner>
+    </BootProvider>
+  );
 }

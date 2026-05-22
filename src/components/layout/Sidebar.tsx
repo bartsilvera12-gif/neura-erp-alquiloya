@@ -42,6 +42,7 @@ import { supabase } from "@/lib/supabase";
 import type { ModuloEmpresa } from "@/lib/empresas/actions";
 import { getFavoritos, toggleFavorito } from "@/lib/favorites";
 import { canAccessSidebarSlug } from "@/lib/modulos/route-slug-map";
+import { useBoot } from "@/components/BootContext";
 
 type MenuItem = {
   key: string;
@@ -369,6 +370,7 @@ export default function Sidebar() {
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   /** Filtro visual del menú (no altera permisos ni rutas). */
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
+  const { markSidebarReady } = useBoot();
 
   useEffect(() => {
     setFavoritos(getFavoritos());
@@ -442,7 +444,10 @@ export default function Sidebar() {
           setEsSuperAdmin(false);
         }
       } finally {
-        if (!cancelled) setCargando(false);
+        if (!cancelled) {
+          setCargando(false);
+          markSidebarReady();
+        }
       }
     }
 
@@ -459,7 +464,7 @@ export default function Sidebar() {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [markSidebarReady]);
 
   const handleToggleFavorito = (id: string) => {
     setFavoritos(toggleFavorito(id));

@@ -10,18 +10,25 @@ import Image from "next/image";
 export default function ZentraLoader({
   label = "Cargando",
   fullscreen = true,
+  overlay = false,
 }: {
   label?: string;
   /** Si es true, ocupa min-h-screen. Si es false, se acomoda al contenedor. */
   fullscreen?: boolean;
+  /** Si es true, queda como overlay fixed cubriendo toda la pantalla (z-200). */
+  overlay?: boolean;
 }) {
   const letters = Array.from(label);
 
   return (
     <div
-      className={`flex w-full flex-col items-center justify-center gap-7 bg-[#4FAEB2] ${
-        fullscreen ? "min-h-screen" : "min-h-[40vh] py-16"
-      }`}
+      className={`flex flex-col items-center justify-center gap-7 bg-[#4FAEB2] ${
+        overlay
+          ? "fixed inset-0 z-[200] h-screen w-screen overflow-hidden"
+          : "w-full"
+      } ${
+        fullscreen && !overlay ? "min-h-screen" : ""
+      } ${!fullscreen && !overlay ? "min-h-[40vh] py-16" : ""}`}
       aria-busy="true"
       role="status"
     >
