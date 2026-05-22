@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { getClientes, clienteNombre } from "@/lib/clientes/storage";
 import type { Cliente } from "@/lib/clientes/types";
 import { etiquetaVisibleTipoServicio, type ClienteTipoServicioRow } from "@/lib/clientes/tipo-servicio-catalogo";
 import { filasTiposDesdeSistemaEstatico, fetchTiposFormCliente } from "@/lib/clientes/fetch-tipos-servicio-form";
+import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
+import ClienteNuevoModal from "./components/ClienteNuevoModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,7 @@ export default function ClientesPage() {
   const [filtroOrigen, setFiltroOrigen] = useState<"" | "CRM" | "VENTA" | "MANUAL">("");
   const [filtroTipo,   setFiltroTipo]   = useState<"" | "empresa" | "persona">("");
   const [filtroTipoServicio, setFiltroTipoServicio] = useState<"" | string>("");
+  const [nuevoOpen, setNuevoOpen] = useState(false);
   const [columnasOpen, setColumnasOpen] = useState(false);
   const [columnasInicializadas, setColumnasInicializadas] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<ClienteColumnKey[]>(DEFAULT_VISIBLE_COLUMN_KEYS);
@@ -297,6 +299,14 @@ export default function ClientesPage() {
     () => clienteColumns.filter((col) => visibleColumnSet.has(col.key)),
     [clienteColumns, visibleColumnSet]
   );
+
+  const recargarClientes = () => {
+    setCargando(true);
+    void getClientes({ incluirPlanActivo: true }).then((data) => {
+      setClientes(data);
+      setCargando(false);
+    });
+  };
 
   useEffect(() => {
     getClientes({ incluirPlanActivo: true }).then((data) => {
@@ -396,82 +406,135 @@ export default function ClientesPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Clientes</h1>
-          <p className="text-gray-500 text-sm mt-1">Base de clientes activos de la empresa</p>
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+            />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+              Base
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Clientes</h1>
+          <p className="mt-1 text-sm text-slate-500">Base de clientes activos de la empresa</p>
         </div>
-        <Link
-          href="/clientes/nuevo"
-          className="flex items-center gap-1.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm shrink-0"
+        <button
+          type="button"
+          onClick={() => setNuevoOpen(true)}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#4FAEB2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[#4FAEB2]/20 transition-colors hover:bg-[#3F8E91]"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
           </svg>
           Nuevo cliente
-        </Link>
+        </button>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-wrap gap-3 items-center">
-        <input
-          type="text"
-          placeholder="Buscar por nombre, código, email, RUC..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 min-w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:outline-none transition-all"
-        />
-        <select
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="relative min-w-[220px] flex-1">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[#4FAEB2]"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, código, email, RUC…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 hover:border-[#4FAEB2]/60 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/20"
+          />
+        </div>
+        <FancySelect
+          className="min-w-[170px] shrink-0"
+          ariaLabel="Filtrar por estado"
+          placeholder="Todos los estados"
           value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value as "" | "activo" | "inactivo")}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:outline-none"
-        >
-          <option value="">Todos los estados</option>
-          <option value="activo">Activo</option>
-          <option value="inactivo">Inactivo</option>
-        </select>
-        <select
+          onChange={(v) => setFiltroEstado(v as "" | "activo" | "inactivo")}
+          options={[
+            { value: "", label: "Todos los estados" },
+            { value: "activo", label: "Activo" },
+            { value: "inactivo", label: "Inactivo" },
+          ]}
+        />
+        <FancySelect
+          className="min-w-[160px] shrink-0"
+          ariaLabel="Filtrar por tipo"
+          placeholder="Todos los tipos"
           value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value as "" | "empresa" | "persona")}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:outline-none"
-        >
-          <option value="">Todos los tipos</option>
-          <option value="empresa">Empresa</option>
-          <option value="persona">Persona</option>
-        </select>
-        <select
+          onChange={(v) => setFiltroTipo(v as "" | "empresa" | "persona")}
+          options={[
+            { value: "", label: "Todos los tipos" },
+            { value: "empresa", label: "Empresa" },
+            { value: "persona", label: "Persona" },
+          ]}
+        />
+        <FancySelect
+          className="min-w-[180px] shrink-0"
+          ariaLabel="Filtrar por origen"
+          placeholder="Todos los orígenes"
           value={filtroOrigen}
-          onChange={(e) => setFiltroOrigen(e.target.value as "" | "CRM" | "VENTA" | "MANUAL")}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:outline-none"
-        >
-          <option value="">Todos los orígenes</option>
-          <option value="CRM">CRM</option>
-          <option value="VENTA">Venta</option>
-          <option value="MANUAL">Manual</option>
-        </select>
-        <select
+          onChange={(v) => setFiltroOrigen(v as "" | "CRM" | "VENTA" | "MANUAL")}
+          options={[
+            { value: "", label: "Todos los orígenes" },
+            { value: "CRM", label: "CRM" },
+            { value: "VENTA", label: "Venta" },
+            { value: "MANUAL", label: "Manual" },
+          ]}
+        />
+        <FancySelect
+          className="min-w-[180px] shrink-0"
+          ariaLabel="Filtrar por tipo de servicio"
+          placeholder="Tipo servicio"
           value={filtroTipoServicio}
-          onChange={(e) => setFiltroTipoServicio(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:outline-none"
-        >
-          <option value="">Tipo servicio</option>
-          {filasTipoCatalogo.map((t) => (
-            <option key={t.slug} value={t.slug}>
-              {t.nombre}
-            </option>
-          ))}
-          {slugsExtraFiltro.map((slug) => (
-            <option key={slug} value={slug}>
-              {etiquetaVisibleTipoServicio(slug, mapNombreTipo)}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setFiltroTipoServicio(v)}
+          options={[
+            { value: "", label: "Todos los servicios" },
+            ...filasTipoCatalogo.map((t) => ({ value: t.slug, label: t.nombre })),
+            ...slugsExtraFiltro.map((slug) => ({
+              value: slug,
+              label: etiquetaVisibleTipoServicio(slug, mapNombreTipo),
+            })),
+          ]}
+        />
         {hayFiltros && (
           <button
-            onClick={() => { setBusqueda(""); setFiltroEstado(""); setFiltroOrigen(""); setFiltroTipo(""); setFiltroTipoServicio(""); }}
-            className="text-xs text-gray-500 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+            onClick={() => {
+              setBusqueda("");
+              setFiltroEstado("");
+              setFiltroOrigen("");
+              setFiltroTipo("");
+              setFiltroTipoServicio("");
+            }}
+            className="shrink-0 rounded-xl border border-transparent px-3 py-2.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
-            Limpiar
+            Limpiar filtros
           </button>
         )}
       </div>
@@ -522,7 +585,7 @@ export default function ClientesPage() {
                           checked={checked}
                           disabled={col.required}
                           onChange={() => toggleColumn(col.key)}
-                          className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                          className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] accent-[#4FAEB2] focus:ring-[#4FAEB2]/30"
                         />
                       </label>
                     );
@@ -555,9 +618,13 @@ export default function ClientesPage() {
               {clientes.length === 0 ? "No hay clientes registrados" : "Sin resultados para los filtros aplicados"}
             </p>
             {clientes.length === 0 && (
-              <Link href="/clientes/nuevo" className="mt-4 inline-block text-sm text-gray-500 underline hover:text-gray-800">
+              <button
+                type="button"
+                onClick={() => setNuevoOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-[#4FAEB2]/20 transition-colors hover:bg-[#3F8E91]"
+              >
                 Crear primer cliente
-              </Link>
+              </button>
             )}
           </div>
         ) : /* tabla */ (
@@ -592,6 +659,15 @@ export default function ClientesPage() {
         )}
       </div>
 
+      <ClienteNuevoModal
+        open={nuevoOpen}
+        onClose={() => setNuevoOpen(false)}
+        onCreated={(id) => {
+          setNuevoOpen(false);
+          recargarClientes();
+          window.location.href = `/clientes/${id}`;
+        }}
+      />
     </div>
   );
 }
