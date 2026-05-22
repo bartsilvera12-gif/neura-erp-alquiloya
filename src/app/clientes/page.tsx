@@ -7,6 +7,7 @@ import type { Cliente } from "@/lib/clientes/types";
 import { etiquetaVisibleTipoServicio, type ClienteTipoServicioRow } from "@/lib/clientes/tipo-servicio-catalogo";
 import { filasTiposDesdeSistemaEstatico, fetchTiposFormCliente } from "@/lib/clientes/fetch-tipos-servicio-form";
 import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
+import EdgeScrollArea from "@/components/ui/EdgeScrollArea";
 import ClienteNuevoModal from "./components/ClienteNuevoModal";
 import ClienteDetalleModal from "./components/ClienteDetalleModal";
 
@@ -739,7 +740,7 @@ export default function ClientesPage() {
             )}
           </div>
         ) : /* tabla */ (
-          <div className="overflow-x-auto">
+          <EdgeScrollArea>
             <table className="w-full min-w-full">
               <thead className="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
                 <tr>
@@ -766,7 +767,7 @@ export default function ClientesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </EdgeScrollArea>
         )}
       </div>
 
