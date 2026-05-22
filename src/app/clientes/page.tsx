@@ -8,6 +8,7 @@ import { etiquetaVisibleTipoServicio, type ClienteTipoServicioRow } from "@/lib/
 import { filasTiposDesdeSistemaEstatico, fetchTiposFormCliente } from "@/lib/clientes/fetch-tipos-servicio-form";
 import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
 import ClienteNuevoModal from "./components/ClienteNuevoModal";
+import ClienteDetalleModal from "./components/ClienteDetalleModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -348,6 +349,7 @@ export default function ClientesPage() {
   const [filtroTipo,   setFiltroTipo]   = useState<"" | "empresa" | "persona">("");
   const [filtroTipoServicio, setFiltroTipoServicio] = useState<"" | string>("");
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [detalleId, setDetalleId] = useState<string | null>(null);
   const [columnasOpen, setColumnasOpen] = useState(false);
   const [columnasInicializadas, setColumnasInicializadas] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<ClienteColumnKey[]>(DEFAULT_VISIBLE_COLUMN_KEYS);
@@ -749,7 +751,7 @@ export default function ClientesPage() {
                   <tr
                     key={c.id}
                     className="group cursor-pointer transition-colors hover:bg-[#4FAEB2]/[0.04]"
-                    onClick={() => (window.location.href = `/clientes/${c.id}`)}
+                    onClick={() => setDetalleId(c.id)}
                   >
                     {visibleColumns.map((col) => (
                       <td key={col.key} className={col.className}>
@@ -770,8 +772,15 @@ export default function ClientesPage() {
         onCreated={(id) => {
           setNuevoOpen(false);
           recargarClientes();
-          window.location.href = `/clientes/${id}`;
+          setDetalleId(id);
         }}
+      />
+
+      <ClienteDetalleModal
+        id={detalleId}
+        open={detalleId != null}
+        onClose={() => setDetalleId(null)}
+        onUpdated={() => recargarClientes()}
       />
     </div>
   );
