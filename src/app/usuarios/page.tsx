@@ -16,30 +16,6 @@ type UsuarioRow = {
   created_at: string;
 };
 
-const AVATAR_TONES = [
-  { bg: "bg-[#4FAEB2]", text: "text-white" },
-  { bg: "bg-[#3F8E91]", text: "text-white" },
-  { bg: "bg-[#6FBEC2]", text: "text-white" },
-  { bg: "bg-[#2F7375]", text: "text-white" },
-  { bg: "bg-[#8FCED1]", text: "text-[#1E4F51]" },
-];
-
-function avatarToneFor(id: string) {
-  const sum = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_TONES[Math.abs(sum) % AVATAR_TONES.length];
-}
-
-function getInitials(nombre: string) {
-  return (
-    (nombre || "?")
-      .split(" ")
-      .slice(0, 2)
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
-
 function labelRol(rol: string | null): string {
   const k = (rol ?? "").trim().toLowerCase();
   const m: Record<string, string> = {
@@ -302,7 +278,6 @@ export default function UsuariosPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtrados.map((usr) => {
-                  const tone = avatarToneFor(usr.id);
                   const isInactive = (usr.estado ?? "activo").toLowerCase() === "inactivo";
                   const rolTone = rolBadgeTone(usr.rol);
                   return (
@@ -312,18 +287,11 @@ export default function UsuariosPage() {
                       onClick={() => verUsuario(usr.id)}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-[0_0_0_2px_rgba(79,174,178,0.15)] ${tone.bg} ${tone.text}`}
-                          >
-                            {getInitials(usr.nombre ?? usr.email)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-slate-800">{usr.nombre ?? "—"}</p>
-                            {usr.telefono && (
-                              <p className="truncate text-xs text-slate-400">{usr.telefono}</p>
-                            )}
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-800">{usr.nombre ?? "—"}</p>
+                          {usr.telefono && (
+                            <p className="truncate text-xs text-slate-400">{usr.telefono}</p>
+                          )}
                         </div>
                       </td>
                       <td className="max-w-[220px] truncate px-4 py-3 text-slate-600">{usr.email}</td>
