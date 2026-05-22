@@ -1,37 +1,31 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useContext, useState } from "react";
 
 type BootContextValue = {
   /** El Sidebar terminó de cargar los módulos del usuario. */
   sidebarReady: boolean;
-  /** Marca el sidebar como listo (idempotente: solo dispara la primera vez). */
-  markSidebarReady: () => void;
+  /** Marca el estado de carga del sidebar. true = listo, false = volvió a cargar. */
+  setSidebarReady: (v: boolean) => void;
 };
 
 const BootContext = createContext<BootContextValue>({
   sidebarReady: false,
-  markSidebarReady: () => {},
+  setSidebarReady: () => {},
 });
 
 /**
  * Provider de señales de arranque del shell. Permite al AuthGuard mantener
  * la pantalla de carga visible hasta que el Sidebar haya completado su
- * fetch de módulos, evitando el flash donde el sidebar aparece vacío.
+ * fetch de módulos. Se mantiene reactivo a recargas posteriores (p. ej.
+ * al volver a la pestaña, supabase emite un auth event que recarga el
+ * menú; mostramos el loader durante esa recarga también).
  */
 export function BootProvider({ children }: { children: React.ReactNode }) {
   const [sidebarReady, setSidebarReady] = useState(false);
-  /** Una sola vez: una vez ready, no volvemos al loader en navegaciones internas. */
-  const marked = useRef(false);
-
-  const markSidebarReady = useCallback(() => {
-    if (marked.current) return;
-    marked.current = true;
-    setSidebarReady(true);
-  }, []);
 
   return (
-    <BootContext.Provider value={{ sidebarReady, markSidebarReady }}>
+    <BootContext.Provider value={{ sidebarReady, setSidebarReady }}>
       {children}
     </BootContext.Provider>
   );

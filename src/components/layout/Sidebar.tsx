@@ -370,7 +370,14 @@ export default function Sidebar() {
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   /** Filtro visual del menú (no altera permisos ni rutas). */
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
-  const { markSidebarReady } = useBoot();
+  const { setSidebarReady } = useBoot();
+
+  /** Sincroniza el estado de carga del menú con el BootContext: cuando el
+   * Sidebar vuelve a cargar (p. ej. al recuperar foco de la pestaña), el
+   * AuthGuard muestra el ZentraLoader hasta que termine. */
+  useEffect(() => {
+    setSidebarReady(!cargando);
+  }, [cargando, setSidebarReady]);
 
   useEffect(() => {
     setFavoritos(getFavoritos());
@@ -446,7 +453,6 @@ export default function Sidebar() {
       } finally {
         if (!cancelled) {
           setCargando(false);
-          markSidebarReady();
         }
       }
     }
@@ -464,7 +470,7 @@ export default function Sidebar() {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [markSidebarReady]);
+  }, []);
 
   const handleToggleFavorito = (id: string) => {
     setFavoritos(toggleFavorito(id));
