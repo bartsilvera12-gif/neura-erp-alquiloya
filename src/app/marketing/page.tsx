@@ -5,6 +5,7 @@ import { getMetricasCumplimiento, updateTaskStatus } from "@/lib/marketing/stora
 import type { MarketingOpsClienteResumen } from "@/lib/marketing/ops-queries";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import type { MarketingTask } from "@/lib/marketing/types";
+import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
 import {
   AlertCircle,
   CalendarDays,
@@ -258,72 +259,85 @@ export default function MarketingOpsPage() {
     }
   }
 
+  const mesOptions = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 6 + i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        return {
+          value: `${y}-${m}`,
+          label: `${MESES[d.getMonth()]} ${y}`,
+        };
+      }),
+    []
+  );
+
   if (cargando && tareas.length === 0 && clientesOps.length === 0) {
     return (
-      <div className="min-h-[50vh] space-y-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="h-9 w-56 rounded-lg bg-slate-200/80 animate-pulse" />
-          <div className="h-10 w-48 rounded-lg bg-slate-200/80 animate-pulse" />
+      <div className="min-h-[50vh] space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="h-9 w-56 animate-pulse rounded-lg bg-slate-200/80" />
+          <div className="h-10 w-48 animate-pulse rounded-lg bg-slate-200/80" />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-slate-100 animate-pulse border border-slate-200/80" />
+            <div key={i} className="h-24 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />
           ))}
         </div>
-        <div className="h-40 rounded-xl bg-slate-100 animate-pulse border border-slate-200/80" />
+        <div className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-slate-200/90 pb-5">
-        <div className="flex gap-3">
-          <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#4FAEB2]/30 bg-[#4FAEB2]/10 text-[#3F8E91] shadow-[0_0_0_3px_rgba(79,174,178,0.10)]">
             <Megaphone className="h-5 w-5" aria-hidden />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Marketing Ops</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+              />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+                Marketing
+              </p>
+            </div>
+            <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">Marketing Ops</h1>
+            <p className="text-xs text-slate-500">
               Calendario y cumplimiento por cliente · schema de datos de la empresa
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <FancySelect
+            size="sm"
+            className="min-w-[150px]"
+            ariaLabel="Mes operativo"
             value={mes}
-            onChange={(e) => setMes(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white shadow-sm"
-            aria-label="Mes operativo"
-          >
-            {Array.from({ length: 24 }, (_, i) => {
-              const d = new Date();
-              d.setMonth(d.getMonth() - 6 + i);
-              const y = d.getFullYear();
-              const m = String(d.getMonth() + 1).padStart(2, "0");
-              const val = `${y}-${m}`;
-              return (
-                <option key={val} value={val}>
-                  {MESES[d.getMonth()]} {y}
-                </option>
-              );
-            })}
-          </select>
+            onChange={(v) => setMes(v)}
+            options={mesOptions}
+          />
           <button
             type="button"
             onClick={() => void cargar()}
             disabled={cargando}
-            className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91] disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${cargando ? "animate-spin" : ""}`} />
             Actualizar
           </button>
           <button
             type="button"
             onClick={() => void handlePreviewSync()}
-            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#4FAEB2] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-[#4FAEB2]/25 transition-colors hover:bg-[#3F8E91] active:scale-95"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-3.5 w-3.5" />
             Sincronizar y regenerar mes
           </button>
         </div>
@@ -340,14 +354,16 @@ export default function MarketingOpsPage() {
       )}
 
       {ultimoSyncMsg && !syncMostrarPreview && (
-        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 whitespace-pre-wrap">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-sky-600 mt-0.5" />
+        <div className="flex items-start gap-2 whitespace-pre-wrap rounded-2xl border border-[#4FAEB2]/30 bg-[#4FAEB2]/8 px-4 py-3 text-sm text-[#1E4F51]">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#3F8E91]" />
           <div className="min-w-0">
-            <p className="font-semibold text-sky-950">Última operación</p>
-            <p className="text-sky-900/90 mt-0.5">{ultimoSyncMsg}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4FAEB2]">
+              Última operación
+            </p>
+            <p className="mt-0.5 text-slate-700">{ultimoSyncMsg}</p>
             <button
               type="button"
-              className="mt-2 text-xs font-medium text-sky-700 hover:underline"
+              className="mt-2 text-xs font-semibold text-[#3F8E91] transition-colors hover:text-[#4FAEB2]"
               onClick={() => setUltimoSyncMsg(null)}
             >
               Cerrar
@@ -356,35 +372,35 @@ export default function MarketingOpsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide">Atrasadas</p>
-          <p className="text-2xl font-bold text-red-800 tabular-nums">{atrasadas.length}</p>
-          <p className="text-[11px] text-red-600/80 mt-1">Vencidas y sin aprobar</p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-red-600">Atrasadas</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-red-700">{atrasadas.length}</p>
+          <p className="mt-0.5 text-[11px] text-red-600/80">Vencidas y sin aprobar</p>
         </div>
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">Hoy</p>
-          <p className="text-2xl font-bold text-amber-900 tabular-nums">{tareasHoy.length}</p>
-          <p className="text-[11px] text-amber-700/80 mt-1">Entregas con fecha {hoyYmd}</p>
+        <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">Hoy</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-amber-800">{tareasHoy.length}</p>
+          <p className="mt-0.5 text-[11px] text-amber-700/80">Entregas con fecha {hoyYmd}</p>
         </div>
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">Esta semana</p>
-          <p className="text-2xl font-bold text-blue-900 tabular-nums">{semana.length}</p>
-          <p className="text-[11px] text-blue-700/80 mt-1">Próximos 7 días</p>
+        <div className="rounded-2xl border border-[#4FAEB2]/30 bg-white p-4 shadow-sm ring-1 ring-[#4FAEB2]/10">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4FAEB2]">Esta semana</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-[#3F8E91]">{semana.length}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Próximos 7 días</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             <Users className="h-3.5 w-3.5" /> Cartera marketing
           </p>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{clientesOps.length}</p>
-          <p className="text-[11px] text-slate-500 mt-1">Plan marketing activo o servicio marketing</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{clientesOps.length}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Plan marketing activo o servicio marketing</p>
         </div>
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm col-span-2 lg:col-span-1">
-          <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide flex items-center gap-1">
+        <div className="col-span-2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm lg:col-span-1">
+          <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
             <Target className="h-3.5 w-3.5" /> Cumplimiento {mes}
           </p>
-          <p className="text-2xl font-bold text-emerald-900 tabular-nums">{metricas.porcentaje}%</p>
-          <p className="text-[11px] text-emerald-700/80 mt-1">
+          <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-700">{metricas.porcentaje}%</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
             {metricas.completadas}/{metricas.total} tareas cerradas
           </p>
         </div>
@@ -392,38 +408,67 @@ export default function MarketingOpsPage() {
 
       {syncMostrarPreview && syncPreview && (
         <div
-          className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-sm"
           onClick={() => setSyncMostrarPreview(false)}
           role="presentation"
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-100"
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-[#4FAEB2]/10 ring-1 ring-[#4FAEB2]/15"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="sync-dialog-title"
           >
-            <h3 id="sync-dialog-title" className="text-lg font-bold text-slate-900 mb-2">
-              Sincronizar y regenerar — {MESES[mesNum - 1]} {ano}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4FAEB2] via-[#4FAEB2]/80 to-[#4FAEB2]/40"
+            />
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+              />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+                Sincronizar y regenerar
+              </p>
+            </div>
+            <h3 id="sync-dialog-title" className="mt-1 text-lg font-bold tracking-tight text-slate-900">
+              {MESES[mesNum - 1]} {ano}
             </h3>
-            <p className="text-sm text-slate-600 mb-3">
+            <p className="mt-2 text-sm text-slate-600">
               Se eliminan las tareas <strong>automáticas</strong> del mes y se vuelven a generar según la plantilla de
               cada plan de marketing. Las tareas manuales no se tocan.
             </p>
-            <ul className="text-sm text-slate-700 space-y-1 mb-4">
-              <li>
-                <strong>{syncPreview.clientes_a_marcar_count}</strong> clientes a tipificar como marketing
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <li className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2]"
+                />
+                <strong className="tabular-nums">{syncPreview.clientes_a_marcar_count}</strong>
+                clientes a tipificar como marketing
               </li>
-              <li>
-                ~<strong>{syncPreview.tareas_a_generar_count}</strong> tareas nuevas (estimado, slots libres)
+              <li className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2]"
+                />
+                ~<strong className="tabular-nums">{syncPreview.tareas_a_generar_count}</strong> tareas nuevas (estimado)
               </li>
             </ul>
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSyncMostrarPreview(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91]"
+              >
+                Cancelar
+              </button>
               <button
                 type="button"
                 onClick={() => void handleExecuteSync()}
                 disabled={syncEjecutando}
-                className="inline-flex items-center justify-center gap-2 bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 min-w-[120px]"
+                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-lg bg-[#4FAEB2] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#4FAEB2]/25 transition-colors hover:bg-[#3F8E91] disabled:opacity-50"
               >
                 {syncEjecutando ? (
                   <>
@@ -433,13 +478,6 @@ export default function MarketingOpsPage() {
                   "Confirmar"
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => setSyncMostrarPreview(false)}
-                className="border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50"
-              >
-                Cancelar
-              </button>
             </div>
           </div>
         </div>
@@ -447,37 +485,55 @@ export default function MarketingOpsPage() {
 
       {regenerarCliente && (
         <div
-          className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-sm"
           onClick={() => setRegenerarCliente(null)}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Regenerar tareas del mes</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Se eliminarán las <strong>tareas automáticas</strong> de{" "}
-              <strong>{nombreClienteOps(regenerarCliente)}</strong> en <strong>
+          <div
+            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-[#4FAEB2]/10 ring-1 ring-[#4FAEB2]/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4FAEB2] via-[#4FAEB2]/80 to-[#4FAEB2]/40"
+            />
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+              />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+                Regenerar tareas del mes
+              </p>
+            </div>
+            <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-900">
+              {nombreClienteOps(regenerarCliente)}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Se eliminarán las <strong>tareas automáticas</strong> en{" "}
+              <strong>
                 {MESES[mesNum - 1]} {ano}
               </strong>{" "}
               y se generarán nuevas según la plantilla actual del plan.
             </p>
-            <p className="text-xs text-amber-700 mb-4 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Las tareas manuales no se modifican.
             </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => void handleRegenerarTareas(regenerarCliente)}
-                disabled={regenerando}
-                className="flex-1 bg-[#0EA5E9] hover:bg-[#0284C7] text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
-              >
-                {regenerando ? "Regenerando…" : "Confirmar"}
-              </button>
+            <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setRegenerarCliente(null)}
                 disabled={regenerando}
-                className="border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91] disabled:opacity-50"
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRegenerarTareas(regenerarCliente)}
+                disabled={regenerando}
+                className="rounded-lg bg-[#4FAEB2] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#4FAEB2]/25 transition-colors hover:bg-[#3F8E91] disabled:opacity-50"
+              >
+                {regenerando ? "Regenerando…" : "Confirmar"}
               </button>
             </div>
           </div>
@@ -485,27 +541,46 @@ export default function MarketingOpsPage() {
       )}
 
       {modalTarea && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4" onClick={() => setModalTarea(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">¿Se cumplió esta tarea?</h3>
-            <p className="text-sm text-slate-600 mb-4 capitalize">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-sm"
+          onClick={() => setModalTarea(null)}
+        >
+          <div
+            className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-[#4FAEB2]/10 ring-1 ring-[#4FAEB2]/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4FAEB2] via-[#4FAEB2]/80 to-[#4FAEB2]/40"
+            />
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2] shadow-[0_0_0_3px_rgba(79,174,178,0.18)]"
+              />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+                Tarea
+              </p>
+            </div>
+            <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-900">¿Se cumplió esta tarea?</h3>
+            <p className="mt-1 text-sm capitalize text-slate-600">
               {modalTarea.tipo_contenido} — {modalTarea.fecha_entrega}
             </p>
-            <div className="flex gap-3">
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalTarea(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-[#4FAEB2]/60 hover:text-[#3F8E91]"
+              >
+                No
+              </button>
               <button
                 type="button"
                 onClick={() => void handleMarcarCumplida(modalTarea)}
                 disabled={marcandoCumplida}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
                 {marcandoCumplida ? "…" : "Sí, aprobada"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalTarea(null)}
-                className="flex-1 border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50"
-              >
-                No
               </button>
             </div>
           </div>
@@ -513,38 +588,42 @@ export default function MarketingOpsPage() {
       )}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-            <CalendarDays className="h-4 w-4" />
-            Clientes — {MESES[mesNum - 1]} {ano}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2">
+            <span aria-hidden="true" className="text-[#4FAEB2]">
+              <CalendarDays className="h-4 w-4" />
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4FAEB2]">
+              Clientes — {MESES[mesNum - 1]} {ano}
+            </span>
           </h2>
           {cargando && (clientesOps.length > 0 || tareas.length > 0) && (
-            <span className="text-xs text-slate-400 inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
               <RefreshCw className="h-3 w-3 animate-spin" /> Actualizando…
             </span>
           )}
         </div>
 
         {clientesOps.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-10 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 mb-3">
+          <div className="rounded-2xl border border-dashed border-[#4FAEB2]/30 bg-[#4FAEB2]/5 px-6 py-10 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#4FAEB2]/30 bg-white text-[#4FAEB2]">
               <Users className="h-6 w-6" />
             </div>
-            <p className="text-slate-800 font-semibold">No hay clientes en cartera marketing para este período</p>
-            <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+            <p className="font-semibold tracking-tight text-slate-800">No hay clientes en cartera marketing para este período</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
               Debe existir al menos una <strong>suscripción activa</strong> a un plan con{" "}
               <strong>«Plan de marketing»</strong> y <strong>plantilla operativa</strong> con ítems, o un cliente con
               tipo de servicio <strong>marketing</strong>.
             </p>
-            <p className="text-xs text-slate-400 mt-4">
+            <p className="mt-4 text-xs text-slate-400">
               Si ya cumplís eso y no ves datos, ejecutá <strong>Sincronizar y regenerar mes</strong> (requiere admin) o
-              revisá que el plan tenga <code className="text-[11px] bg-slate-100 px-1 rounded">es_plan_marketing</code>{" "}
+              revisá que el plan tenga <code className="rounded bg-slate-100 px-1 text-[11px]">es_plan_marketing</code>{" "}
               en la base.
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="hidden md:grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto] gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 px-4 py-2 border-b border-slate-200">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-[#4FAEB2]/15">
+            <div className="hidden grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto] gap-2 border-b border-slate-200 bg-slate-50/70 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 md:grid">
               <span>Cliente</span>
               <span>Plan</span>
               <span className="text-center">Cupo mes</span>
@@ -554,144 +633,176 @@ export default function MarketingOpsPage() {
               <span>Próxima</span>
               <span />
             </div>
-            {clientesOps.map((c) => {
-              const expandido = expandidoId === c.id;
-              const grupoPorDia = grupoPorDiaPorCliente.get(c.id) ?? new Map<string, MarketingTask[]>();
-              const cupoMes = c.tareas_total;
-              const pct = cupoMes > 0 ? Math.round((c.tareas_completadas / cupoMes) * 100) : 0;
+            <div className="divide-y divide-slate-100">
+              {clientesOps.map((c) => {
+                const expandido = expandidoId === c.id;
+                const grupoPorDia = grupoPorDiaPorCliente.get(c.id) ?? new Map<string, MarketingTask[]>();
+                const cupoMes = c.tareas_total;
+                const pct = cupoMes > 0 ? Math.round((c.tareas_completadas / cupoMes) * 100) : 0;
 
-              return (
-                <div
-                  key={c.id}
-                  className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setExpandidoId(expandido ? null : c.id)}
-                    className="w-full text-left px-4 py-3 md:py-2 hover:bg-slate-50/90 transition-colors"
-                  >
-                    <div className="flex flex-col md:grid md:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto] md:items-center gap-2 md:gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {expandido ? (
-                          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">{nombreClienteOps(c)}</p>
-                          <p className="text-[11px] text-slate-500 md:hidden">
-                            {c.plan_marketing_nombre ?? "—"} · {pct}% cumplido
-                          </p>
-                        </div>
-                      </div>
-                      <div className="hidden md:block text-sm text-slate-600 truncate pl-6 md:pl-0">
-                        {c.plan_marketing_nombre ?? (
-                          <span className="text-slate-400 italic">Sin plan vinculado</span>
-                        )}
-                        {c.por_suscripcion_marketing && c.tipo_servicio_cliente !== "marketing" && (
-                          <span className="ml-1 text-[10px] text-amber-700 font-medium">(sync pendiente)</span>
-                        )}
-                      </div>
-                      <div className="hidden md:block text-center text-sm font-medium tabular-nums text-slate-800">
-                        {cupoMes}
-                      </div>
-                      <div className="hidden md:block text-center text-sm font-medium tabular-nums text-emerald-700">
-                        {c.tareas_completadas}
-                      </div>
-                      <div className="hidden md:block text-center text-sm font-medium tabular-nums text-amber-800">
-                        {c.tareas_pendientes}
-                      </div>
-                      <div className="hidden md:block text-center text-sm font-medium tabular-nums text-red-700">
-                        {c.tareas_atrasadas}
-                      </div>
-                      <div className="hidden md:flex items-center gap-1 text-sm text-slate-600">
-                        <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span>{c.proxima_entrega ?? "—"}</span>
-                      </div>
-                      <div className="hidden md:flex justify-end">
-                        <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            pct >= 100 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {pct}%
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-
-                  {expandido && (
-                    <div className="border-t border-slate-100 p-4 bg-slate-50/60">
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <div className="text-xs text-slate-600 space-y-1">
-                          <p>
-                            <span className="font-medium text-slate-800">Resumen:</span> {c.tareas_completadas}{" "}
-                            completadas · {c.tareas_pendientes} pendientes · {c.tareas_atrasadas} atrasadas
-                          </p>
-                          {c.proxima_entrega && (
-                            <p>
-                              Próxima entrega: <strong>{c.proxima_entrega}</strong>
+                return (
+                  <div key={c.id} className="bg-white">
+                    <button
+                      type="button"
+                      onClick={() => setExpandidoId(expandido ? null : c.id)}
+                      className="w-full px-4 py-2.5 text-left transition-colors hover:bg-[#4FAEB2]/[0.04]"
+                    >
+                      <div className="flex flex-col gap-2 md:grid md:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto] md:items-center md:gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {expandido ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-[#4FAEB2]" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold tracking-tight text-slate-900">
+                              {nombreClienteOps(c)}
                             </p>
+                            <p className="text-[11px] text-slate-500 md:hidden">
+                              {c.plan_marketing_nombre ?? "—"} · {pct}% cumplido
+                            </p>
+                          </div>
+                        </div>
+                        <div className="hidden truncate pl-6 text-sm text-slate-600 md:block md:pl-0">
+                          {c.plan_marketing_nombre ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4FAEB2]/30 bg-[#4FAEB2]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3F8E91]">
+                              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[#4FAEB2]" />
+                              {c.plan_marketing_nombre}
+                            </span>
+                          ) : (
+                            <span className="italic text-slate-400">Sin plan vinculado</span>
+                          )}
+                          {c.por_suscripcion_marketing && c.tipo_servicio_cliente !== "marketing" && (
+                            <span className="ml-1 text-[10px] font-semibold text-amber-700">(sync pendiente)</span>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRegenerarCliente(c);
-                          }}
-                          className="text-sm font-medium px-4 py-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200/80"
-                        >
-                          Regenerar tareas de este cliente
-                        </button>
+                        <div className="hidden text-center text-sm font-semibold tabular-nums text-slate-800 md:block">
+                          {cupoMes}
+                        </div>
+                        <div className="hidden text-center text-sm font-semibold tabular-nums text-emerald-700 md:block">
+                          {c.tareas_completadas}
+                        </div>
+                        <div className="hidden text-center text-sm font-semibold tabular-nums text-amber-700 md:block">
+                          {c.tareas_pendientes}
+                        </div>
+                        <div className="hidden text-center text-sm font-semibold tabular-nums text-red-600 md:block">
+                          {c.tareas_atrasadas}
+                        </div>
+                        <div className="hidden items-center gap-1 text-sm text-slate-600 md:flex">
+                          <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <span>{c.proxima_entrega ?? "—"}</span>
+                        </div>
+                        <div className="hidden justify-end md:flex">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                              pct >= 100
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : pct >= 50
+                                ? "border-[#4FAEB2]/30 bg-[#4FAEB2]/10 text-[#3F8E91]"
+                                : "border-slate-200 bg-slate-50 text-slate-600"
+                            }`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                pct >= 100 ? "bg-emerald-500" : pct >= 50 ? "bg-[#4FAEB2]" : "bg-slate-400"
+                              }`}
+                            />
+                            {pct}%
+                          </span>
+                        </div>
                       </div>
-                      <div className="overflow-x-auto rounded-lg border border-slate-200/80 bg-white">
-                        <div className="grid grid-cols-7 min-w-[640px] gap-1 p-2" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
-                          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
-                            <div key={d} className="text-center text-[10px] font-semibold text-slate-500 py-1">
-                              {d}
-                            </div>
-                          ))}
-                          {Array.from(
-                            { length: diasDelMes.length ? new Date(ano, mesNum - 1, 1).getDay() : 0 },
-                            (_, i) => <div key={`e-${i}`} className="min-h-[72px]" />
-                          )}
-                          {diasDelMes.map((fecha) => {
-                            const tareasDia = grupoPorDia.get(fecha) ?? [];
-                            const esHoy = fecha === hoyYmd;
-                            return (
+                    </button>
+
+                    {expandido && (
+                      <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <div className="space-y-1 text-xs text-slate-600">
+                            <p>
+                              <span className="font-semibold text-slate-800">Resumen:</span>{" "}
+                              {c.tareas_completadas} completadas · {c.tareas_pendientes} pendientes ·{" "}
+                              {c.tareas_atrasadas} atrasadas
+                            </p>
+                            {c.proxima_entrega && (
+                              <p>
+                                Próxima entrega: <strong>{c.proxima_entrega}</strong>
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRegenerarCliente(c);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#4FAEB2]/45 bg-white px-3 py-1.5 text-xs font-semibold text-[#3F8E91] shadow-sm transition-colors hover:bg-[#4FAEB2]/10"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Regenerar tareas de este cliente
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                          <div
+                            className="grid min-w-[640px] grid-cols-7 gap-1 p-2"
+                            style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
+                          >
+                            {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
                               <div
-                                key={fecha}
-                                className={`min-h-[72px] p-1.5 rounded-lg border text-left ${
-                                  esHoy ? "border-sky-400 bg-sky-50/90" : "border-slate-200 bg-white"
-                                }`}
+                                key={d}
+                                className="py-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
                               >
-                                <span className="text-[10px] font-semibold text-slate-500">{fecha.slice(8)}</span>
-                                <div className="mt-1 space-y-0.5">
-                                  {tareasDia.map((t) => (
-                                    <button
-                                      key={t.id}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setModalTarea(t);
-                                      }}
-                                      className={`block w-full text-left text-[10px] leading-tight truncate px-1 py-0.5 rounded border cursor-pointer hover:opacity-90 ${estiloTarea(t, hoyYmd)}`}
-                                    >
-                                      {t.tipo_contenido}
-                                    </button>
-                                  ))}
-                                </div>
+                                {d}
                               </div>
-                            );
-                          })}
+                            ))}
+                            {Array.from(
+                              { length: diasDelMes.length ? new Date(ano, mesNum - 1, 1).getDay() : 0 },
+                              (_, i) => <div key={`e-${i}`} className="min-h-[72px]" />
+                            )}
+                            {diasDelMes.map((fecha) => {
+                              const tareasDia = grupoPorDia.get(fecha) ?? [];
+                              const esHoy = fecha === hoyYmd;
+                              return (
+                                <div
+                                  key={fecha}
+                                  className={`min-h-[72px] rounded-lg border p-1.5 text-left ${
+                                    esHoy
+                                      ? "border-[#4FAEB2]/60 bg-[#4FAEB2]/8 shadow-[0_0_0_3px_rgba(79,174,178,0.10)]"
+                                      : "border-slate-200 bg-white"
+                                  }`}
+                                >
+                                  <span
+                                    className={`text-[10px] font-bold ${
+                                      esHoy ? "text-[#3F8E91]" : "text-slate-500"
+                                    }`}
+                                  >
+                                    {fecha.slice(8)}
+                                  </span>
+                                  <div className="mt-1 space-y-0.5">
+                                    {tareasDia.map((t) => (
+                                      <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setModalTarea(t);
+                                        }}
+                                        className={`block w-full cursor-pointer truncate rounded border px-1 py-0.5 text-left text-[10px] leading-tight transition-opacity hover:opacity-90 ${estiloTarea(t, hoyYmd)}`}
+                                      >
+                                        {t.tipo_contenido}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </section>
