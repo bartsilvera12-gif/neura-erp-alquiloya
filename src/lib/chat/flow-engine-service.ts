@@ -1455,7 +1455,79 @@ export function createFlowEngine(ctx: FlowEngineContext) {
     return { ok: true };
   }
 
+  /**
+   * Audit wrapper: cualquier excepción no controlada o `ok:false` interno se persiste como
+   * `flow_send_failed` en `chat_flow_events`, dejando el bot diagnosticable y permitiendo
+   * el reintento manual del operador desde la inbox ("Reenviar paso"). El motor avanza el puntero
+   * antes de enviar; si el envío falla aquí, sin este evento la conversación queda silenciosamente
+   * bloqueada (P1 2026-05-23). Idempotente: no muta puntero ni datos del flujo.
+   */
   async function sendCurrentFlowNode(
+    params: SendCurrentNodeParams
+  ): Promise<{ ok: boolean; nodeCode?: string; error?: string }> {
+    let result: { ok: boolean; nodeCode?: string; error?: string };
+    try {
+      result = await sendCurrentFlowNodeImpl(params);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error("[flow-engine] sendCurrentFlowNode_exception", {
+        conversationId: params.conversationId,
+        error: errMsg,
+      });
+      await tryLogFlowSendFailed(params.conversationId, errMsg, "exception");
+      return { ok: false, error: errMsg };
+    }
+    if (!result.ok) {
+      await tryLogFlowSendFailed(
+        params.conversationId,
+        result.error ?? "send_failed",
+        "ok_false"
+      );
+    }
+    return result;
+  }
+
+  /** Best-effort audit del bot trabado. No re-lanza para no perder el ok:false original. */
+  async function tryLogFlowSendFailed(
+    conversationId: string,
+    errorMessage: string,
+    reason: "exception" | "ok_false"
+  ): Promise<void> {
+    try {
+      const { data: conv } = await supabase
+        .from("chat_conversations")
+        .select("empresa_id, flow_code, flow_current_node, active_flow_session_id")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (!conv) return;
+      const c = conv as {
+        empresa_id?: string | null;
+        flow_code?: string | null;
+        flow_current_node?: string | null;
+        active_flow_session_id?: string | null;
+      };
+      if (!c.empresa_id || !c.flow_code) return;
+      await insertFlowEvent({
+        empresaId: c.empresa_id,
+        conversationId,
+        flowCode: c.flow_code,
+        nodeCode: c.flow_current_node ?? null,
+        flowSessionId: c.active_flow_session_id ?? null,
+        eventType: "flow_send_failed",
+        payload: {
+          error_message: errorMessage.slice(0, 500),
+          reason,
+        },
+      });
+    } catch (auditErr) {
+      console.warn("[flow-engine] flow_send_failed_audit_failed", {
+        conversationId,
+        message: auditErr instanceof Error ? auditErr.message : String(auditErr),
+      });
+    }
+  }
+
+  async function sendCurrentFlowNodeImpl(
     params: SendCurrentNodeParams
   ): Promise<{ ok: boolean; nodeCode?: string; error?: string }> {
     const currentHop = params.__autoHop ?? 0;
