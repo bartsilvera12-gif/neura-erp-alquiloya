@@ -157,7 +157,7 @@ export default function ProspectoNuevoForm({
     if (!form.etapa) return setError("Seleccioná una etapa.");
     if (form.telefono && !isValidTelefono(form.telefono)) {
       return setError(
-        "El número debe tener formato 0980000000 (10 dígitos, comenzando con 09).",
+        "Número inválido. Usá formato local 0981100453 o internacional +595981100453.",
       );
     }
 
