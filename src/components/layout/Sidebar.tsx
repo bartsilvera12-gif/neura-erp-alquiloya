@@ -33,6 +33,7 @@ import {
   ListChecks,
   FolderKanban,
   Percent,
+  Tags,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
@@ -180,6 +181,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     href: "/sorteos",
     icon: Ticket,
     children: [{ label: "Tickets / Comprobantes", href: "/sorteos/tickets", exactMatch: true }],
+  },
+  {
+    key: "etiquetas",
+    slug: "etiquetas",
+    label: "Etiquetas",
+    href: "/dashboard/etiquetas",
+    icon: Tags,
   },
 ];
 
