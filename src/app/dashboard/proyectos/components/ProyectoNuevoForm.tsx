@@ -10,6 +10,7 @@ import {
 import { FancySelect } from "@/app/dashboard/proyectos/components/FancySelect";
 import {
   PROYECTO_DATOS_BRIEF_FIELDS,
+  applyBriefFormToExisting,
   applySaasFormToExisting,
   type ProyectoModuloSnapshot,
 } from "@/lib/proyectos/brief-data";
@@ -54,6 +55,7 @@ export default function ProyectoNuevoForm({
   const [fechaIngreso, setFechaIngreso] = useState(() => new Date().toISOString().slice(0, 10));
   const [fechaProm, setFechaProm] = useState("");
   const [brief, setBrief] = useState<Record<string, string>>({});
+  const [briefLists, setBriefLists] = useState<Record<string, string[]>>({});
   const [saasEmpresaNombre, setSaasEmpresaNombre] = useState("");
   const [saasWhatsapp, setSaasWhatsapp] = useState("");
   const [saasObservaciones, setSaasObservaciones] = useState("");
@@ -115,9 +117,7 @@ export default function ProyectoNuevoForm({
     setSaving(true);
     setErr(null);
     const brief_data = esWeb
-      ? Object.fromEntries(
-          PROYECTO_DATOS_BRIEF_FIELDS.map(({ key }) => [key, brief[key] ?? ""]).filter(([, v]) => v !== "")
-        )
+      ? applyBriefFormToExisting({}, brief, briefLists)
       : esSaas
         ? applySaasFormToExisting(
             {},
@@ -341,23 +341,106 @@ export default function ProyectoNuevoForm({
               <h2 className="text-sm font-semibold text-slate-900">Datos del proyecto (web)</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {PROYECTO_DATOS_BRIEF_FIELDS.map((f) =>
-                f.kind === "checkbox" ? (
-                  <label
-                    key={f.key}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-[#4FAEB2]/60"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] accent-[#4FAEB2] focus:ring-[#4FAEB2]/30"
-                      checked={brief[f.key] === "1"}
-                      onChange={(e) =>
-                        setBrief((b) => ({ ...b, [f.key]: e.target.checked ? "1" : "" }))
-                      }
-                    />
-                    {f.label}
-                  </label>
-                ) : (
+              {PROYECTO_DATOS_BRIEF_FIELDS.map((f) => {
+                if (f.kind === "checkbox") {
+                  return (
+                    <label
+                      key={f.key}
+                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-[#4FAEB2]/60"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] accent-[#4FAEB2] focus:ring-[#4FAEB2]/30"
+                        checked={brief[f.key] === "1"}
+                        onChange={(e) =>
+                          setBrief((b) => ({ ...b, [f.key]: e.target.checked ? "1" : "" }))
+                        }
+                      />
+                      {f.label}
+                    </label>
+                  );
+                }
+                if (f.kind === "url_list") {
+                  const urls = briefLists[f.key] ?? [];
+                  const items = urls.length > 0 ? urls : [""];
+                  return (
+                    <div key={f.key} className="block text-sm sm:col-span-2">
+                      <span className={LABEL_CLS}>{f.label}</span>
+                      <div className="mt-1.5 space-y-2">
+                        {items.map((url, idx) => (
+                          <div key={idx} className="flex items-stretch gap-2">
+                            <input
+                              type="url"
+                              className={`${INPUT_CLS} mt-0 flex-1`}
+                              placeholder={f.placeholder ?? "https://..."}
+                              value={url}
+                              onChange={(e) => {
+                                const next = [...items];
+                                next[idx] = e.target.value;
+                                setBriefLists((b) => ({ ...b, [f.key]: next }));
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = items.filter((_, i) => i !== idx);
+                                setBriefLists((b) => ({ ...b, [f.key]: next }));
+                              }}
+                              disabled={items.length === 1 && !items[0]}
+                              aria-label={`Eliminar link ${idx + 1}`}
+                              title="Eliminar"
+                              className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBriefLists((b) => ({
+                              ...b,
+                              [f.key]: [...(b[f.key] ?? []), ""],
+                            }))
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#4FAEB2]/40 bg-[#4FAEB2]/5 px-3 py-2 text-xs font-semibold text-[#3F8E91] transition-colors hover:border-[#4FAEB2] hover:bg-[#4FAEB2]/10"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          Agregar otro link
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
                   <label key={f.key} className="block text-sm sm:col-span-2">
                     <span className={LABEL_CLS}>{f.label}</span>
                     <input
@@ -367,8 +450,8 @@ export default function ProyectoNuevoForm({
                       onChange={(e) => setBrief((b) => ({ ...b, [f.key]: e.target.value }))}
                     />
                   </label>
-                )
-              )}
+                );
+              })}
             </div>
           </div>
         ) : null}

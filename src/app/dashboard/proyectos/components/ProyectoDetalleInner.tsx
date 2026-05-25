@@ -16,6 +16,7 @@ import {
   applySaasFormToExisting,
   coalesceBriefData,
   formatFechaPyFull,
+  readBriefUrlList,
   readSaasBriefData,
   type ProyectoModuloSnapshot,
   type ProyectoSaasBriefForm,
@@ -237,6 +238,7 @@ export default function ProyectoDetalleInner({
   const [tareaSaving, setTareaSaving] = useState(false);
 
   const [briefForm, setBriefForm] = useState<Record<string, string>>({});
+  const [briefLists, setBriefLists] = useState<Record<string, string[]>>({});
   const [saasForm, setSaasForm] = useState<ProyectoSaasBriefForm>({
     empresa_nombre: "",
     whatsapp_contacto: "",
@@ -262,12 +264,20 @@ export default function ProyectoDetalleInner({
     const p = j.data.proyecto;
     const merged = coalesceBriefData(p.brief_data);
     const saas = readSaasBriefData(p.brief_data);
+    const lists: Record<string, string[]> = {};
+    for (const f of PROYECTO_DATOS_BRIEF_FIELDS) {
+      if (f.kind === "url_list") {
+        lists[f.key] = readBriefUrlList(p.brief_data, f.key);
+      }
+    }
     setBriefForm(merged);
+    setBriefLists(lists);
     setSaasForm(saas);
     setResponsableTecnicoId(typeof p.responsable_tecnico_id === "string" ? p.responsable_tecnico_id : "");
     setObservaciones(typeof p.observaciones_comerciales === "string" ? p.observaciones_comerciales : "");
     setDatosSnapshot(JSON.stringify({
       bf: merged,
+      bl: lists,
       saas,
       responsable_tecnico_id: typeof p.responsable_tecnico_id === "string" ? p.responsable_tecnico_id : "",
       obs: typeof p.observaciones_comerciales === "string" ? p.observaciones_comerciales : "",
@@ -358,12 +368,13 @@ export default function ProyectoDetalleInner({
   const datosDirty = useMemo(() => {
     const cur = JSON.stringify({
       bf: briefForm,
+      bl: briefLists,
       saas: saasForm,
       responsable_tecnico_id: responsableTecnicoId,
       obs: observaciones,
     });
     return datosSnapshot !== "" && cur !== datosSnapshot;
-  }, [briefForm, saasForm, responsableTecnicoId, observaciones, datosSnapshot]);
+  }, [briefForm, briefLists, saasForm, responsableTecnicoId, observaciones, datosSnapshot]);
 
   useEffect(() => {
     onDirtyChange?.(datosDirty);
@@ -376,7 +387,7 @@ export default function ProyectoDetalleInner({
     const briefMerged =
       tipoCodigo === "saas"
         ? applySaasFormToExisting(proyecto.brief_data, saasForm)
-        : applyBriefFormToExisting(proyecto.brief_data, briefForm);
+        : applyBriefFormToExisting(proyecto.brief_data, briefForm, briefLists);
     const res = await fetchWithSupabaseSession(`/api/proyectos/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -816,23 +827,106 @@ export default function ProyectoDetalleInner({
 
             {esWeb ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {PROYECTO_DATOS_BRIEF_FIELDS.map((f) =>
-                  f.kind === "checkbox" ? (
-                    <label
-                      key={f.key}
-                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-[#4FAEB2]/60"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] accent-[#4FAEB2] focus:ring-[#4FAEB2]/30"
-                        checked={briefForm[f.key] === "1"}
-                        onChange={(e) =>
-                          setBriefForm((b) => ({ ...b, [f.key]: e.target.checked ? "1" : "" }))
-                        }
-                      />
-                      {f.label}
-                    </label>
-                  ) : (
+                {PROYECTO_DATOS_BRIEF_FIELDS.map((f) => {
+                  if (f.kind === "checkbox") {
+                    return (
+                      <label
+                        key={f.key}
+                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-[#4FAEB2]/60"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] accent-[#4FAEB2] focus:ring-[#4FAEB2]/30"
+                          checked={briefForm[f.key] === "1"}
+                          onChange={(e) =>
+                            setBriefForm((b) => ({ ...b, [f.key]: e.target.checked ? "1" : "" }))
+                          }
+                        />
+                        {f.label}
+                      </label>
+                    );
+                  }
+                  if (f.kind === "url_list") {
+                    const urls = briefLists[f.key] ?? [];
+                    const items = urls.length > 0 ? urls : [""];
+                    return (
+                      <div key={f.key} className="block text-sm sm:col-span-2">
+                        <span className={labelCls}>{f.label}</span>
+                        <div className="mt-1.5 space-y-2">
+                          {items.map((url, idx) => (
+                            <div key={idx} className="flex items-stretch gap-2">
+                              <input
+                                type="url"
+                                className={`${inputCls} mt-0 flex-1`}
+                                placeholder={f.placeholder ?? "https://..."}
+                                value={url}
+                                onChange={(e) => {
+                                  const next = [...items];
+                                  next[idx] = e.target.value;
+                                  setBriefLists((b) => ({ ...b, [f.key]: next }));
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = items.filter((_, i) => i !== idx);
+                                  setBriefLists((b) => ({ ...b, [f.key]: next }));
+                                }}
+                                disabled={items.length === 1 && !items[0]}
+                                aria-label={`Eliminar link ${idx + 1}`}
+                                title="Eliminar"
+                                className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <line x1="18" y1="6" x2="6" y2="18" />
+                                  <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBriefLists((b) => ({
+                                ...b,
+                                [f.key]: [...(b[f.key] ?? []), ""],
+                              }))
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#4FAEB2]/40 bg-[#4FAEB2]/5 px-3 py-2 text-xs font-semibold text-[#3F8E91] transition-colors hover:border-[#4FAEB2] hover:bg-[#4FAEB2]/10"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Agregar otro link
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
                     <label key={f.key} className={`block text-sm ${f.key === "secciones" ? "sm:col-span-2" : ""}`}>
                       <span className={labelCls}>{f.label}</span>
                       <input
@@ -842,8 +936,8 @@ export default function ProyectoDetalleInner({
                         onChange={(e) => setBriefForm((b) => ({ ...b, [f.key]: e.target.value }))}
                       />
                     </label>
-                  )
-                )}
+                  );
+                })}
               </div>
             ) : null}
 
