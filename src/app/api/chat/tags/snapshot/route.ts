@@ -74,13 +74,33 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(0, parseIntParam(url.searchParams.get("offset"), 0, 1_000_000));
     const action = (url.searchParams.get("action") || "dry_run").trim();
 
+    // FASE 4H: si el cliente no pidio un run_key especifico, usamos por defecto el
+    // run_key mas reciente (snapshot vigente) para que la tabla principal no
+    // mezcle sugerencias historicas.
+    let effectiveRunKey = runKey;
+    let runKeyDefaultedToLatest = false;
+    if (!effectiveRunKey) {
+      const latest = await pool.query(
+        `SELECT metadata->>'run_key' AS run_key
+           FROM "${schema}".chat_conversation_tag_history
+          WHERE empresa_id = $1
+            AND action = $2
+            AND metadata ? 'run_key'
+          ORDER BY created_at DESC
+          LIMIT 1`,
+        [auth.empresa_id, action]
+      );
+      effectiveRunKey = latest.rows[0]?.run_key ?? "";
+      runKeyDefaultedToLatest = !!effectiveRunKey;
+    }
+
     const params: unknown[] = [auth.empresa_id, action];
     const where: string[] = [
       `h.empresa_id = $1`,
       `h.action = $2`,
     ];
-    if (runKey) {
-      params.push(runKey);
+    if (effectiveRunKey) {
+      params.push(effectiveRunKey);
       where.push(`h.metadata->>'run_key' = $${params.length}`);
     }
     if (tagCode) {
@@ -188,6 +208,8 @@ export async function GET(request: NextRequest) {
       wrote_changes: false,
       filters: {
         run_key: runKey || null,
+        effective_run_key: effectiveRunKey || null,
+        run_key_defaulted_to_latest: runKeyDefaultedToLatest,
         tag_code: tagCode || null,
         phone: phoneRaw || null,
         date_from: dateFromIso,

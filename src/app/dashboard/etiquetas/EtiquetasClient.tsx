@@ -394,13 +394,16 @@ export default function EtiquetasClient() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">run_key</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Snapshot histórico</label>
             <input
               value={runKey}
               onChange={(e) => setRunKey(e.target.value)}
-              placeholder="opcional"
+              placeholder="Opcional: ver snapshot anterior"
               className={`${INPUT_CN} font-mono`}
             />
+            <p className="mt-1 text-[11px] text-slate-500">
+              Por defecto se muestra el snapshot más reciente.
+            </p>
           </div>
         </div>
       </section>
