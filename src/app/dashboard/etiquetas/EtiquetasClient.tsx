@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { Search, X, RefreshCw, AlertTriangle, Filter } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search, X, RefreshCw, AlertTriangle, Filter, Copy, Sparkles, Tag as TagIcon, EyeOff, ArrowLeftCircle } from "lucide-react";
 
 interface ByTagRow {
   tag_code: string;
@@ -23,8 +23,27 @@ interface SnapshotRow {
   purchase_condition: string | null;
   category: string | null;
   run_key: string | null;
+  applied_batch_id: string | null;
+  action: string | null;
   created_at: string | null;
 }
+
+interface CountersResponse {
+  ok: boolean;
+  counters?: {
+    suggested_latest_snapshot: number;
+    latest_run_key: string | null;
+    applied_total: number;
+    replaced_total: number;
+    cleared_total: number;
+    reactivated_total: number;
+    hidden_by_tag_total: number;
+  };
+}
+
+type EtiquetasView = "suggested" | "applied";
+
+const PILOT_5B_BATCH_ID = "637dd1da-9c88-4d51-a917-797b45533cb3";
 
 interface SnapshotResponse {
   ok: boolean;
@@ -121,8 +140,15 @@ export default function EtiquetasClient() {
   // Se actualizan recien al presionar "Buscar", para que cambiar un input no dispare fetch.
   const [appliedFilters, setAppliedFilters] = useState<{
     tagCode: string; phone: string; dateFrom: string; dateTo: string;
-    currentNode: string; runKey: string;
+    currentNode: string; runKey: string; view: EtiquetasView; appliedBatchId: string;
   } | null>(null);
+
+  // FASE 5B-FIX: vista del modulo (sugeridas vs aplicadas reales).
+  const [view, setView] = useState<EtiquetasView>("suggested");
+  const [appliedBatchId, setAppliedBatchId] = useState("");
+
+  // Counters de las 4 cards superiores (siempre visibles, se cargan al montar).
+  const [counters, setCounters] = useState<CountersResponse["counters"] | null>(null);
 
   // Modal
   const [modalConvId, setModalConvId] = useState<string | null>(null);
@@ -131,6 +157,8 @@ export default function EtiquetasClient() {
   const [modalData, setModalData] = useState<ConversationPreviewResponse | null>(null);
 
   // Cuántos filtros tiene actualmente seleccionados el usuario (sin aplicarlos aun).
+  // En vista "applied" la mera seleccion de vista ya cuenta como filtro implicito,
+  // ya que es un universo acotado (solo 10 hoy en Papu).
   const filtersActiveCount = useMemo(() => {
     let n = 0;
     if (tagCode) n++;
@@ -139,13 +167,19 @@ export default function EtiquetasClient() {
     if (dateTo) n++;
     if (currentNode) n++;
     if (runKey) n++;
+    if (appliedBatchId) n++;
+    if (view === "applied") n++;
     return n;
-  }, [tagCode, phone, dateFrom, dateTo, currentNode, runKey]);
+  }, [tagCode, phone, dateFrom, dateTo, currentNode, runKey, appliedBatchId, view]);
 
   // Helper: construye la querystring a partir de un set de filtros aplicados y offset.
   const buildQuery = useCallback(
     (
-      f: { tagCode: string; phone: string; dateFrom: string; dateTo: string; currentNode: string; runKey: string },
+      f: {
+        tagCode: string; phone: string; dateFrom: string; dateTo: string;
+        currentNode: string; runKey: string;
+        view: EtiquetasView; appliedBatchId: string;
+      },
       off: number
     ) => {
       const sp = new URLSearchParams();
@@ -155,6 +189,8 @@ export default function EtiquetasClient() {
       if (f.dateTo) sp.set("date_to", f.dateTo);
       if (f.currentNode) sp.set("current_node_code", f.currentNode);
       if (f.runKey) sp.set("run_key", f.runKey);
+      sp.set("action", f.view === "applied" ? "applied" : "dry_run");
+      if (f.appliedBatchId) sp.set("applied_batch_id", f.appliedBatchId);
       sp.set("limit", String(limit));
       sp.set("offset", String(off));
       return sp.toString();
@@ -164,7 +200,11 @@ export default function EtiquetasClient() {
 
   const fetchSnapshot = useCallback(
     async (
-      f: { tagCode: string; phone: string; dateFrom: string; dateTo: string; currentNode: string; runKey: string },
+      f: {
+        tagCode: string; phone: string; dateFrom: string; dateTo: string;
+        currentNode: string; runKey: string;
+        view: EtiquetasView; appliedBatchId: string;
+      },
       off: number
     ) => {
       setLoading(true);
@@ -198,12 +238,60 @@ export default function EtiquetasClient() {
       setError("Elegí al menos un filtro para consultar.");
       return;
     }
-    const next = { tagCode, phone, dateFrom, dateTo, currentNode, runKey };
+    const next = { tagCode, phone, dateFrom, dateTo, currentNode, runKey, view, appliedBatchId };
     setAppliedFilters(next);
     setOffset(0);
     setHasSearched(true);
     void fetchSnapshot(next, 0);
-  }, [filtersActiveCount, tagCode, phone, dateFrom, dateTo, currentNode, runKey, fetchSnapshot]);
+  }, [filtersActiveCount, tagCode, phone, dateFrom, dateTo, currentNode, runKey, view, appliedBatchId, fetchSnapshot]);
+
+  // FASE 5B-FIX: shortcut "Ver piloto 5B"
+  const handleViewPilot5B = useCallback(() => {
+    setView("applied");
+    setAppliedBatchId(PILOT_5B_BATCH_ID);
+    setTagCode("");
+    setPhone("");
+    setDateFrom("");
+    setDateTo("");
+    setCurrentNode("");
+    setRunKey("");
+    const next = {
+      tagCode: "", phone: "", dateFrom: "", dateTo: "", currentNode: "", runKey: "",
+      view: "applied" as EtiquetasView, appliedBatchId: PILOT_5B_BATCH_ID,
+    };
+    setAppliedFilters(next);
+    setOffset(0);
+    setHasSearched(true);
+    setError(null);
+    void fetchSnapshot(next, 0);
+  }, [fetchSnapshot]);
+
+  // FASE 5B-FIX: cambiar vista resetea resultados y filtros aplicados (el usuario debe presionar Buscar).
+  const switchView = useCallback((v: EtiquetasView) => {
+    setView(v);
+    setHasSearched(false);
+    setAppliedFilters(null);
+    setRows([]);
+    setByTag([]);
+    setTotal(0);
+    setOffset(0);
+    setError(null);
+  }, []);
+
+  // Counters
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat/tags/counters`, { cache: "no-store" });
+        const json: CountersResponse = await res.json();
+        if (!cancelled && json.ok && json.counters) setCounters(json.counters);
+      } catch {
+        /* counters opcionales; ignorar errores */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Recargar: solo tiene sentido si ya hubo búsqueda con filtros aplicados.
   const handleReload = useCallback(() => {
@@ -260,6 +348,7 @@ export default function EtiquetasClient() {
     setDateTo("");
     setCurrentNode("");
     setRunKey("");
+    setAppliedBatchId("");
     setOffset(0);
     // FASE 4E: limpiar tambien el snapshot ya cargado y la marca de busqueda.
     setAppliedFilters(null);
@@ -287,9 +376,102 @@ export default function EtiquetasClient() {
         </div>
         <div className="inline-flex max-w-md items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 shadow-sm">
           <AlertTriangle size={14} className="text-amber-600 shrink-0" />
-          <span>Modo shadow / read-only. Son sugerencias calculadas; no ocultan conversaciones.</span>
+          <span>
+            {view === "applied"
+              ? "Etiquetas aplicadas reales: ocultan la conversación de Conversaciones."
+              : "Sugeridas en modo shadow / read-only. No ocultan conversaciones."}
+          </span>
         </div>
       </header>
+
+      {/* FASE 5B-FIX: cards de cabecera */}
+      <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] text-slate-500">
+            <Sparkles size={12} className="text-[#4FAEB2]" />
+            Sugeridas del snapshot vigente
+          </div>
+          <div className="mt-1.5 text-2xl font-semibold text-slate-900">
+            {counters ? counters.suggested_latest_snapshot.toLocaleString("es-PY") : "—"}
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">action=dry_run</div>
+        </div>
+        <div className="rounded-2xl border border-[#4FAEB2]/45 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] text-slate-500">
+            <TagIcon size={12} className="text-emerald-600" />
+            Aplicadas reales
+          </div>
+          <div className="mt-1.5 text-2xl font-semibold text-slate-900">
+            {counters ? counters.applied_total.toLocaleString("es-PY") : "—"}
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">history.action=applied</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] text-slate-500">
+            <EyeOff size={12} className="text-slate-500" />
+            Ocultas por etiqueta
+          </div>
+          <div className="mt-1.5 text-2xl font-semibold text-slate-900">
+            {counters ? counters.hidden_by_tag_total.toLocaleString("es-PY") : "—"}
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">chat_conversations.hidden_by_tag=true</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] text-slate-500">
+            <ArrowLeftCircle size={12} className="text-amber-600" />
+            Reactivadas (cliente respondió)
+          </div>
+          <div className="mt-1.5 text-2xl font-semibold text-slate-900">
+            {counters ? counters.reactivated_total.toLocaleString("es-PY") : "—"}
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400">history.action=cleared</div>
+        </div>
+      </section>
+
+      {/* FASE 5B-FIX: toggle Sugeridas / Aplicadas + shortcut piloto */}
+      <section className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => switchView("suggested")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              view === "suggested"
+                ? "bg-[#4FAEB2] text-white shadow-sm shadow-[#4FAEB2]/25"
+                : "text-slate-600 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
+            }`}
+          >
+            <Sparkles size={14} />
+            Sugeridas
+          </button>
+          <button
+            type="button"
+            onClick={() => switchView("applied")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              view === "applied"
+                ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+            }`}
+          >
+            <TagIcon size={14} />
+            Aplicadas reales
+          </button>
+        </div>
+        {counters && counters.applied_total > 0 && (
+          <button
+            type="button"
+            onClick={handleViewPilot5B}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100"
+          >
+            <TagIcon size={13} />
+            Ver piloto 5B (10)
+          </button>
+        )}
+        <p className="text-xs text-slate-500">
+          {view === "suggested"
+            ? "Estas son sugerencias calculadas. No todas están aplicadas."
+            : "Estas conversaciones tienen una etiqueta aplicada y están ocultas del inbox."}
+        </p>
+      </section>
 
       {/* Cards por etiqueta - solo despues de la primera busqueda */}
       {hasSearched && byTag.length > 0 && (
@@ -306,10 +488,10 @@ export default function EtiquetasClient() {
             <button
               key={t.tag_code}
               onClick={() => {
-                const next = t.tag_code === tagCode ? "" : t.tag_code;
-                setTagCode(next);
+                const nextTag = t.tag_code === tagCode ? "" : t.tag_code;
+                setTagCode(nextTag);
                 if (appliedFilters) {
-                  const applied = { ...appliedFilters, tagCode: next };
+                  const applied = { ...appliedFilters, tagCode: nextTag };
                   setAppliedFilters(applied);
                   setOffset(0);
                   void fetchSnapshot(applied, 0);
@@ -393,18 +575,33 @@ export default function EtiquetasClient() {
               className={INPUT_CN}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Snapshot histórico</label>
-            <input
-              value={runKey}
-              onChange={(e) => setRunKey(e.target.value)}
-              placeholder="Opcional: ver snapshot anterior"
-              className={`${INPUT_CN} font-mono`}
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              Por defecto se muestra el snapshot más reciente.
-            </p>
-          </div>
+          {view === "suggested" ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Snapshot histórico</label>
+              <input
+                value={runKey}
+                onChange={(e) => setRunKey(e.target.value)}
+                placeholder="Opcional: ver snapshot anterior"
+                className={`${INPUT_CN} font-mono`}
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Por defecto se muestra el snapshot más reciente.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Batch ID aplicado</label>
+              <input
+                value={appliedBatchId}
+                onChange={(e) => setAppliedBatchId(e.target.value)}
+                placeholder="Opcional: filtrar por lote"
+                className={`${INPUT_CN} font-mono`}
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                UUID del lote (ej. piloto 5B).
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -468,20 +665,29 @@ export default function EtiquetasClient() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50/80 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             <tr>
-              <th className="px-4 py-3">Etiqueta sugerida</th>
+              <th className="px-4 py-3">{view === "applied" ? "Etiqueta aplicada" : "Etiqueta sugerida"}</th>
+              {view === "applied" && <th className="px-4 py-3">Estado</th>}
               <th className="px-4 py-3">Contacto</th>
               <th className="px-4 py-3">Teléfono / Número</th>
+              <th className="px-4 py-3">Conv ID</th>
               <th className="px-4 py-3">Nodo</th>
               <th className="px-4 py-3">Días inactivo</th>
               <th className="px-4 py-3">Último msg</th>
-              <th className="px-4 py-3">Snapshot</th>
-              <th className="px-4 py-3 text-right">Acción</th>
+              {view === "applied" ? (
+                <>
+                  <th className="px-4 py-3">Batch</th>
+                  <th className="px-4 py-3">Fecha aplicada</th>
+                </>
+              ) : (
+                <th className="px-4 py-3">Snapshot</th>
+              )}
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={view === "applied" ? 11 : 9} className="px-4 py-8 text-center text-slate-500">
                   Sin resultados para los filtros seleccionados.
                 </td>
               </tr>
@@ -493,27 +699,60 @@ export default function EtiquetasClient() {
                     {r.tag_label || r.tag_code}
                   </span>
                 </td>
+                {view === "applied" && (
+                  <td className="px-4 py-2.5">
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                      Aplicada
+                    </span>
+                  </td>
+                )}
                 <td className="px-4 py-2.5 text-slate-700">
                   {r.contact_name || <span className="text-slate-400">—</span>}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm font-semibold text-slate-800 tracking-wider">
                   {r.phone_masked || "—"}
                 </td>
+                <td className="px-4 py-2.5 font-mono text-xs text-slate-600" title={r.conversation_id}>
+                  {r.conversation_id.slice(0, 8)}…
+                </td>
                 <td className="px-4 py-2.5 text-slate-700">{r.current_node_code || "—"}</td>
                 <td className="px-4 py-2.5 text-slate-700">
                   {r.days_idle != null ? `${r.days_idle}d` : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-slate-500">{formatDate(r.last_message_at)}</td>
-                <td className="px-4 py-2.5 text-slate-500">{formatDate(r.created_at)}</td>
+                {view === "applied" ? (
+                  <>
+                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500" title={r.applied_batch_id ?? ""}>
+                      {r.applied_batch_id ? `${r.applied_batch_id.slice(0, 8)}…` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500">{formatDate(r.created_at)}</td>
+                  </>
+                ) : (
+                  <td className="px-4 py-2.5 text-slate-500">{formatDate(r.created_at)}</td>
+                )}
                 <td className="px-4 py-2.5 text-right">
-                  <button
-                    type="button"
-                    onClick={() => openModal(r.conversation_id)}
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
-                    title="Ver últimos mensajes"
-                  >
-                    <Search size={14} />
-                  </button>
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!r.phone_masked) return;
+                        const last4 = r.phone_masked.replace(/\D+/g, "");
+                        if (last4) void navigator.clipboard.writeText(last4);
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
+                      title="Copiar últimos 4 dígitos"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openModal(r.conversation_id)}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 shadow-sm transition-colors hover:border-[#4FAEB2]/60 hover:bg-[#4FAEB2]/5 hover:text-[#3F8E91]"
+                      title="Ver últimos mensajes"
+                    >
+                      <Search size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

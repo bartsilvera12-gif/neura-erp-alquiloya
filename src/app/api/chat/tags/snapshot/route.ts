@@ -73,13 +73,19 @@ export async function GET(request: NextRequest) {
     const limit = parseIntParam(url.searchParams.get("limit"), DEFAULT_LIMIT, MAX_LIMIT);
     const offset = Math.max(0, parseIntParam(url.searchParams.get("offset"), 0, 1_000_000));
     const action = (url.searchParams.get("action") || "dry_run").trim();
+    // FASE 5B-FIX: filtro adicional por applied_batch_id (solo aplica a view 'applied').
+    const appliedBatchIdRaw = (url.searchParams.get("applied_batch_id") || "").trim();
+    const appliedBatchId = appliedBatchIdRaw && isUuid(appliedBatchIdRaw) ? appliedBatchIdRaw : null;
 
     // FASE 4H: si el cliente no pidio un run_key especifico, usamos por defecto el
     // run_key mas reciente (snapshot vigente) para que la tabla principal no
     // mezcle sugerencias historicas.
+    // FASE 5B-FIX: el default a "latest run_key" solo aplica para action='dry_run'.
+    // Para 'applied'/'replaced'/'cleared' no hay concepto de snapshot agrupado;
+    // se filtra por action y opcionalmente applied_batch_id.
     let effectiveRunKey = runKey;
     let runKeyDefaultedToLatest = false;
-    if (!effectiveRunKey) {
+    if (!effectiveRunKey && action === "dry_run") {
       const latest = await pool.query(
         `SELECT metadata->>'run_key' AS run_key
            FROM "${schema}".chat_conversation_tag_history
@@ -102,6 +108,10 @@ export async function GET(request: NextRequest) {
     if (effectiveRunKey) {
       params.push(effectiveRunKey);
       where.push(`h.metadata->>'run_key' = $${params.length}`);
+    }
+    if (appliedBatchId) {
+      params.push(appliedBatchId);
+      where.push(`h.metadata->>'applied_batch_id' = $${params.length}`);
     }
     if (tagCode) {
       params.push(tagCode);
@@ -170,6 +180,7 @@ export async function GET(request: NextRequest) {
              ct.name AS contact_name,
              c.last_message_at,
              c.flow_current_node,
+             h.action,
              h.metadata,
              h.created_at
         FROM "${schema}".chat_conversation_tag_history h
@@ -198,6 +209,8 @@ export async function GET(request: NextRequest) {
         purchase_condition: (meta.purchase_condition as string) ?? null,
         category: (meta.category as string) ?? null,
         run_key: (meta.run_key as string) ?? null,
+        applied_batch_id: (meta.applied_batch_id as string) ?? null,
+        action: (r.action as string) ?? null,
         created_at: r.created_at ? new Date(r.created_at).toISOString() : null,
       };
     });
@@ -210,6 +223,7 @@ export async function GET(request: NextRequest) {
         run_key: runKey || null,
         effective_run_key: effectiveRunKey || null,
         run_key_defaulted_to_latest: runKeyDefaultedToLatest,
+        applied_batch_id: appliedBatchId,
         tag_code: tagCode || null,
         phone: phoneRaw || null,
         date_from: dateFromIso,
