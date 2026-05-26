@@ -1018,7 +1018,122 @@ export function ConversacionesClient({
     router.replace("/dashboard/conversaciones");
   }, [mode, botFlowsChecked, hasActiveBotFlows, router, searchParams]);
 
-  /** Lista: Realtime sobre conversaciones + INSERT en mensajes (cubre preview/unread si el UPDATE de conversación no emite). */
+  /**
+   * PERF-2A: refetch debounced de respaldo cuando Realtime trae cambios que no
+   * podemos parchar incrementalmente (ej. conversación nueva que no está en la
+   * lista local o status que la saca del filtro vigente). Coalesce eventos
+   * rapidos en una sola llamada y respeta visibilidad.
+   */
+  const debouncedRefetchTimerRef = useRef<number | null>(null);
+  const scheduleListRefetch = useCallback((delayMs = 1500) => {
+    if (debouncedRefetchTimerRef.current != null) return;
+    debouncedRefetchTimerRef.current = window.setTimeout(() => {
+      debouncedRefetchTimerRef.current = null;
+      if (document.visibilityState !== "visible") return;
+      void loadConversationsRef.current?.({ silent: true });
+    }, delayMs);
+  }, []);
+
+  /**
+   * PERF-2A: aplica un cambio de chat_conversations Realtime sobre la lista local
+   * sin recargar todo el inbox. Si la conversación ya no es elegible (status closed
+   * o hidden_by_tag=true), se quita. Si llegó un INSERT/UPDATE para una conversación
+   * que no está en la lista, se programa un refetch debounced.
+   */
+  const patchConversationFromRealtime = useCallback(
+    (row: Record<string, unknown> | null | undefined) => {
+      if (!row || typeof row.id !== "string") return;
+      const id = row.id;
+      const status = typeof row.status === "string" ? row.status : null;
+      const hiddenByTag = row.hidden_by_tag === true;
+      const stillInScope = status === "open" || status === "pending";
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === id);
+        if (idx < 0) {
+          // Conversación no presente en la lista local. Solo si entra al universo
+          // visible (open/pending, no oculta) vale la pena reconciliar.
+          if (stillInScope && !hiddenByTag) scheduleListRefetch(1500);
+          return prev;
+        }
+        // Si sale del universo visible, quitarla.
+        if (!stillInScope || hiddenByTag) {
+          return prev.filter((c) => c.id !== id);
+        }
+        const cur = prev[idx];
+        const next = [...prev];
+        const lastMessageAt =
+          typeof row.last_message_at === "string" ? row.last_message_at : cur.last_message_at;
+        const lastMessagePreview =
+          typeof row.last_message_preview === "string" ? row.last_message_preview : cur.last_message_preview;
+        const unreadCount =
+          typeof row.unread_count === "number" ? row.unread_count : cur.unread_count;
+        next[idx] = {
+          ...cur,
+          status: stillInScope ? status ?? cur.status : cur.status,
+          priority: typeof row.priority === "string" ? row.priority : cur.priority,
+          queue_id: (row.queue_id as string | null) ?? cur.queue_id,
+          assigned_agent_id: (row.assigned_agent_id as string | null) ?? cur.assigned_agent_id,
+          last_message_at: lastMessageAt,
+          last_message_preview: lastMessagePreview,
+          unread_count: unreadCount,
+          flow_status: typeof row.flow_status === "string" ? row.flow_status : cur.flow_status,
+          human_taken_over: row.human_taken_over === true ? true : row.human_taken_over === false ? false : cur.human_taken_over,
+          flow_code: typeof row.flow_code === "string" ? row.flow_code : cur.flow_code,
+          flow_current_node:
+            typeof row.flow_current_node === "string" ? row.flow_current_node : cur.flow_current_node,
+        };
+        next.sort((a, b) => {
+          const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+          const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+          return tb - ta;
+        });
+        return next;
+      });
+    },
+    [scheduleListRefetch]
+  );
+
+  /**
+   * PERF-2A: ante un INSERT en chat_messages, actualiza last_message_at/preview y
+   * unread de la conversación en la lista local sin recargar el inbox. Si la
+   * conversación no está en la lista (nueva o fuera del filtro actual), se programa
+   * un refetch debounced.
+   */
+  const patchConversationOnMessageInsert = useCallback(
+    (row: Record<string, unknown> | null | undefined) => {
+      if (!row || typeof row.conversation_id !== "string") return;
+      const convId = row.conversation_id;
+      const fromMe = row.from_me === true;
+      const createdAt = typeof row.created_at === "string" ? row.created_at : new Date().toISOString();
+      const previewRaw = typeof row.content === "string" ? row.content : null;
+      const preview = previewRaw ? previewRaw.slice(0, 280) : null;
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === convId);
+        if (idx < 0) {
+          scheduleListRefetch(1500);
+          return prev;
+        }
+        const cur = prev[idx];
+        const next = [...prev];
+        const bumpUnread = !fromMe && convId !== selectedIdRef.current;
+        next[idx] = {
+          ...cur,
+          last_message_at: createdAt,
+          last_message_preview: preview ?? cur.last_message_preview,
+          unread_count: bumpUnread ? (cur.unread_count ?? 0) + 1 : cur.unread_count,
+        };
+        next.sort((a, b) => {
+          const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+          const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+          return tb - ta;
+        });
+        return next;
+      });
+    },
+    [scheduleListRefetch]
+  );
+
+  /** Lista: Realtime sobre conversaciones (PERF-2A: merge incremental, sin full refetch). */
   useEffect(() => {
     const channel = supabaseChat
       .channel("conversaciones-inbox-list")
@@ -1027,7 +1142,10 @@ export function ConversacionesClient({
         { event: "*", schema: chatDataSchema, table: "chat_conversations" },
         (payload) => {
           trackInboxRealtimeEvent("conversation", { event: payload.eventType });
-          void loadConversationsRef.current?.({ silent: true });
+          // PERF-2A: parchar en local en vez de full refetch.
+          const newRow = payload.new as Record<string, unknown> | null;
+          const oldRow = payload.old as Record<string, unknown> | null;
+          patchConversationFromRealtime(newRow ?? oldRow);
         }
       )
       .subscribe((status, err) => {
@@ -1043,9 +1161,9 @@ export function ConversacionesClient({
     return () => {
       void supabaseChat.removeChannel(channel);
     };
-  }, [chatDataSchema, supabaseChat]);
+  }, [chatDataSchema, supabaseChat, patchConversationFromRealtime]);
 
-  /** Mensajes entrantes: refresca inbox, beep opcional (dedupe por id de mensaje). */
+  /** Mensajes entrantes: PERF-2A patch local + beep si corresponde (sin full refetch). */
   useEffect(() => {
     const channel = supabaseChat
       .channel("conversaciones-inbox-inbound-messages")
@@ -1054,11 +1172,14 @@ export function ConversacionesClient({
         { event: "INSERT", schema: chatDataSchema, table: "chat_messages" },
         (payload) => {
           trackInboxRealtimeEvent("message_list", { event: payload.eventType });
-          void loadConversationsRef.current?.({ silent: true });
           const row = payload.new as Record<string, unknown>;
+          // PERF-2A: actualizar preview/unread/last_message_at en local.
+          patchConversationOnMessageInsert(row);
+          // Si el hilo está abierto, el canal por-hilo (más abajo) ya lo agrega via mergeRow.
+          // Solo si no hay canal de hilo activo (race), refrescamos puntualmente.
           const convId = typeof row?.conversation_id === "string" ? row.conversation_id : "";
           if (convId && convId === selectedIdRef.current) {
-            void loadMessagesRef.current(convId, { silent: true });
+            // El canal por-hilo lo manejará via mergeRow. No disparamos fetch redundante.
           }
           const mid = typeof row?.id === "string" ? row.id : "";
           if (!mid || row.from_me === true) return;
@@ -1086,15 +1207,19 @@ export function ConversacionesClient({
     return () => {
       void supabaseChat.removeChannel(channel);
     };
-  }, [chatDataSchema, supabaseChat]);
+  }, [chatDataSchema, supabaseChat, patchConversationOnMessageInsert]);
 
-  /** Respaldo si Realtime no llega (publicación RLS, pestaña en background, etc.). */
+  /**
+   * PERF-2A: red de seguridad si Realtime falla (publicación RLS, websocket caído).
+   * Antes corría cada 2.8s con full refetch — eso saturaba el pool.
+   * Ahora 60s, solo cuando la pestaña está visible. Realtime sigue siendo el motor principal.
+   */
   useEffect(() => {
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       trackInboxPollingList({ visibility: "visible" });
       void loadConversationsRef.current?.({ silent: true });
-    }, 2800);
+    }, 60_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -1110,14 +1235,19 @@ export function ConversacionesClient({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  /** Con hilo abierto: sondeo corto por si Realtime no entrega INSERT/UPDATE (p. ej. webhook vía PG). */
+  /**
+   * PERF-2A: con hilo abierto, el canal por-hilo ya hace merge incremental
+   * (mergeRow en INSERT y UPDATE). Antes corría además un setInterval(2.8s)
+   * con full refetch del hilo — eso era el doble de tráfico que el inbox.
+   * Ahora 30s, solo como red de seguridad si Realtime de mensajes falla.
+   */
   useEffect(() => {
     if (!selectedId) return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       trackInboxPollingThread({ has_selected: true });
       void loadMessagesRef.current(selectedId, { silent: true });
-    }, 2800);
+    }, 30_000);
     return () => window.clearInterval(id);
   }, [selectedId]);
 
