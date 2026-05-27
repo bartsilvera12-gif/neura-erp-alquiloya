@@ -1,6 +1,7 @@
 // Catálogo / Resultados de búsqueda
 
 function CatalogPage({ onProperty }) {
+  const { properties } = useAlquiloYaPublicData();
   const pending = (typeof window !== 'undefined' && window.__pendingSearch) || null;
   const [tipo, setTipo] = React.useState(pending?.tipo || 'all');
   const [sort, setSort] = React.useState('recent');
@@ -15,8 +16,10 @@ function CatalogPage({ onProperty }) {
     amoblado: false, mascotas: false, verified: false, temporal: false,
   });
   React.useEffect(() => { if (window.__pendingSearch) delete window.__pendingSearch; }, []);
-  const filtered = PROPERTIES.filter(p =>
+  const filtered = properties.filter(p =>
     (tipo === 'all' || p.tipo === tipo) &&
+    (!filters.ciudad || p.ciudad === filters.ciudad) &&
+    (!filters.barrio || filters.barrio === 'Todos' || filters.barrio === 'Todos los barrios' || p.barrio === filters.barrio) &&
     p.price >= filters.min && p.price <= filters.max &&
     (!filters.areaMin || p.m2 >= filters.areaMin) &&
     (!filters.areaMax || p.m2 <= filters.areaMax) &&

@@ -43,7 +43,7 @@ function App() {
       {!hideHeader && <Header route={route} onNav={nav}/>}
       {route === 'home' && <HomePage onNav={nav} onProperty={openProperty}/>}
       {route === 'catalog' && <CatalogPage onProperty={openProperty}/>}
-      {route === 'detail' && <DetailPage p={property || PROPERTIES[0]} onProperty={openProperty} onNav={nav}/>}
+      {route === 'detail' && <DetailPage p={property} onProperty={openProperty} onNav={nav}/>}
       {route === 'temporal' && <TemporalPage onProperty={openProperty}/>}
       {route === 'plans' && <PlansPage onNav={nav}/>}
       {route === 'help' && <HelpPage onNav={nav}/>}

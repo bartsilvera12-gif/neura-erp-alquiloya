@@ -1,13 +1,14 @@
 // Home / Landing principal
 
 function HomePage({ onNav, onProperty }) {
-  const featured = PROPERTIES.filter(p => p.featured || p.verified).slice(0, 6);
+  const { properties } = useAlquiloYaPublicData();
+  const featured = properties.filter(p => p.featured || p.verified).slice(0, 6);
   return (
     <div className="fade-in">
       <Hero onNav={onNav}/>
       <Featured properties={featured} onProperty={onProperty} onNav={onNav}/>
-      <Categories onNav={onNav}/>
-      <CatalogPreview onProperty={onProperty} onNav={onNav}/>
+      <Categories properties={properties} onNav={onNav}/>
+      <CatalogPreview properties={properties} onProperty={onProperty} onNav={onNav}/>
       <OwnersBlock onNav={onNav}/>
       <Faq/>
     </div>
@@ -616,8 +617,8 @@ function MiniMap({ height = 200, pins = 8 }) {
   );
 }
 
-function Categories({ onNav }) {
-  const countByTipo = (id) => PROPERTIES.filter(p => p.tipo === id).length;
+function Categories({ properties = PROPERTIES, onNav }) {
+  const countByTipo = (id) => properties.filter(p => p.tipo === id).length;
   const cats = [
     { id: 'depto',    label: 'Departamentos',         count: countByTipo('depto'),    img: 'uploads/departamento.png' },
     { id: 'casa',     label: 'Casas independientes',  count: countByTipo('casa'),     img: 'uploads/casas.png' },
@@ -769,12 +770,12 @@ function SectionHead({ eyebrow, title, action, actionLabel }) {
   );
 }
 
-function CatalogPreview({ onProperty, onNav }) {
+function CatalogPreview({ properties = PROPERTIES, onProperty, onNav }) {
   // Tomamos 8 propiedades distintas de las destacadas — un mix variado
   const list = React.useMemo(() => {
-    const sorted = [...PROPERTIES].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    const sorted = [...properties].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     return sorted.slice(0, 8);
-  }, []);
+  }, [properties]);
   return (
     <section className="container" style={{ padding: '32px 32px 8px' }}>
       <SectionHead

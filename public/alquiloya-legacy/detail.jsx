@@ -2,8 +2,11 @@
 
 function DetailPage({ p, onProperty, onNav }) {
   const [active, setActive] = React.useState(0);
-  if (!p) p = PROPERTIES[0];
-  const similar = PROPERTIES.filter(x => x.id !== p.id && x.tipo === p.tipo).slice(0, 3);
+  const { properties } = useAlquiloYaPublicData();
+  const baseProperty = p || properties[0] || PROPERTIES[0];
+  const apiProperty = useAlquiloYaPublicProperty(baseProperty?.id);
+  p = apiProperty || baseProperty;
+  const similar = properties.filter(x => x.id !== p.id && x.tipo === p.tipo).slice(0, 3);
   return (
     <div className="fade-in">
       <div className="container" style={{ padding: '24px 32px 8px' }}>
@@ -39,7 +42,7 @@ function DetailPage({ p, onProperty, onNav }) {
   );
 }
 
-function Gallery({ photos, active, setActive, property }) {
+function Gallery({ photos = [], active, setActive, property }) {
   const [openFull, setOpenFull] = React.useState(false);
   const totalExtra = Math.max(0, (photos.length || 0) - 4);
   return (
@@ -74,9 +77,10 @@ function FullGalleryModal({ property, onClose }) {
   const [tab, setTab] = React.useState('fotos');
   const [favorite, setFavorite] = React.useState(false);
   // Generate extra photos to fill the grid
-  const photos = property.photos.length >= 12
-    ? property.photos
-    : [...property.photos, ...Array.from({ length: 12 - property.photos.length }, (_, i) => photo(i * 4 + 3))];
+  const basePhotos = Array.isArray(property.photos) ? property.photos : [];
+  const photos = basePhotos.length >= 12
+    ? basePhotos
+    : [...basePhotos, ...Array.from({ length: 12 - basePhotos.length }, (_, i) => photo(i * 4 + 3))];
 
   React.useEffect(() => {
     const prev = document.body.style.overflow;
@@ -177,11 +181,13 @@ function FullGalleryModal({ property, onClose }) {
 }
 
 function GalleryAgentSidebar({ property }) {
-  const agent = property.agent;
-  const agentRecord = AGENTS.find(a => a.name === agent.name);
+  const { agents } = useAlquiloYaPublicData();
+  const agent = property.agent || agents[0] || AGENTS[0];
+  const agentRecord = agents.find(a => a.id === agent.id || a.apiId === agent.id || a.name === agent.name);
   const [phoneRevealed, setPhoneRevealed] = React.useState(false);
   const [form, setForm] = React.useState({ name: '', phone: '', email: '', message: 'Hola, vi esta propiedad en AlquiloYa y me interesa recibir más información. ¿Podría coordinar una visita?' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const phone = agent.phone || agent.whatsapp || '';
   return (
     <div>
       <div className="card" style={{ padding: 16 }}>
@@ -198,7 +204,7 @@ function GalleryAgentSidebar({ property }) {
           </div>
         </div>
         <button onClick={() => setPhoneRevealed(true)} className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', marginTop: 14, fontSize: 14 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72a2 2 0 0 1 1.72 2.01z"/></svg> {phoneRevealed ? agent.phone : (agent.phone.slice(0, 10) + '... · Ver teléfono')}
+          <I.whats s={14}/> {phoneRevealed ? phone : ((phone || 'Sin telefono').slice(0, 10) + (phone ? '... Ver telefono' : ''))}
         </button>
       </div>
 
@@ -312,6 +318,7 @@ function DetailFeatures({ p }) {
 }
 
 function DetailDescription({ p }) {
+  const features = Array.isArray(p.features) ? p.features : [];
   return (
     <div className="card" style={{ padding: 24, marginTop: 16 }}>
       <h3 style={{ fontSize: 18 }}>Descripción</h3>
@@ -322,7 +329,7 @@ function DetailDescription({ p }) {
       <div style={{ marginTop: 18 }}>
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Servicios y comodidades</div>
         <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-          {p.features.map(f => (
+          {features.map(f => (
             <span key={f} className="pill" style={{ background: 'var(--bg-2)', border: '1px solid var(--line-2)' }}>
               <I.check s={12}/> {f}
             </span>
@@ -371,7 +378,9 @@ function DetailQR({ p }) {
 }
 
 function AgentCard({ agent, price, tipo, onNav }) {
-  const agentRecord = AGENTS.find(a => a.name === agent.name);
+  const { agents } = useAlquiloYaPublicData();
+  agent = agent || agents[0] || AGENTS[0];
+  const agentRecord = agents.find(a => a.id === agent.id || a.apiId === agent.id || a.name === agent.name);
   const openProfile = () => agentRecord && onNav && onNav('agent/' + agentRecord.slug);
   return (
     <div className="card" style={{ padding: 22 }}>

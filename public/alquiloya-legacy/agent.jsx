@@ -1,9 +1,15 @@
 // Perfil público de agente — visible para cualquier visitante
 
 function AgentProfilePage({ slug, onNav, onProperty }) {
-  const agent = AGENTS.find(a => a.slug === slug) || AGENTS[0];
+  const { agents, properties } = useAlquiloYaPublicData();
+  const baseAgent = agents.find(a => a.slug === slug || a.id === slug || a.apiId === slug) || agents[0] || AGENTS[0];
+  const apiAgent = useAlquiloYaPublicAgent(baseAgent?.id);
+  const agent = apiAgent || baseAgent;
   const [tab, setTab] = React.useState('propiedades');
-  const props = PROPERTIES.filter(p => p.agent?.name === agent.name).slice(0, 9);
+  const props = (agent.propiedades && agent.propiedades.length
+    ? agent.propiedades
+    : properties.filter(p => p.agent?.id === agent.id || p.agent?.apiId === agent.id || p.agent?.name === agent.name)
+  ).slice(0, 9);
   const firstName = agent.name.split(' ')[0];
 
   return (
