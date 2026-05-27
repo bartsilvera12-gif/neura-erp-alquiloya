@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>AlquiloYa — Donde encontrás más rápido</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --blue: #0058A5;
+    --blue-700: #003e74;
+    --blue-50: #eaf2fb;
+    --blue-100: #d4e6f7;
+    --yellow: #F9B000;
+    --yellow-600: #db9c00;
+    --yellow-50: #fff7e3;
+    --ink: #0b1622;
+    --ink-2: #2a3543;
+    --ink-3: #5b6573;
+    --ink-4: #8893a1;
+    --line: #e7ebf0;
+    --line-2: #eef1f4;
+    --bg: #ffffff;
+    --bg-2: #f6f8fb;
+    --bg-3: #eef2f7;
+    --green: #1f8a5b;
+    --red: #c33636;
+    --radius: 14px;
+    --radius-lg: 20px;
+    --shadow-sm: 0 1px 2px rgba(11,22,34,.05), 0 1px 1px rgba(11,22,34,.04);
+    --shadow: 0 2px 6px rgba(11,22,34,.06), 0 8px 24px rgba(11,22,34,.06);
+    --shadow-lg: 0 10px 30px rgba(11,22,34,.10), 0 30px 60px rgba(11,22,34,.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-2); color: var(--ink); font-family: 'Poppins', system-ui, sans-serif; font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  h1,h2,h3,h4,h5 { font-family: 'Montserrat', sans-serif; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); margin: 0; }
+  h1 { font-size: 56px; line-height: 1.05; letter-spacing: -0.02em; font-weight: 900; }
+  h2 { font-size: 36px; line-height: 1.1; letter-spacing: -0.02em; }
+  h3 { font-size: 22px; line-height: 1.2; }
+  p { margin: 0; color: var(--ink-2); }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; font-size: 15px; color: var(--ink); }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--yellow); color: var(--ink); }
+
+  /* App shell */
+  .app-shell { min-height: 100vh; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+  .container-wide { max-width: 1440px; margin: 0 auto; padding: 0 32px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; font-weight: 600; font-size: 14.5px; border: none; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; white-space: nowrap; }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--yellow); color: var(--ink); }
+  .btn-primary:hover { background: var(--yellow-600); box-shadow: 0 6px 18px rgba(249,176,0,.35); }
+  .btn-blue { background: var(--blue); color: #fff; }
+  .btn-blue:hover { background: var(--blue-700); box-shadow: 0 6px 18px rgba(0,88,165,.35); }
+  .btn-ghost { background: transparent; color: var(--ink); }
+  .btn-ghost:hover { background: var(--bg-3); }
+  .btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn-outline:hover { border-color: var(--ink-3); }
+  .btn-wa { background: #25D366; color: #fff; }
+  .btn-wa:hover { background: #1ebd5b; }
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .btn-lg { padding: 16px 24px; font-size: 16px; }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; }
+  .badge-verified { background: var(--blue); color: #fff; }
+  .badge-featured { background: var(--yellow); color: var(--ink); }
+  .badge-new { background: var(--green); color: #fff; }
+  .badge-temporal { background: #6e3ad1; color: #fff; }
+  .badge-soft { background: var(--blue-50); color: var(--blue); }
+  .badge-soft-yellow { background: var(--yellow-50); color: #8a5e00; }
+
+  /* Cards */
+  .card { background: #fff; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+  .card-soft { background: var(--bg-2); border-radius: var(--radius); border: 1px solid var(--line-2); }
+
+  /* Inputs */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12.5px; font-weight: 600; color: var(--ink-3); letter-spacing: .02em; text-transform: uppercase; }
+  .input, .select { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .input:focus, .select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px var(--blue-50); }
+
+  /* Pretty select — applies globally to every native select */
+  select, .select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230058A5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 14px;
+    padding-right: 38px !important;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, background-color .15s;
+  }
+  select:hover, .select:hover { border-color: var(--blue-100); }
+  select:focus, .select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px var(--blue-50); }
+  /* Style the dropdown options (Chromium/Edge support partial — best effort) */
+  select option { padding: 10px 14px; font-size: 14px; color: var(--ink); background: #fff; }
+  select option:checked { background: var(--blue-50); color: var(--blue); font-weight: 600; }
+  /* Remove the chevron for the borderless inline selects in HeroSearch (they have their own chevron rendered by React) */
+  .hero-search-select { background-image: none !important; padding-right: 0 !important; }
+  .checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+  .checkbox input { width: 16px; height: 16px; accent-color: var(--blue); }
+
+  /* Util */
+  .row { display: flex; align-items: center; }
+  .col { display: flex; flex-direction: column; }
+  .between { justify-content: space-between; }
+  .gap-4 { gap: 4px; } .gap-8 { gap: 8px; } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; } .gap-20 { gap: 20px; } .gap-24 { gap: 24px; } .gap-32 { gap: 32px; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .muted { color: var(--ink-3); }
+  .mut2 { color: var(--ink-4); }
+  .small { font-size: 13px; }
+  .xs { font-size: 12px; }
+  .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); }
+  .divider { height: 1px; background: var(--line); }
+  .pill { padding: 6px 12px; border-radius: 999px; background: var(--bg-3); font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  .pill-active { background: var(--ink); color: #fff; }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: none;} }
+  @keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
+  .fade-up { animation: fadeUp .5s ease both; }
+  .fade-in { animation: fadeIn .4s ease both; }
+
+  /* Featured property cards — staggered reveal on scroll */
+  @keyframes featuredReveal {
+    0%   { opacity: 0; transform: translateY(28px) scale(.96); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .featured-reveal {
+    animation: featuredReveal .65s cubic-bezier(.22,1,.36,1) both;
+    will-change: transform, opacity;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .featured-reveal { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
+
+  /* VIVIO typing indicator dots */
+  @keyframes vivioBlink {
+    0%, 80%, 100% { opacity: .25; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-2px); }
+  }
+
+  /* Hide decorative hero illustration in header on smaller screens */
+  @media (max-width: 900px) {
+    .header-hero-deco { display: none !important; }
+  }
+
+  /* Hero "rápido" emphasis — runs ONCE on page entry (~900ms), then stays static */
+  @keyframes rapidoBounce {
+    0%   { transform: scale(.88); opacity: 0; }
+    55%  { transform: scale(1.08); opacity: 1; }
+    75%  { transform: scale(.97); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes rapidoShimmer {
+    0%   { background-position: 200% 50%; }
+    100% { background-position: -50% 50%; }
+  }
+  @keyframes rapidoUnderlineDraw {
+    0%   { stroke-dashoffset: 220; }
+    100% { stroke-dashoffset: 0; }
+  }
+  .rapido-emph {
+    display: inline-block;
+    transform-origin: center bottom;
+    will-change: transform, opacity;
+    background-image: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.6) 50%, transparent 70%);
+    background-size: 200% 100%;
+    background-position: 200% 50%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation:
+      rapidoBounce 900ms cubic-bezier(.34,1.56,.64,1) .15s both,
+      rapidoShimmer 900ms ease-out .35s both;
+  }
+  .rapido-underline {
+    stroke-dasharray: 220;
+    stroke-dashoffset: 220;
+    animation: rapidoUnderlineDraw 800ms ease-out .55s both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rapido-emph { animation: none !important; background-image: none !important; opacity: 1; transform: none; }
+    .rapido-underline { animation: none !important; stroke-dasharray: none; stroke-dashoffset: 0 !important; }
+  }
+
+  /* Photo placeholders */
+  .photo { background: linear-gradient(135deg, #c9d6e6, #eaf2fb); position: relative; overflow: hidden; }
+  .photo::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, rgba(255,255,255,0) 0 14px, rgba(255,255,255,.35) 14px 16px); pointer-events: none; opacity: .55; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+  .photo-label { position: absolute; bottom: 10px; left: 10px; z-index: 2; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(0,0,0,.5); background: rgba(255,255,255,.85); padding: 4px 8px; border-radius: 6px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #ccd5e0; border-radius: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* Tooltip-like floating note */
+  .float-note { position: fixed; bottom: 16px; right: 16px; background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 12.5px; font-family: 'JetBrains Mono', monospace; opacity: .9; z-index: 50; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="vivio-sendpulse.js"></script>
+<script type="text/babel" src="brand.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="home.jsx"></script>
+<script type="text/babel" src="catalog.jsx"></script>
+<script type="text/babel" src="detail.jsx"></script>
+<script type="text/babel" src="temporal.jsx"></script>
+<script type="text/babel" src="plans.jsx"></script>
+<script type="text/babel" src="publish.jsx"></script>
+<script type="text/babel" src="posters.jsx"></script>
+<script type="text/babel" src="admin.jsx"></script>
+<script type="text/babel" src="agent.jsx"></script>
+<script type="text/babel" src="help.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
