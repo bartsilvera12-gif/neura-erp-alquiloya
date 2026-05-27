@@ -1,12 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getClientSchema } from "@/lib/env/instance-mode";
 
 /**
  * Esquema Postgres de datos del ERP.
  *
- * Requiere en Supabase: Settings → API → "Exposed schemas" incluir `zentra_erp`
- * (además de lo que ya tengas para auth/storage).
+ * Requiere en Supabase: Settings → API → "Exposed schemas" incluir el schema configurado
+ * (default `zentra_erp`, override via `NEURA_CLIENT_SCHEMA`), además de auth/storage.
+ *
+ * El valor se resuelve al cargar el módulo a partir de `NEURA_CLIENT_SCHEMA`; si la variable
+ * no está seteada se mantiene el legado `zentra_erp` (comportamiento idéntico al anterior).
  */
-export const SUPABASE_APP_SCHEMA = "zentra_erp" as const;
+export const SUPABASE_APP_SCHEMA: string = getClientSchema();
 
 /**
  * Schema PostgREST para tablas de negocio de una empresa (`clientes`, `productos`, `chat_*` en tenant, etc.).

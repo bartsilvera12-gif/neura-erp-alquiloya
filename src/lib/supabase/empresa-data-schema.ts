@@ -6,13 +6,21 @@ import {
   supabaseServiceRoleClientOptions,
 } from "@/lib/supabase/schema";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
+import { isSingleClientMode, getClientSchema } from "@/lib/env/instance-mode";
 
 /**
- * Lee `empresas.data_schema` (catálogo en zentra_erp).
- * NULL o vacío → datos de negocio en plantilla `zentra_erp` (empresas legadas).
- * Valor `erp_*` → schema tenant clonado desde zentra_erp.
+ * Lee `empresas.data_schema` (catálogo en `SUPABASE_APP_SCHEMA`).
+ * NULL o vacío → datos de negocio en la plantilla compartida (empresas legadas).
+ * Valor `erp_*` → schema tenant clonado.
+ *
+ * En modo `single_client` se cortocircuita la consulta y se devuelve `NEURA_CLIENT_SCHEMA`
+ * directamente, sin tocar Postgres.
  */
 export async function fetchDataSchemaForEmpresaId(empresaId: string): Promise<string> {
+  if (isSingleClientMode()) {
+    return getClientSchema();
+  }
+
   const catalog = createServiceRoleClient();
   const { data, error } = await catalog
     .from("empresas")
