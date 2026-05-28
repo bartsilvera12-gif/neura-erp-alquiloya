@@ -1,13 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { signIn } from "@/lib/auth";
 
+/**
+ * Solo permitimos `next` con paths relativos same-origin para evitar open-redirects.
+ * Aceptamos hash (`#admin-agent`) — necesario para volver al panel legacy de AlquiloYa
+ * después de "Ingresar".
+ */
+function sanitizeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  // Path debe empezar con "/" y no con "//" (que sería protocol-relative).
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = sanitizeNext(searchParams?.get("next") ?? null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,6 +60,12 @@ export default function LoginPage() {
       return;
     }
 
+    if (nextParam) {
+      // Usamos navegación full-page para preservar el fragmento (#admin-agent),
+      // que `router.push` no garantiza al cruzar el redirect /publico → legacy.
+      window.location.assign(nextParam);
+      return;
+    }
     router.push("/");
   }
 
