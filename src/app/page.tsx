@@ -104,6 +104,13 @@ const Icon = {
       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
     </svg>
   ),
+  Propiedades: ({ className = "h-4 w-4" }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 21h18" />
+      <path d="M5 21V7l8-4 8 4v14" />
+      <path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1" />
+    </svg>
+  ),
   Target: ({ className = "h-4 w-4" }: IconProps) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
@@ -2484,7 +2491,7 @@ const PERIODO_OPTS: { id: Periodo; label: string }[] = [
   { id: "anio", label: "Año"       },
 ];
 
-const TAB_VALID: TabDash[] = ["comercial", "financiero", "inventario", "ventas"];
+const TAB_VALID: TabDash[] = ["comercial", "financiero", "inventario", "ventas", "propiedades"];
 
 type DashScope =
   | { kind: "pending" }
@@ -2632,6 +2639,7 @@ export default function DashboardPage() {
     financiero: { label: "Financiero", Icon: Icon.Financiero },
     inventario: { label: "Inventario", Icon: Icon.Inventario },
     ventas: { label: "Ventas", Icon: Icon.Ventas },
+    propiedades: { label: "Propiedades", Icon: Icon.Propiedades },
   };
 
   if (!config) {
@@ -2842,6 +2850,237 @@ export default function DashboardPage() {
         />
       )}
 
+      {tab === "propiedades" && <DashPropiedades />}
+
+    </div>
+  );
+}
+
+// ── Dashboard Propiedades (AlquiloYa) ─────────────────────────────────────────
+type AlquiloyaSummary = {
+  propiedades: { total: number; activas: number; publicadas: number; destacadas: number };
+  por_tipo: { label: string; value: number }[];
+  por_ciudad: { label: string; value: number }[];
+  agentes: { activos: number; total: number };
+  consultas: { total: number; ultimas_30: number; pendientes: number };
+  ultimas: Array<{
+    id: string;
+    titulo: string | null;
+    tipo: string | null;
+    ciudad: string | null;
+    precio: number | null;
+    moneda: string | null;
+    cover_url: string | null;
+    created_at: string;
+    agente_nombre: string | null;
+  }>;
+};
+
+function DashPropiedades() {
+  const [data, setData] = useState<AlquiloyaSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetchWithSupabaseSession("/api/dashboard/alquiloya-summary", {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as { success?: boolean; data?: AlquiloyaSummary; error?: string };
+        if (cancelled) return;
+        if (body.success && body.data) setData(body.data);
+        else throw new Error(body.error ?? "Respuesta inválida");
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : "Error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const panelClass =
+    "rounded-2xl border border-[#4FAEB2]/45 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-8";
+  const titleClass =
+    "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600";
+  const panelDot = (
+    <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-[#4FAEB2]" />
+  );
+  const panelBar = <span aria-hidden="true" className="block h-5 w-1 rounded-full bg-[#4FAEB2]" />;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-slate-500">
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#4FAEB2]" />
+        <span className="ml-3">Cargando catálogo inmobiliario…</span>
+      </div>
+    );
+  }
+
+  if (err || !data) {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-6 text-sm text-rose-800">
+        No se pudo cargar el resumen de propiedades: {err ?? "sin datos"}
+      </div>
+    );
+  }
+
+  const fmtPrecio = (precio: number | null, moneda: string | null) => {
+    if (precio == null) return "—";
+    const m = moneda || "USD";
+    try {
+      return new Intl.NumberFormat("es-PY", {
+        style: "currency",
+        currency: m,
+        maximumFractionDigits: 0,
+      }).format(precio);
+    } catch {
+      return `${m} ${precio.toLocaleString("es-PY")}`;
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* KPIs principales */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard
+          icon={<Icon.Propiedades className="h-4 w-4" />}
+          label="Total de propiedades"
+          value={String(data.propiedades.total)}
+          accent="featured"
+        />
+        <KpiCard
+          icon={<Icon.CheckCircle className="h-4 w-4" />}
+          label="Activas / publicadas"
+          value={`${data.propiedades.activas} / ${data.propiedades.publicadas}`}
+          sub="Activas · publicadas en la web"
+        />
+        <KpiCard
+          icon={<Icon.Diamond className="h-4 w-4" />}
+          label="Destacadas"
+          value={String(data.propiedades.destacadas)}
+        />
+        <KpiCard
+          icon={<Icon.Target className="h-4 w-4" />}
+          label="Agentes activos"
+          value={`${data.agentes.activos} / ${data.agentes.total}`}
+          sub="Activos · totales"
+        />
+      </div>
+
+      {/* Consultas */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard
+          icon={<Icon.Chat className="h-4 w-4" />}
+          label="Consultas recibidas"
+          value={String(data.consultas.total)}
+        />
+        <KpiCard
+          icon={<Icon.Calendar className="h-4 w-4" />}
+          label="Consultas últimos 30 días"
+          value={String(data.consultas.ultimas_30)}
+          accent={data.consultas.ultimas_30 > 0 ? "featured" : "neutral"}
+        />
+        <KpiCard
+          icon={<Icon.Alert className="h-4 w-4" />}
+          label="Pendientes de atención"
+          value={String(data.consultas.pendientes)}
+          accent={data.consultas.pendientes > 0 ? "warning" : "neutral"}
+        />
+      </div>
+
+      {/* Distribución por tipo y ciudad */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <motion.div whileHover={{ y: -2 }} className={panelClass}>
+          <div className="flex items-center gap-2">
+            {panelBar}
+            <h3 className={titleClass}>
+              {panelDot}
+              Propiedades por tipo
+            </h3>
+          </div>
+          <p className="mt-1 pl-3 text-[11px] text-slate-500">Distribución del catálogo por tipología</p>
+          <div className="mt-5">
+            <HBarChart data={data.por_tipo} color="bg-[#4FAEB2]" tone="zentra" />
+          </div>
+        </motion.div>
+        <motion.div whileHover={{ y: -2 }} className={panelClass}>
+          <div className="flex items-center gap-2">
+            {panelBar}
+            <h3 className={titleClass}>
+              {panelDot}
+              Propiedades por ciudad
+            </h3>
+          </div>
+          <p className="mt-1 pl-3 text-[11px] text-slate-500">Top 12 ciudades con más propiedades</p>
+          <div className="mt-5">
+            <HBarChart data={data.por_ciudad} color="bg-[#4FAEB2]" tone="zentra" />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Últimas propiedades */}
+      <motion.div whileHover={{ y: -2 }} className={panelClass}>
+        <div className="flex items-center gap-2">
+          {panelBar}
+          <h3 className={titleClass}>
+            {panelDot}
+            Últimas propiedades cargadas
+          </h3>
+        </div>
+        {data.ultimas.length === 0 ? (
+          <p className="mt-6 text-center text-sm text-slate-500">Sin propiedades cargadas.</p>
+        ) : (
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {data.ultimas.map((p) => (
+              <a
+                key={p.id}
+                href={`/dashboard/propiedades/${p.id}`}
+                className="group block overflow-hidden rounded-xl border border-[#4FAEB2]/30 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="aspect-[16/10] w-full overflow-hidden bg-slate-100">
+                  {p.cover_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={p.cover_url}
+                      alt={p.titulo ?? ""}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+                      sin foto
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="truncate text-sm font-semibold text-slate-900" title={p.titulo ?? ""}>
+                    {p.titulo ?? "Sin título"}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {[p.tipo, p.ciudad].filter(Boolean).join(" · ") || "—"}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="font-semibold tabular-nums text-[#4FAEB2]">
+                      {fmtPrecio(p.precio, p.moneda)}
+                    </span>
+                    {p.agente_nombre ? (
+                      <span className="truncate text-slate-500" title={p.agente_nombre}>
+                        {p.agente_nombre}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }
