@@ -183,6 +183,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Building,
   },
   {
+    key: "agentes-inmobiliarios",
+    slug: "agentes-inmobiliarios",
+    label: "Agentes inmobiliarios",
+    href: "/dashboard/agentes-inmobiliarios",
+    icon: Users,
+  },
+  {
     key: "sorteos",
     slug: "sorteos",
     label: "Sorteos",
