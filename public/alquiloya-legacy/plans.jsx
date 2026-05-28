@@ -3,7 +3,36 @@
 function PlansPage({ onNav }) {
   const [audience, setAudience] = React.useState('owner');
   const [verifyOpen, setVerifyOpen] = React.useState(false);
-  const filtered = PLANS.filter(p => p.tier.includes(audience === 'owner' ? 'owner' : 'agent'));
+  // Fuente real desde API; fallback a PLANS de data.jsx si la API falla.
+  const [plansData, setPlansData] = React.useState(PLANS);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/public/alquiloya/planes-publicacion', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+      .then(body => {
+        if (cancelled) return;
+        const arr = body && body.success && body.data && Array.isArray(body.data.planes) ? body.data.planes : null;
+        if (!arr || arr.length === 0) return;
+        // Normalizar al shape consumido por el render (compat con PLANS mock).
+        const mapped = arr.map(p => ({
+          tier: p.tier,
+          target: p.target,
+          name: p.nombre,
+          price: Number(p.precio) || 0,
+          billing: p.billing,
+          badge: p.badge,
+          bullets: Array.isArray(p.bullets) ? p.bullets : [],
+          excluded: Array.isArray(p.excluded) ? p.excluded : [],
+          cta: p.cta || 'Quiero este plan',
+          highlighted: !!p.highlighted,
+          freeBoosts: p.free_boosts != null ? Number(p.free_boosts) : undefined,
+        }));
+        setPlansData(mapped);
+      })
+      .catch(() => { /* fallback PLANS ya cargado */ });
+    return () => { cancelled = true; };
+  }, []);
+  const filtered = plansData.filter(p => p.tier.includes(audience === 'owner' ? 'owner' : 'agent'));
   return (
     <div className="fade-in container" style={{ padding: '48px 32px' }}>
       <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto' }}>
