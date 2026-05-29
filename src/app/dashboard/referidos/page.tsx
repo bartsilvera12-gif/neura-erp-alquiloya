@@ -1,4 +1,5 @@
 import "server-only";
+import Link from "next/link";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 
@@ -32,16 +33,11 @@ async function tableExists(name: string): Promise<boolean> {
 
 async function loadStats(): Promise<Stats> {
   const empty: Stats = {
-    partners: 0,
-    linksActivos: 0,
-    clicks: 0,
-    conversiones: 0,
-    comisionPendiente: 0,
+    partners: 0, linksActivos: 0, clicks: 0, conversiones: 0, comisionPendiente: 0,
   };
   const pool = getChatPostgresPool();
   if (!pool) return empty;
   if (!(await tableExists("referral_partners"))) return empty;
-
   try {
     const [{ rows: p }, { rows: l }, { rows: c }, { rows: cv }, { rows: cm }] = await Promise.all([
       queryWithRetry<{ n: number }>(
@@ -79,54 +75,85 @@ async function loadStats(): Promise<Stats> {
       conversiones: cv[0]?.n ?? 0,
       comisionPendiente: Number(cm[0]?.n ?? "0"),
     };
-  } catch {
-    return empty;
-  }
+  } catch { return empty; }
 }
 
-type Partner = {
+type PartnerRow = {
   id: string;
   nombre: string;
   email: string | null;
   telefono: string | null;
   tipo: string | null;
   activo: boolean;
+  primary_slug: string | null;
+  primary_campania: string | null;
+  rule_tipo: string | null;
+  rule_valor: number | null;
+  rule_moneda: string | null;
+  rule_recurrente: boolean | null;
+  rule_meses_recurrencia: number | null;
   links_count: number;
+  clicks_count: number;
   conversiones_count: number;
+  comision_pendiente: number;
 };
 
-async function loadPartners(): Promise<Partner[]> {
+async function loadPartners(): Promise<PartnerRow[]> {
   const pool = getChatPostgresPool();
   if (!pool) return [];
   if (!(await tableExists("referral_partners"))) return [];
   try {
-    const { rows } = await queryWithRetry<Partner>(
+    const { rows } = await queryWithRetry<PartnerRow>(
       pool,
       `
         SELECT
           p.id, p.nombre, p.email, p.telefono, p.tipo, p.activo,
-          COALESCE(lk.n, 0)::int AS links_count,
-          COALESCE(cv.n, 0)::int AS conversiones_count
+          lk.slug AS primary_slug,
+          lk.campania AS primary_campania,
+          r.tipo AS rule_tipo,
+          r.valor::float8 AS rule_valor,
+          r.moneda AS rule_moneda,
+          r.recurrente AS rule_recurrente,
+          r.meses_recurrencia AS rule_meses_recurrencia,
+          COALESCE(lc.n, 0)::int AS links_count,
+          COALESCE(cc.n, 0)::int AS clicks_count,
+          COALESCE(cv.n, 0)::int AS conversiones_count,
+          COALESCE(cm.s, 0)::float8 AS comision_pendiente
         FROM alquiloya.referral_partners p
         LEFT JOIN LATERAL (
-          SELECT count(*)::int AS n
-            FROM alquiloya.referral_links
-           WHERE partner_id = p.id AND activo = true
+          SELECT slug, campania FROM alquiloya.referral_links
+           WHERE partner_id = p.id ORDER BY activo DESC, created_at ASC LIMIT 1
         ) lk ON true
         LEFT JOIN LATERAL (
-          SELECT count(*)::int AS n
-            FROM alquiloya.referral_conversions
+          SELECT tipo, valor, moneda, recurrente, meses_recurrencia
+            FROM alquiloya.referral_commission_rules
+           WHERE partner_id = p.id AND vigente_hasta IS NULL
+           ORDER BY vigente_desde DESC LIMIT 1
+        ) r ON true
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int AS n FROM alquiloya.referral_links
+           WHERE partner_id = p.id AND activo = true
+        ) lc ON true
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int AS n FROM alquiloya.referral_clicks
+           WHERE empresa_id = p.empresa_id
+             AND link_id IN (SELECT id FROM alquiloya.referral_links WHERE partner_id = p.id)
+        ) cc ON true
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int AS n FROM alquiloya.referral_conversions
            WHERE partner_id = p.id
         ) cv ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(sum(monto_comision),0) AS s FROM alquiloya.referral_commissions
+           WHERE partner_id = p.id AND estado = 'pendiente'
+        ) cm ON true
         WHERE p.empresa_id = $1::uuid
         ORDER BY p.created_at DESC NULLS LAST, lower(p.nombre) ASC
       `,
       [ALQUILOYA_EMPRESA_ID]
     );
     return rows ?? [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function fmt(n: number): string {
@@ -134,12 +161,20 @@ function fmt(n: number): string {
 }
 function fmtGs(n: number): string {
   try {
-    return new Intl.NumberFormat("es-PY", {
-      style: "currency",
-      currency: "PYG",
-      maximumFractionDigits: 0,
-    }).format(n);
+    return new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 }).format(n);
   } catch { return `Gs. ${n.toLocaleString("es-PY")}`; }
+}
+function fmtComision(p: PartnerRow): string {
+  if (p.rule_tipo === "porcentaje" && p.rule_valor != null) {
+    const r = p.rule_recurrente ? ` × ${p.rule_meses_recurrencia ?? "?"}m` : "";
+    return `${p.rule_valor}%${r}`;
+  }
+  if (p.rule_tipo === "monto_fijo" && p.rule_valor != null) {
+    const moneda = p.rule_moneda ?? "PYG";
+    const r = p.rule_recurrente ? ` × ${p.rule_meses_recurrencia ?? "?"}m` : "";
+    return `${moneda} ${p.rule_valor.toLocaleString("es-PY")}${r}`;
+  }
+  return "—";
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -161,18 +196,15 @@ export default async function ReferidosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Referidos</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Programa de referidos, influencers y aliados. Acá vas a crear partners,
-            asignarles un link único y configurar la comisión.
+            Programa de referidos, influencers y aliados. Creá un partner con link único y configurá su comisión.
           </p>
         </div>
-        <button
-          type="button"
-          disabled
-          title="Disponible en la próxima fase"
-          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2 text-sm font-semibold text-slate-400 ring-1 ring-slate-200"
+        <Link
+          href="/dashboard/referidos/nuevo"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91]"
         >
           + Nuevo referido
-        </button>
+        </Link>
       </header>
 
       <section className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -193,8 +225,8 @@ export default async function ReferidosPage() {
 
         {partners.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-slate-500">
-            Todavía no hay referidos cargados. Cuando se creen partners,
-            aparecerán acá con sus links, conversiones y comisiones.
+            Todavía no hay referidos cargados. Hacé clic en{" "}
+            <span className="font-semibold text-[#3F8E91]">+ Nuevo referido</span> para crear el primero.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -203,22 +235,42 @@ export default async function ReferidosPage() {
                 <tr>
                   <th className="px-4 py-2.5">Nombre</th>
                   <th className="px-4 py-2.5">Tipo</th>
-                  <th className="px-4 py-2.5">Email</th>
-                  <th className="px-4 py-2.5">Teléfono</th>
-                  <th className="px-4 py-2.5 text-center">Links</th>
+                  <th className="px-4 py-2.5">Slug / link</th>
+                  <th className="px-4 py-2.5">Comisión</th>
+                  <th className="px-4 py-2.5 text-center">Clicks</th>
                   <th className="px-4 py-2.5 text-center">Conversiones</th>
+                  <th className="px-4 py-2.5 text-right">Comisión pendiente</th>
                   <th className="px-4 py-2.5">Activo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {partners.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 font-medium text-slate-900">{p.nombre}</td>
-                    <td className="px-4 py-2 text-slate-700">{p.tipo ?? "—"}</td>
-                    <td className="px-4 py-2 text-slate-700">{p.email ?? "—"}</td>
-                    <td className="px-4 py-2 text-slate-700">{p.telefono ?? "—"}</td>
-                    <td className="px-4 py-2 text-center tabular-nums">{p.links_count}</td>
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-slate-900">{p.nombre}</div>
+                      {p.email || p.telefono ? (
+                        <div className="mt-0.5 text-[11px] text-slate-400">
+                          {[p.email, p.telefono].filter(Boolean).join(" · ")}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2 text-slate-700">{(p.tipo ?? "—").replace("_", " ")}</td>
+                    <td className="px-4 py-2">
+                      {p.primary_slug ? (
+                        <div>
+                          <span className="font-mono text-[12.5px] text-[#3F8E91]">/r/{p.primary_slug}</span>
+                          {p.primary_campania ? (
+                            <div className="text-[11px] text-slate-400">{p.primary_campania}</div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-slate-700">{fmtComision(p)}</td>
+                    <td className="px-4 py-2 text-center tabular-nums">{p.clicks_count}</td>
                     <td className="px-4 py-2 text-center tabular-nums">{p.conversiones_count}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtGs(p.comision_pendiente)}</td>
                     <td className="px-4 py-2">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
