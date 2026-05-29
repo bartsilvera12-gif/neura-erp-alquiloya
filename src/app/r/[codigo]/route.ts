@@ -3,8 +3,130 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import { getChatServiceClientForEmpresa } from "@/lib/supabase/chat-service-role-empresa";
 import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
+import { queryWithRetry } from "@/lib/supabase/pg-retry";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
+
+/**
+ * Branch AlquiloYa: cuando /r/{slug} se hits SIN `?sorteo=`, se interpreta
+ * como link de referido del programa de AlquiloYa.
+ *   - busca referral_links activo + partner activo
+ *   - inserta referral_clicks (con visitor_cookie, UA, IP hash, UTM)
+ *   - setea cookie `aly_ref` con duración link.cookie_dias
+ *   - 302 a /publico (preserva utm_* si vinieron)
+ * Si el slug no existe → 404 limpio.
+ */
+async function handleAlquiloyaReferralRedirect(
+  request: NextRequest,
+  slug: string
+): Promise<NextResponse> {
+  const pool = getChatPostgresPool();
+  if (!pool) {
+    return new NextResponse("Servicio no disponible.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  type LinkRow = {
+    id: string;
+    partner_id: string;
+    cookie_dias: number;
+    partner_activo: boolean;
+  };
+  const { rows } = await queryWithRetry<LinkRow>(
+    pool,
+    `SELECT l.id, l.partner_id, l.cookie_dias,
+            p.activo AS partner_activo
+       FROM alquiloya.referral_links l
+       JOIN alquiloya.referral_partners p ON p.id = l.partner_id
+      WHERE l.empresa_id = $1::uuid
+        AND lower(l.slug) = lower($2)
+        AND l.activo = true
+      LIMIT 1`,
+    [ALQUILOYA_EMPRESA_ID, slug]
+  );
+
+  const link = rows?.[0];
+  if (!link || !link.partner_activo) {
+    return new NextResponse("Link de referido no válido.", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  // Cookie del visitante: si ya tiene una vigente, reusamos para no romper
+  // atribuciones previas; si no, generamos opaca y la enviamos.
+  const existingCookie = request.cookies.get("aly_ref")?.value ?? null;
+  const visitorCookie =
+    existingCookie && /^[A-Za-z0-9_-]{16,64}$/.test(existingCookie)
+      ? existingCookie
+      : randomBytes(18).toString("base64url");
+
+  const ua = (request.headers.get("user-agent") ?? "").slice(0, 512);
+  const referer = request.headers.get("referer")?.slice(0, 512) ?? null;
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "";
+  const ipHash = ip
+    ? createHash("sha256").update(ip).digest("hex").slice(0, 32)
+    : null;
+
+  const sp = request.nextUrl.searchParams;
+  const utmSource = sp.get("utm_source")?.slice(0, 120) ?? null;
+  const utmMedium = sp.get("utm_medium")?.slice(0, 120) ?? null;
+  const utmCampaign = sp.get("utm_campaign")?.slice(0, 120) ?? null;
+
+  try {
+    await queryWithRetry(
+      pool,
+      `INSERT INTO alquiloya.referral_clicks (
+         empresa_id, link_id, slug, ip_hash, user_agent, referer,
+         utm_source, utm_medium, utm_campaign, visitor_cookie
+       )
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        ALQUILOYA_EMPRESA_ID,
+        link.id,
+        slug,
+        ipHash,
+        ua,
+        referer,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        visitorCookie,
+      ]
+    );
+  } catch (e) {
+    // No bloqueamos el redirect si falla el insert; el partner igual debe
+    // poder mandar tráfico a la web pública aunque la tabla se caiga.
+    console.error("[r/aly-referral] insert click:", (e as Error).message);
+  }
+
+  // Destino: /publico, preservando UTM si vino.
+  const dest = new URL("/publico", request.url);
+  if (utmSource) dest.searchParams.set("utm_source", utmSource);
+  if (utmMedium) dest.searchParams.set("utm_medium", utmMedium);
+  if (utmCampaign) dest.searchParams.set("utm_campaign", utmCampaign);
+
+  const res = NextResponse.redirect(dest.toString(), 302);
+  res.cookies.set("aly_ref", visitorCookie, {
+    path: "/",
+    maxAge: Math.max(1, Math.min(365, link.cookie_dias)) * 86400,
+    sameSite: "lax",
+    httpOnly: false,
+    secure: request.nextUrl.protocol === "https:",
+  });
+  // Cache-Control para no cachear el redirect en CF.
+  res.headers.set("Cache-Control", "private, no-store");
+  return res;
+}
 
 function digitsOnly(s: string): string {
   return s.replace(/\D/g, "");
@@ -160,11 +282,18 @@ export async function GET(
   const { codigo: codigoRaw } = await context.params;
   const codigo = decodeURIComponent(codigoRaw ?? "").trim();
   const sorteoId = request.nextUrl.searchParams.get("sorteo")?.trim() ?? "";
-  if (!codigo || !sorteoId) {
-    return new NextResponse("Falta código en la ruta o sorteo en ?sorteo=uuid", {
+
+  if (!codigo) {
+    return new NextResponse("Falta código en la ruta.", {
       status: 400,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
+  }
+
+  // Branch AlquiloYa: sin ?sorteo, se trata como slug de referido.
+  // El flujo sorteos sigue intacto cuando viene ?sorteo=<uuid>.
+  if (!sorteoId) {
+    return handleAlquiloyaReferralRedirect(request, codigo);
   }
 
   let catalog;
