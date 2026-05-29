@@ -2,62 +2,107 @@
 
 function PublishPage() {
   const [step, setStep] = React.useState(0);
+  // Fase Publicar-1: wizard de 5 pasos (sin "Gestión").
   const steps = [
     { id: 0, title: 'Datos básicos', icon: 'doc' },
     { id: 1, title: 'Ubicación', icon: 'pin' },
     { id: 2, title: 'Fotos', icon: 'upload' },
-    { id: 3, title: 'Gestión', icon: 'user' },
-    { id: 4, title: 'Plan', icon: 'star' },
-    { id: 5, title: 'Vista previa', icon: 'eye' },
+    { id: 3, title: 'Plan', icon: 'star' },
+    { id: 4, title: 'Vista previa', icon: 'eye' },
   ];
 
-  // Lifted state para la sección "Gestión" (asesoría de agente)
-  const [mgmtMode, setMgmtMode] = React.useState('self'); // 'self' | 'agent'
+  // ── Estado controlado del wizard ─────────────────────────────────────────
+  const [form, setForm] = React.useState({
+    titulo: '',
+    tipo: 'departamento',
+    operacion: 'alquiler', // 'alquiler' | 'venta'
+    precio: '',
+    moneda: 'PYG',
+    descripcion: '',
+    dormitorios: '',
+    banos: '',
+    cocheras: '',
+    superficie_m2: '',
+    terreno_m2: '',
+    // ubicación
+    ciudad: '',
+    barrio: '',
+    direccion: '',
+    // fotos: lista de { url, alt, es_portada }
+    fotos: [],
+    // características: array de string nombre
+    caracteristicas: [],
+    // plan
+    plan_id: null,
+    // contacto propietario (movido aquí desde "Gestión")
+    propietario_nombre: '',
+    propietario_email: '',
+    propietario_telefono: '',
+  });
+  const setF = React.useCallback((patch) => setForm(f => Object.assign({}, f, typeof patch === 'function' ? patch(f) : patch)), []);
+
+  // Asesoría agente — opcional, no parte del wizard. Disponible vía card lateral.
   const [pickedAgentId, setPickedAgentId] = React.useState(null);
-  const [propietarioForm, setPropietarioForm] = React.useState({
+  const [asesoriaPropietario, setAsesoriaPropietario] = React.useState({
     nombre: '', email: '', telefono: '',
     propiedad_titulo: '', tipo_propiedad: 'departamento',
     ciudad: '', barrio: '', mensaje: '',
   });
-  const [submitState, setSubmitState] = React.useState({ loading: false, error: null, success: false });
-  // Modal de asesoría disponible desde el Paso 1 (CTA siempre visible en la columna derecha).
   const [asesoriaOpen, setAsesoriaOpen] = React.useState(false);
+  const [submitState, setSubmitState] = React.useState({ loading: false, error: null, success: null });
 
-  async function onPublicar() {
-    setSubmitState({ loading: false, error: null, success: false });
-    if (mgmtMode !== 'agent') {
-      setSubmitState({ loading: false, error: null, success: true });
-      return;
+  function validateAll() {
+    if (!(form.titulo || '').trim()) return 'Título obligatorio.';
+    if (!(form.tipo || '').trim()) return 'Tipo obligatorio.';
+    if (!(form.ciudad || '').trim()) return 'Ciudad obligatoria.';
+    const precio = Number(String(form.precio).replace(/[^\d.]/g, ''));
+    if (!Number.isFinite(precio) || precio <= 0) return 'Precio obligatorio.';
+    if (!(form.propietario_nombre || '').trim()) return 'Tu nombre es obligatorio.';
+    if (!(form.propietario_email || '').trim() && !(form.propietario_telefono || '').trim()) {
+      return 'Dejá email o teléfono para que te contactemos.';
     }
-    if (!pickedAgentId) { setSubmitState({ loading: false, error: 'Elegí un agente.', success: false }); return; }
-    if (!propietarioForm.nombre.trim()) { setSubmitState({ loading: false, error: 'Tu nombre es obligatorio.', success: false }); return; }
-    if (!propietarioForm.email.trim() && !propietarioForm.telefono.trim()) {
-      setSubmitState({ loading: false, error: 'Dejá un email o teléfono para que el agente te contacte.', success: false });
-      return;
-    }
-    setSubmitState({ loading: true, error: null, success: false });
+    return null;
+  }
+
+  async function onEnviar() {
+    setSubmitState({ loading: false, error: null, success: null });
+    const err = validateAll();
+    if (err) { setSubmitState({ loading: false, error: err, success: null }); return; }
+    setSubmitState({ loading: true, error: null, success: null });
     try {
-      const res = await fetch('/api/public/alquiloya/captaciones', {
+      const precio = Number(String(form.precio).replace(/[^\d.]/g, ''));
+      const payload = {
+        titulo: form.titulo,
+        tipo: form.tipo,
+        operacion: form.operacion,
+        descripcion: form.descripcion || null,
+        ciudad: form.ciudad,
+        barrio: form.barrio || null,
+        direccion: form.direccion || null,
+        precio,
+        moneda: form.moneda || 'PYG',
+        dormitorios: form.dormitorios ? Number(form.dormitorios) : null,
+        banos: form.banos ? Number(form.banos) : null,
+        cocheras: form.cocheras ? Number(form.cocheras) : null,
+        superficie_m2: form.superficie_m2 ? Number(form.superficie_m2) : null,
+        terreno_m2: form.terreno_m2 ? Number(form.terreno_m2) : null,
+        fotos: (form.fotos || []).filter(f => (f && f.url || '').trim()),
+        caracteristicas: (form.caracteristicas || []).map(n => ({ nombre: n })),
+        propietario_nombre: form.propietario_nombre,
+        propietario_email: form.propietario_email || null,
+        propietario_telefono: form.propietario_telefono || null,
+        plan_publicacion_id: form.plan_id || null,
+      };
+      const res = await fetch('/api/public/alquiloya/propiedades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agente_id: pickedAgentId,
-          propietario_nombre: propietarioForm.nombre,
-          propietario_email: propietarioForm.email || null,
-          propietario_telefono: propietarioForm.telefono || null,
-          propiedad_titulo: propietarioForm.propiedad_titulo || null,
-          tipo_propiedad: propietarioForm.tipo_propiedad || null,
-          ciudad: propietarioForm.ciudad || null,
-          barrio: propietarioForm.barrio || null,
-          mensaje: propietarioForm.mensaje || null,
-          origen: 'web_publica',
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
-      setSubmitState({ loading: false, error: null, success: true });
+      setSubmitState({ loading: false, error: null, success: data });
     } catch (e) {
-      setSubmitState({ loading: false, error: (e && e.message) || 'No se pudo enviar.', success: false });
+      setSubmitState({ loading: false, error: (e && e.message) || 'No se pudo enviar.', success: null });
     }
   }
   return (
@@ -65,7 +110,7 @@ function PublishPage() {
       <div className="row between">
         <div>
           <div className="tag">Publicar inmueble</div>
-          <h2 style={{ marginTop: 6, fontSize: 30 }}>Cargá tu propiedad en 6 pasos</h2>
+          <h2 style={{ marginTop: 6, fontSize: 30 }}>Cargá tu propiedad en 5 pasos</h2>
         </div>
         <button className="btn btn-outline">Guardar borrador</button>
       </div>
@@ -99,27 +144,16 @@ function PublishPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 28, marginTop: 28, alignItems: 'flex-start' }}>
         <div className="card" style={{ padding: 32 }}>
-          {step === 0 && <StepBasics/>}
-          {step === 1 && <StepLocation/>}
-          {step === 2 && <StepPhotos/>}
-          {step === 3 && (
-            <StepManagement
-              mode={mgmtMode}
-              setMode={setMgmtMode}
-              pickedAgent={pickedAgentId}
-              setPickedAgent={setPickedAgentId}
-              propietario={propietarioForm}
-              setPropietario={setPropietarioForm}
-            />
-          )}
-          {step === 4 && <StepPlan/>}
-          {step === 5 && <StepPreview/>}
+          {step === 0 && <StepBasics form={form} setF={setF}/>}
+          {step === 1 && <StepLocation form={form} setF={setF}/>}
+          {step === 2 && <StepPhotos form={form} setF={setF}/>}
+          {step === 3 && <StepPlan form={form} setF={setF}/>}
+          {step === 4 && <StepPreview form={form} setF={setF}/>}
 
           {submitState.success && (
             <div style={{ marginTop: 16, padding: 16, background: '#eaf6f0', borderRadius: 12, border: '1px solid #b6dec6', color: '#1f5e3a', fontSize: 14 }}>
-              {mgmtMode === 'agent'
-                ? '✓ Tu solicitud fue enviada al agente. Te va a contactar pronto.'
-                : '✓ ¡Listo! En esta demo aún no publicamos la propiedad real, pero recibimos tu solicitud.'}
+              ✓ Tu propiedad fue enviada para revisión. El equipo de AlquiloYa la revisará antes de publicarla.
+              {submitState.success.codigo ? <div className="muted xs" style={{ marginTop: 6 }}>Código: <strong>{submitState.success.codigo}</strong></div> : null}
             </div>
           )}
           {submitState.error && (
@@ -142,13 +176,11 @@ function PublishPage() {
               ) : (
                 <button
                   className="btn btn-primary btn-lg"
-                  disabled={submitState.loading}
-                  onClick={onPublicar}
-                  style={submitState.loading ? { opacity: 0.6, cursor: 'wait' } : null}
+                  disabled={submitState.loading || !!submitState.success}
+                  onClick={onEnviar}
+                  style={(submitState.loading || submitState.success) ? { opacity: 0.6, cursor: submitState.loading ? 'wait' : 'default' } : null}
                 >
-                  {submitState.loading
-                    ? 'Enviando…'
-                    : (mgmtMode === 'agent' ? 'Enviar solicitud al agente' : 'Publicar inmueble')}
+                  {submitState.loading ? 'Enviando…' : (submitState.success ? 'Enviado ✓' : 'Enviar para revisión')}
                   <I.check s={16}/>
                 </button>
               )}
@@ -157,23 +189,19 @@ function PublishPage() {
         </div>
 
         <div style={{ position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <AsesoriaCTACard onOpen={() => { setMgmtMode('agent'); setAsesoriaOpen(true); }}/>
-          <PreviewCard step={step}/>
+          <AsesoriaCTACard onOpen={() => setAsesoriaOpen(true)}/>
+          <PreviewCard step={step} form={form}/>
         </div>
       </div>
 
       {asesoriaOpen && (
         <AsesoriaModal
           onClose={() => setAsesoriaOpen(false)}
-          propietario={propietarioForm}
-          setPropietario={setPropietarioForm}
+          propietario={asesoriaPropietario}
+          setPropietario={setAsesoriaPropietario}
           pickedAgentId={pickedAgentId}
           setPickedAgentId={setPickedAgentId}
-          onAfterSuccess={() => {
-            // Cerramos el modal y mostramos el mensaje de éxito al pie del wizard.
-            setSubmitState({ loading: false, error: null, success: true });
-            setAsesoriaOpen(false);
-          }}
+          onAfterSuccess={() => { setAsesoriaOpen(false); }}
         />
       )}
     </div>
@@ -413,7 +441,25 @@ function FormGrid({ children }) {
   return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>{children}</div>;
 }
 
-function StepBasics() {
+const PUBLISH_TIPOS = [
+  { id: 'departamento',     label: 'Departamento',     icon: 'building' },
+  { id: 'casa',             label: 'Casa',             icon: 'home' },
+  { id: 'duplex',           label: 'Dúplex',           icon: 'building' },
+  { id: 'local_comercial',  label: 'Local comercial',  icon: 'store' },
+  { id: 'oficina',          label: 'Oficina',          icon: 'briefcase' },
+  { id: 'terreno',          label: 'Terreno',          icon: 'pin' },
+  { id: 'deposito',         label: 'Depósito',         icon: 'archive' },
+];
+const PUBLISH_CARAC = ['Cochera','Amoblado','Mascotas permitidas','Piscina','Quincho','Aire acondicionado','Wifi','Lavadero','Seguridad 24hs','Cocina equipada'];
+
+function StepBasics({ form, setF }) {
+  function toggleCarac(name) {
+    setF(f => {
+      const has = (f.caracteristicas || []).includes(name);
+      const next = has ? f.caracteristicas.filter(x => x !== name) : [...(f.caracteristicas || []), name];
+      return { caracteristicas: next };
+    });
+  }
   return (
     <div>
       <div className="tag">Paso 1</div>
@@ -423,61 +469,62 @@ function StepBasics() {
         <div className="field" style={{ marginBottom: 18 }}>
           <label>Tipo de inmueble</label>
           <div className="row gap-10" style={{ flexWrap: 'wrap' }}>
-            {TIPOS.map(t => <TileChoice key={t.id} icon={t.icon} label={t.label} active={t.id === 'depto'}/>)}
+            {PUBLISH_TIPOS.map(t => (
+              <TileChoice
+                key={t.id}
+                icon={I[t.icon] ? t.icon : 'doc'}
+                label={t.label}
+                active={form.tipo === t.id}
+                onClick={() => setF({ tipo: t.id })}
+              />
+            ))}
           </div>
         </div>
         <div className="field" style={{ marginBottom: 18 }}>
           <label>Título de la publicación</label>
-          <input className="input" defaultValue="Dúplex moderno con balcón en zona Villa Morra"/>
-          <span className="muted xs">Hasta 80 caracteres. Sé claro y específico.</span>
+          <input className="input" value={form.titulo} onChange={(e) => setF({ titulo: e.target.value })} placeholder="Ej. Dúplex moderno con balcón en Villa Morra" maxLength={120}/>
+          <span className="muted xs">Sé claro y específico.</span>
         </div>
         <FormGrid>
           <div className="field">
-            <label>Precio mensual (Gs.)</label>
-            <input className="input" defaultValue="3.800.000"/>
+            <label>Precio (Gs.)</label>
+            <input className="input" value={form.precio} onChange={(e) => setF({ precio: e.target.value.replace(/[^\d]/g, '') })} placeholder="Ej. 3800000" inputMode="numeric"/>
           </div>
           <div className="field">
             <label>Operación</label>
-            <PrettySelect value="permanente" onChange={() => {}} options={[
-              { value: 'permanente', label: 'Alquiler permanente' },
-              { value: 'temporal', label: 'Alquiler temporal' },
+            <PrettySelect value={form.operacion} onChange={(v) => setF({ operacion: v })} options={[
+              { value: 'alquiler', label: 'Alquiler' },
+              { value: 'venta',    label: 'Venta' },
             ]}/>
           </div>
         </FormGrid>
         <div style={{ height: 18 }}/>
         <FormGrid>
-          <div className="field"><label>Dormitorios</label><input className="input" defaultValue="2"/></div>
-          <div className="field"><label>Baños</label><input className="input" defaultValue="2"/></div>
-          <div className="field"><label>Superficie (m²)</label><input className="input" defaultValue="85"/></div>
-          <div className="field"><label>Antigüedad</label>
-            <PrettySelect value="estrenar" onChange={() => {}} options={[
-              { value: 'estrenar', label: 'A estrenar' },
-              { value: '1-5', label: '1–5 años' },
-              { value: '5-10', label: '5–10 años' },
-              { value: '+10', label: '+10 años' },
-            ]}/>
-          </div>
+          <div className="field"><label>Dormitorios</label><input className="input" value={form.dormitorios} onChange={(e) => setF({ dormitorios: e.target.value.replace(/[^\d]/g,'') })} inputMode="numeric"/></div>
+          <div className="field"><label>Baños</label><input className="input" value={form.banos} onChange={(e) => setF({ banos: e.target.value.replace(/[^\d]/g,'') })} inputMode="numeric"/></div>
+          <div className="field"><label>Superficie (m²)</label><input className="input" value={form.superficie_m2} onChange={(e) => setF({ superficie_m2: e.target.value.replace(/[^\d.]/g,'') })} inputMode="decimal"/></div>
+          <div className="field"><label>Cocheras</label><input className="input" value={form.cocheras} onChange={(e) => setF({ cocheras: e.target.value.replace(/[^\d]/g,'') })} inputMode="numeric"/></div>
         </FormGrid>
         <div className="field" style={{ marginTop: 18 }}>
           <label>Características</label>
           <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-            {['Cochera','Amoblado','Mascotas permitidas','Piscina','Quincho','Aire acondicionado','Wifi','Lavadero','Seguridad 24hs','Cocina equipada'].map((f,i) => (
-              <Chip key={f} label={f} active={i < 5}/>
+            {PUBLISH_CARAC.map(name => (
+              <Chip key={name} label={name} active={(form.caracteristicas || []).includes(name)} onClick={() => toggleCarac(name)}/>
             ))}
           </div>
         </div>
         <div className="field" style={{ marginTop: 18 }}>
           <label>Descripción</label>
-          <textarea className="input" rows={4} defaultValue="Excelente departamento recientemente refaccionado. Cuenta con ambientes amplios, ventilados, y todos los servicios."/>
+          <textarea className="input" rows={4} value={form.descripcion} onChange={(e) => setF({ descripcion: e.target.value })} placeholder="Detalles del inmueble (ambientes, servicios, comodidades, etc.)"/>
         </div>
       </div>
     </div>
   );
 }
 
-function TileChoice({ icon, label, active }) {
+function TileChoice({ icon, label, active, onClick }) {
   return (
-    <button style={{
+    <button type="button" onClick={onClick} style={{
       padding: '8px 12px', borderRadius: 10,
       border: '1.5px solid ' + (active ? 'var(--blue)' : 'var(--line)'),
       background: active ? 'var(--blue-50)' : '#fff',
@@ -485,23 +532,24 @@ function TileChoice({ icon, label, active }) {
       color: active ? 'var(--blue)' : 'var(--ink-2)', fontWeight: 600, fontSize: 12.5,
       fontFamily: 'inherit', whiteSpace: 'nowrap',
     }}>
-      {React.createElement(I[icon], { s: 14 })}
+      {I[icon] ? React.createElement(I[icon], { s: 14 }) : null}
       {label}
     </button>
   );
 }
-function Chip({ label, active }) {
+function Chip({ label, active, onClick }) {
   return (
-    <button style={{
+    <button type="button" onClick={onClick} style={{
       padding: '8px 14px', borderRadius: 999,
       border: '1px solid ' + (active ? 'var(--blue)' : 'var(--line)'),
       background: active ? 'var(--blue)' : '#fff',
-      color: active ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+      color: active ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+      fontFamily: 'inherit',
     }}>{active && '✓ '}{label}</button>
   );
 }
 
-function StepLocation() {
+function StepLocation({ form, setF }) {
   return (
     <div>
       <div className="tag">Paso 2</div>
@@ -509,63 +557,63 @@ function StepLocation() {
       <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>La ubicación exacta solo se compartirá cuando coordines una visita.</p>
       <div style={{ marginTop: 24 }}>
         <FormGrid>
-          <div className="field"><label>Departamento</label><PrettySelect value={DEPARTAMENTOS[0]} onChange={() => {}} options={DEPARTAMENTOS}/></div>
-          <div className="field"><label>Ciudad</label><PrettySelect value={CIUDADES['Central'][0]} onChange={() => {}} options={CIUDADES['Central']}/></div>
-          <div className="field"><label>Barrio</label><PrettySelect value={BARRIOS[0]} onChange={() => {}} options={BARRIOS}/></div>
-          <div className="field"><label>Código postal</label><input className="input" defaultValue="1208"/></div>
+          <div className="field"><label>Ciudad *</label><input className="input" value={form.ciudad} onChange={(e) => setF({ ciudad: e.target.value })} placeholder="Ej. Asunción"/></div>
+          <div className="field"><label>Barrio</label><input className="input" value={form.barrio} onChange={(e) => setF({ barrio: e.target.value })} placeholder="Ej. Villa Morra"/></div>
         </FormGrid>
         <div className="field" style={{ marginTop: 18 }}>
           <label>Dirección (no se mostrará al público)</label>
-          <input className="input" defaultValue="Mariscal López casi Capitán Brizuela"/>
+          <input className="input" value={form.direccion} onChange={(e) => setF({ direccion: e.target.value })} placeholder="Ej. Mariscal López casi Capitán Brizuela"/>
         </div>
-      </div>
-      <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 18, border: '1px solid var(--line)' }}>
-        <div style={{ padding: '14px 16px', background: 'var(--bg-2)', borderBottom: '1px solid var(--line-2)' }} className="row between">
-          <div className="row gap-8"><I.pin s={14}/> <span style={{ fontWeight: 600, fontSize: 13 }}>Ubicación aproximada</span></div>
-          <button className="btn btn-outline btn-sm">Ajustar pin</button>
-        </div>
-        <MiniMap height={260} pins={1}/>
       </div>
     </div>
   );
 }
 
-function StepPhotos() {
-  const photos = Array.from({ length: 6 }, (_, i) => photo(i));
+function StepPhotos({ form, setF }) {
+  const [urlNew, setUrlNew] = React.useState('');
+  function addFoto() {
+    const url = (urlNew || '').trim();
+    if (!url) return;
+    setF(f => ({ fotos: [...(f.fotos || []), { url, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
+    setUrlNew('');
+  }
+  function removeFoto(idx) {
+    setF(f => ({ fotos: (f.fotos || []).filter((_, i) => i !== idx) }));
+  }
   return (
     <div>
       <div className="tag">Paso 3</div>
-      <h3 style={{ fontSize: 22, marginTop: 6 }}>Subí tus mejores fotos</h3>
-      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>La primera foto será la principal. Recomendamos al menos 5 fotos para maximizar consultas.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 24 }}>
-        {photos.map((src, i) => (
-          <div key={i} style={{ position: 'relative' }}>
-            <Photo src={src} style={{ height: 130, borderRadius: 10 }}/>
-            {i === 0 && <span className="badge badge-featured" style={{ position: 'absolute', top: 8, left: 8 }}>Principal</span>}
-            <button style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,.95)', border: 'none', cursor: 'pointer' }}>
-              <I.x s={12}/>
-            </button>
-          </div>
-        ))}
-        <button style={{
-          height: 130, borderRadius: 10, border: '2px dashed var(--line)', background: 'var(--bg-2)',
-          display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--ink-3)'
-        }}>
-          <div className="col" style={{ alignItems: 'center', gap: 4 }}>
-            <I.upload s={20}/>
-            <span style={{ fontSize: 12.5, fontWeight: 600 }}>Agregar foto</span>
-          </div>
-        </button>
-      </div>
-      <div style={{ marginTop: 24, padding: 18, background: 'var(--blue-50)', borderRadius: 12 }}>
-        <div className="row gap-12">
-          <I.bolt s={20} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Premium incluye video y tour 360°</div>
-            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Las propiedades con video reciben 3x más consultas. <a style={{ color: 'var(--blue)', fontWeight: 600 }}>Activar Premium →</a></div>
-          </div>
+      <h3 style={{ fontSize: 22, marginTop: 6 }}>Sumá fotos de tu propiedad</h3>
+      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>
+        Pegá las URLs de las fotos (servidor de imágenes propio o Google Drive/Imgur con enlace público). La primera será la principal.
+      </p>
+      <div className="card" style={{ padding: 14, marginTop: 18, background: 'var(--bg-2)', border: '1px dashed var(--line)' }}>
+        <div className="row gap-8">
+          <input
+            className="input"
+            placeholder="https://..."
+            value={urlNew}
+            onChange={(e) => setUrlNew(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFoto(); } }}
+          />
+          <button type="button" className="btn btn-blue" onClick={addFoto}>+ Agregar</button>
         </div>
+        <div className="muted xs" style={{ marginTop: 6 }}>Si todavía no tenés las fotos, podés saltear este paso y subirlas más tarde desde el panel.</div>
       </div>
+      {(form.fotos || []).length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 18 }}>
+          {form.fotos.map((f, i) => (
+            <div key={i} style={{ position: 'relative' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={f.url} alt={f.alt || ''} style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 10, background: 'var(--bg-2)' }} onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}/>
+              {i === 0 && <span className="badge badge-featured" style={{ position: 'absolute', top: 8, left: 8 }}>Principal</span>}
+              <button type="button" onClick={() => removeFoto(i)} style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,.95)', border: 'none', cursor: 'pointer' }}>
+                <I.x s={12}/>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -781,70 +829,115 @@ function AgentLevelBadge({ level }) {
   return <span className="badge" style={{ background: c.bg, color: c.fg, fontSize: 9.5 }}>{level}</span>;
 }
 
-function StepPlan() {
-  const [picked, setPicked] = React.useState('basico-owner');
+function StepPlan({ form, setF }) {
+  const list = PLANS.filter(p => p.tier && String(p.tier).includes('owner'));
   return (
     <div>
-      <div className="tag">Paso 5</div>
+      <div className="tag">Paso 4</div>
       <h3 style={{ fontSize: 22, marginTop: 6 }}>Elegí un plan para tu publicación</h3>
       <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>Podés cambiar de plan más adelante.</p>
       <div className="col gap-12" style={{ marginTop: 20 }}>
-        {PLANS.filter(p => p.tier.includes('owner')).map(p => (
-          <button key={p.tier} onClick={() => setPicked(p.tier)} className="card" style={{
-            padding: 18, textAlign: 'left',
-            border: '2px solid ' + (picked === p.tier ? 'var(--blue)' : 'var(--line)'),
-            background: picked === p.tier ? 'var(--blue-50)' : '#fff',
-            cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16
-          }}>
-            <div className="row gap-14">
-              <span style={{
-                width: 22, height: 22, borderRadius: '50%',
-                border: '2px solid ' + (picked === p.tier ? 'var(--blue)' : 'var(--line)'),
-                background: picked === p.tier ? 'var(--blue)' : '#fff',
-                display: 'grid', placeItems: 'center', color: '#fff'
-              }}>{picked === p.tier && <I.check s={12}/>}</span>
-              <div>
-                <div className="row gap-8">
-                  <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>{p.name}</div>
-                  {p.badge && <span className="badge badge-featured" style={{ fontSize: 10 }}>{p.badge}</span>}
+        {list.map(p => {
+          const picked = form.plan_id === p.tier;
+          return (
+            <button key={p.tier} type="button" onClick={() => setF({ plan_id: p.tier })} className="card" style={{
+              padding: 18, textAlign: 'left',
+              border: '2px solid ' + (picked ? 'var(--blue)' : 'var(--line)'),
+              background: picked ? 'var(--blue-50)' : '#fff',
+              cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16
+            }}>
+              <div className="row gap-14">
+                <span style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  border: '2px solid ' + (picked ? 'var(--blue)' : 'var(--line)'),
+                  background: picked ? 'var(--blue)' : '#fff',
+                  display: 'grid', placeItems: 'center', color: '#fff'
+                }}>{picked && <I.check s={12}/>}</span>
+                <div>
+                  <div className="row gap-8">
+                    <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>{p.name}</div>
+                    {p.badge && <span className="badge badge-featured" style={{ fontSize: 10 }}>{p.badge}</span>}
+                  </div>
+                  <div className="muted xs">{(p.bullets || [])[0]} {(p.bullets || [])[1] ? '· ' + p.bullets[1] : ''}</div>
                 </div>
-                <div className="muted xs">{p.bullets[0]} · {p.bullets[1]}</div>
               </div>
-            </div>
-            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, color: 'var(--blue)', textAlign: 'right' }}>
-              {p.billing === 'gratis' ? 'Gratis' : formatGs(p.price)}
-              {p.billing === 'mensual' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>/ mes</div>}
-              {p.billing === 'unico' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>pago único</div>}
-            </div>
-          </button>
-        ))}
+              <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, color: 'var(--blue)', textAlign: 'right' }}>
+                {p.billing === 'gratis' ? 'Gratis' : formatGs(p.price)}
+                {p.billing === 'mensual' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>/ mes</div>}
+                {p.billing === 'unico' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>pago único</div>}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function StepPreview() {
+function StepPreview({ form, setF }) {
+  const titulo = form.titulo || 'Tu propiedad';
+  const ubic = [form.barrio, form.ciudad].filter(Boolean).join(', ') || 'Ubicación';
+  const precioNum = Number(String(form.precio).replace(/[^\d.]/g, ''));
+  const cover = (form.fotos || []).find(f => f && f.url);
   return (
     <div>
-      <div className="tag">Paso 6</div>
-      <h3 style={{ fontSize: 22, marginTop: 6 }}>Revisá cómo se verá tu publicación</h3>
-      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>Si todo está correcto, publicá. Podrás editar en cualquier momento.</p>
-      <div className="card" style={{ marginTop: 24, padding: 0, overflow: 'hidden' }}>
-        <Photo src={photo(0)} style={{ height: 280, borderRadius: 0 }}/>
+      <div className="tag">Paso 5</div>
+      <h3 style={{ fontSize: 22, marginTop: 6 }}>Revisá tu publicación y dejá tu contacto</h3>
+      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>
+        Cuando envíes la propiedad, queda pendiente de revisión. El equipo de AlquiloYa la valida antes de publicarla.
+      </p>
+
+      <div className="card" style={{ marginTop: 18, padding: 0, overflow: 'hidden' }}>
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover.url} alt={titulo} style={{ width: '100%', height: 240, objectFit: 'cover', display: 'block', background: 'var(--bg-2)' }} onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}/>
+        ) : (
+          <div style={{ height: 240, background: 'var(--bg-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Sin foto principal</div>
+        )}
         <div style={{ padding: 22 }}>
           <div className="row gap-8">
-            <span className="badge badge-verified"><I.check s={11}/> Verificación pendiente</span>
+            <span className="badge badge-verified"><I.check s={11}/> Pendiente de revisión</span>
           </div>
-          <h3 style={{ marginTop: 10, fontSize: 22 }}>Dúplex moderno con balcón en zona Villa Morra</h3>
-          <div className="muted" style={{ marginTop: 4, fontSize: 13 }}><I.pin s={13}/> Villa Morra, Asunción · Central</div>
-          <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 28, color: 'var(--blue)', marginTop: 12 }}>Gs. 3.800.000<span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 500 }}> / mes</span></div>
+          <h3 style={{ marginTop: 10, fontSize: 22 }}>{titulo}</h3>
+          <div className="muted" style={{ marginTop: 4, fontSize: 13 }}><I.pin s={13}/> {ubic}</div>
+          {Number.isFinite(precioNum) && precioNum > 0 ? (
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 28, color: 'var(--blue)', marginTop: 12 }}>
+              {formatGs(precioNum)}
+              <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 500 }}>
+                {form.operacion === 'venta' ? '' : ' / mes'}
+              </span>
+            </div>
+          ) : null}
+          {(form.caracteristicas || []).length > 0 ? (
+            <div className="row gap-6" style={{ flexWrap: 'wrap', marginTop: 14 }}>
+              {form.caracteristicas.map(n => <span key={n} className="badge" style={{ background: 'var(--blue-50)', color: 'var(--blue)', fontSize: 11 }}>{n}</span>)}
+            </div>
+          ) : null}
         </div>
       </div>
-      <div style={{ marginTop: 16, padding: 18, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 13.5, color: '#8a5e00' }}>
-        <I.bolt s={14}/> Al publicar, tu inmueble entra en cola de verificación. Tarda menos de 24 hs hábiles.
+
+      <div className="card" style={{ marginTop: 18, padding: 18 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Tus datos de contacto *</div>
+        <FormGrid>
+          <div className="field">
+            <label>Tu nombre *</label>
+            <input className="input" value={form.propietario_nombre} onChange={(e) => setF({ propietario_nombre: e.target.value })} placeholder="Nombre y apellido"/>
+          </div>
+          <div className="field">
+            <label>Email</label>
+            <input type="email" className="input" value={form.propietario_email} onChange={(e) => setF({ propietario_email: e.target.value })} placeholder="usuario@dominio.com"/>
+          </div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <label>Teléfono / WhatsApp</label>
+            <input className="input" value={form.propietario_telefono} onChange={(e) => setF({ propietario_telefono: e.target.value })} placeholder="+595 ..."/>
+          </div>
+        </FormGrid>
+        <div className="muted xs" style={{ marginTop: 8 }}>Dejá al menos email o teléfono para que el equipo de AlquiloYa pueda contactarte.</div>
       </div>
 
-      <AutoActionsSection/>
+      <div style={{ marginTop: 16, padding: 18, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 13.5, color: '#8a5e00' }}>
+        <I.bolt s={14}/> Al enviar, tu inmueble entra en revisión. NO se publica automáticamente en el catálogo público.
+      </div>
     </div>
   );
 }
@@ -1056,23 +1149,42 @@ function BrochurePage2() {
   );
 }
 
-function PreviewCard({ step }) {
+function PreviewCard({ step, form }) {
+  const f = form || {};
+  const titulo = (f.titulo || '').trim() || 'Tu propiedad';
+  const ubic = [f.barrio, f.ciudad].filter(Boolean).join(', ') || 'Ubicación';
+  const precioNum = Number(String(f.precio || '').replace(/[^\d.]/g, ''));
+  const cover = (f.fotos || []).find(x => x && x.url);
   return (
     <div className="card" style={{ padding: 22 }}>
       <div className="tag">Vista previa</div>
       <div style={{ fontWeight: 700, fontSize: 15, marginTop: 6 }}>Así se va completando tu ficha</div>
       <div className="card" style={{ marginTop: 16, padding: 14, border: '1px dashed var(--line)' }}>
-        <Photo src={photo(0)} style={{ height: 140, borderRadius: 8 }}/>
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover.url} alt={titulo} style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, background: 'var(--bg-2)' }} onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}/>
+        ) : (
+          <div style={{ height: 140, background: 'var(--bg-2)', borderRadius: 8, display: 'grid', placeItems: 'center', color: 'var(--ink-4)', fontSize: 12 }}>Sin foto</div>
+        )}
         <div style={{ marginTop: 12 }}>
           <div className="row gap-6">
             <span className="badge badge-soft">Borrador</span>
-            {step >= 3 && <span className="badge badge-featured" style={{ fontSize: 10 }}>Premium</span>}
           </div>
-          <div style={{ fontWeight: 700, fontSize: 14, marginTop: 6 }}>Dúplex moderno · Villa Morra</div>
-          <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, color: 'var(--blue)', marginTop: 4 }}>Gs. 3.800.000<span style={{ fontSize: 11, color: 'var(--ink-3)' }}> /mes</span></div>
-          <div className="row gap-12 muted" style={{ marginTop: 8, fontSize: 12 }}>
-            <span><I.bed s={11}/> 2</span><span><I.bath s={11}/> 2</span><span><I.ruler s={11}/> 85m²</span>
-          </div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginTop: 6 }}>{titulo}</div>
+          <div className="muted xs" style={{ marginTop: 2 }}>{ubic}</div>
+          {Number.isFinite(precioNum) && precioNum > 0 ? (
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, color: 'var(--blue)', marginTop: 6 }}>
+              {formatGs(precioNum)}
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{f.operacion === 'venta' ? '' : ' /mes'}</span>
+            </div>
+          ) : null}
+          {(f.dormitorios || f.banos || f.superficie_m2) ? (
+            <div className="row gap-12 muted" style={{ marginTop: 8, fontSize: 12 }}>
+              {f.dormitorios ? <span><I.bed s={11}/> {f.dormitorios}</span> : null}
+              {f.banos ? <span><I.bath s={11}/> {f.banos}</span> : null}
+              {f.superficie_m2 ? <span><I.ruler s={11}/> {f.superficie_m2}m²</span> : null}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="col gap-10" style={{ marginTop: 18, fontSize: 13 }}>
