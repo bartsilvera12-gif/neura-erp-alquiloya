@@ -5,6 +5,7 @@ import {
   listErpAgenteCaptaciones,
 } from "@/lib/alquiloya/erp-agentes-inmobiliarios";
 import { AccesoBlock } from "../../_components/AccesoBlock";
+import { EtapaSelect } from "../../captaciones/_components/EtapaSelect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -111,17 +112,7 @@ export default async function AgenteDetailPage({ params }: Props) {
                       {[c.ciudad, c.barrio].filter(Boolean).join(" · ") || "—"}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
-                          c.etapa === "cerrado"
-                            ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
-                            : c.etapa === "perdido"
-                            ? "bg-rose-100 text-rose-700 ring-1 ring-rose-200"
-                            : "bg-sky-100 text-sky-700 ring-1 ring-sky-200"
-                        }`}
-                      >
-                        {c.etapa}
-                      </span>
+                      <EtapaSelect captacionId={c.id} initial={c.etapa} />
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-500">
                       {c.created_at?.slice(0, 10) ?? "—"}
