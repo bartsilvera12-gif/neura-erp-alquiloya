@@ -12,7 +12,8 @@ function AdminLayout({ kind, route, onNav, title, subtitle, actions, children })
     { id: 'admin-agent-properties', label: 'Mis propiedades', icon: 'house' },
     { id: 'admin-agent-captures', label: 'Captaciones', icon: 'shield' },
     { id: 'admin-agent-referrals', label: 'Referidos', icon: 'trend' },
-    { id: 'admin-agent-queries', label: 'Consultas', icon: 'chat' },
+    // Consultas: ítem ocultado del menú del panel agente (limpieza UI legacy).
+    // El componente QueriesSection sigue en el archivo pero ya no se accede vía menú.
     { id: 'admin-agent-qr', label: 'Carteles QR', icon: 'qr' },
     { id: 'admin-agent-profile', label: 'Mi perfil', icon: 'user' },
   ];
@@ -76,7 +77,7 @@ function AdminLayout({ kind, route, onNav, title, subtitle, actions, children })
               <div className="row gap-8">
                 {actions || (
                   <>
-                    <button onClick={() => onNav && onNav('admin-agent-queries')} style={{ padding: '6px 12px', height: 32, borderRadius: 8, background: '#fff', border: '1px solid var(--line)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.bell s={12}/> 4 nuevas</button>
+                    {/* Contador "4 nuevas" (consultas) ocultado en limpieza UI legacy. */}
                     {kind !== 'global' && <button onClick={() => onNav && onNav('publish')} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
                   </>
                 )}
@@ -86,7 +87,7 @@ function AdminLayout({ kind, route, onNav, title, subtitle, actions, children })
           {/* Floating action buttons when no header */}
           {!title && (
             <div className="row gap-8" style={{ justifyContent: 'flex-end', marginBottom: 14 }}>
-              <button onClick={() => onNav && onNav('admin-agent-queries')} style={{ padding: '6px 12px', height: 32, borderRadius: 8, background: '#fff', border: '1px solid var(--line)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.bell s={12}/> 4 nuevas</button>
+              {/* Contador "4 nuevas" (consultas) ocultado en limpieza UI legacy. */}
               {kind !== 'global' && <button onClick={() => onNav && onNav('publish')} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
             </div>
           )}
@@ -459,66 +460,7 @@ function AdminAgentPage({ route, onNav }) {
 
         {view === 'overview' && (
         <div className="col gap-12">
-          {/* Consultas — compact feed */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div className="row between" style={{ padding: '11px 14px', borderBottom: '1px solid var(--line-2)', alignItems: 'center' }}>
-              <div className="row gap-6" style={{ alignItems: 'center' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Consultas recientes</span>
-                <span style={{ background: 'var(--yellow)', color: 'var(--ink)', fontSize: 9.5, fontWeight: 700, padding: '2px 6px', borderRadius: 999 }}>4</span>
-              </div>
-              <button onClick={() => onNav('admin-agent-queries')} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ver todas →</button>
-            </div>
-            <div className="col">
-              {[
-                ['Pablo R.','está disponible el sábado?','AY-01241','5m',true],
-                ['Sofía G.','Permiten mascotas?','AY-01243','22m',true],
-                ['Lucía M.','¿incluye expensas?','AY-01242','45m',false],
-                ['Damián V.','coordinar visita mañana','AY-01244','1h',false],
-              ].map(([n, m, id, t, unread], i) => (
-                <div key={n} style={{
-                  padding: '8px 14px 8px 22px',
-                  borderTop: i > 0 ? '1px solid var(--line-2)' : 'none',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  cursor: 'pointer', transition: 'background .12s',
-                  position: 'relative', background: unread ? '#fafbfc' : '#fff',
-                }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
-                   onMouseLeave={e => e.currentTarget.style.background = unread ? '#fafbfc' : '#fff'}>
-                  {unread && <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)' }}/>}
-                  <Avatar name={n} size={26}/>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="row between" style={{ alignItems: 'baseline' }}>
-                      <span style={{ fontWeight: 700, fontSize: 11.5 }}>{n}</span>
-                      <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>{t}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tareas / Quick actions */}
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Pendientes</div>
-            <div className="col gap-8">
-              {[
-                ['Responder a 4 consultas', '12 min atrás', 'whats', 'var(--yellow-600)'],
-                ['Verificar AY-01243', 'hoy', 'shield', 'var(--blue)'],
-                ['Marcar AY-01006 como alquilada', 'cobrar comisión', 'check', 'var(--green)'],
-              ].map(([title, sub, icon, color]) => (
-                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px dashed var(--line-2)' }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 7, background: color + '14', color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    {React.createElement(I[icon], { s: 11 })}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink)' }}>{title}</div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-4)' }}>{sub}</div>
-                  </div>
-                  <button style={{ background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 14, padding: 0 }}>→</button>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Consultas recientes y Pendientes: bloques ocultados en limpieza UI legacy. */}
 
           {/* QR mini */}
           <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
