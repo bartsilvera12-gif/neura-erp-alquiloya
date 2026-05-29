@@ -10,6 +10,54 @@ function PublishPage() {
     { id: 4, title: 'Plan', icon: 'star' },
     { id: 5, title: 'Vista previa', icon: 'eye' },
   ];
+
+  // Lifted state para la sección "Gestión" (asesoría de agente)
+  const [mgmtMode, setMgmtMode] = React.useState('self'); // 'self' | 'agent'
+  const [pickedAgentId, setPickedAgentId] = React.useState(null);
+  const [propietarioForm, setPropietarioForm] = React.useState({
+    nombre: '', email: '', telefono: '',
+    propiedad_titulo: '', tipo_propiedad: 'departamento',
+    ciudad: '', barrio: '', mensaje: '',
+  });
+  const [submitState, setSubmitState] = React.useState({ loading: false, error: null, success: false });
+
+  async function onPublicar() {
+    setSubmitState({ loading: false, error: null, success: false });
+    if (mgmtMode !== 'agent') {
+      setSubmitState({ loading: false, error: null, success: true });
+      return;
+    }
+    if (!pickedAgentId) { setSubmitState({ loading: false, error: 'Elegí un agente.', success: false }); return; }
+    if (!propietarioForm.nombre.trim()) { setSubmitState({ loading: false, error: 'Tu nombre es obligatorio.', success: false }); return; }
+    if (!propietarioForm.email.trim() && !propietarioForm.telefono.trim()) {
+      setSubmitState({ loading: false, error: 'Dejá un email o teléfono para que el agente te contacte.', success: false });
+      return;
+    }
+    setSubmitState({ loading: true, error: null, success: false });
+    try {
+      const res = await fetch('/api/public/alquiloya/captaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agente_id: pickedAgentId,
+          propietario_nombre: propietarioForm.nombre,
+          propietario_email: propietarioForm.email || null,
+          propietario_telefono: propietarioForm.telefono || null,
+          propiedad_titulo: propietarioForm.propiedad_titulo || null,
+          tipo_propiedad: propietarioForm.tipo_propiedad || null,
+          ciudad: propietarioForm.ciudad || null,
+          barrio: propietarioForm.barrio || null,
+          mensaje: propietarioForm.mensaje || null,
+          origen: 'web_publica',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+      setSubmitState({ loading: false, error: null, success: true });
+    } catch (e) {
+      setSubmitState({ loading: false, error: (e && e.message) || 'No se pudo enviar.', success: false });
+    }
+  }
   return (
     <div className="fade-in container" style={{ padding: '32px' }}>
       <div className="row between">
@@ -52,9 +100,31 @@ function PublishPage() {
           {step === 0 && <StepBasics/>}
           {step === 1 && <StepLocation/>}
           {step === 2 && <StepPhotos/>}
-          {step === 3 && <StepManagement/>}
+          {step === 3 && (
+            <StepManagement
+              mode={mgmtMode}
+              setMode={setMgmtMode}
+              pickedAgent={pickedAgentId}
+              setPickedAgent={setPickedAgentId}
+              propietario={propietarioForm}
+              setPropietario={setPropietarioForm}
+            />
+          )}
           {step === 4 && <StepPlan/>}
           {step === 5 && <StepPreview/>}
+
+          {submitState.success && (
+            <div style={{ marginTop: 16, padding: 16, background: '#eaf6f0', borderRadius: 12, border: '1px solid #b6dec6', color: '#1f5e3a', fontSize: 14 }}>
+              {mgmtMode === 'agent'
+                ? '✓ Tu solicitud fue enviada al agente. Te va a contactar pronto.'
+                : '✓ ¡Listo! En esta demo aún no publicamos la propiedad real, pero recibimos tu solicitud.'}
+            </div>
+          )}
+          {submitState.error && (
+            <div style={{ marginTop: 16, padding: 12, background: '#fdecec', borderRadius: 12, border: '1px solid #f3c2c2', color: '#a8312f', fontSize: 13 }}>
+              {submitState.error}
+            </div>
+          )}
 
           <div className="row between" style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--line-2)' }}>
             <button className="btn btn-outline" disabled={step === 0} onClick={() => setStep(s => Math.max(0, s - 1))}
@@ -68,8 +138,16 @@ function PublishPage() {
                   Continuar <I.arrow s={14}/>
                 </button>
               ) : (
-                <button className="btn btn-primary btn-lg">
-                  Publicar inmueble <I.check s={16}/>
+                <button
+                  className="btn btn-primary btn-lg"
+                  disabled={submitState.loading}
+                  onClick={onPublicar}
+                  style={submitState.loading ? { opacity: 0.6, cursor: 'wait' } : null}
+                >
+                  {submitState.loading
+                    ? 'Enviando…'
+                    : (mgmtMode === 'agent' ? 'Enviar solicitud al agente' : 'Publicar inmueble')}
+                  <I.check s={16}/>
                 </button>
               )}
             </div>
@@ -245,13 +323,57 @@ function StepPhotos() {
   );
 }
 
-function StepManagement() {
-  const [mode, setMode] = React.useState('self'); // self | agent
-  const [pickedAgent, setPickedAgent] = React.useState(null);
+function StepManagement(props) {
+  // Backwards-compatible: si llamás sin props (uso legacy), usa estado local.
+  const localMode = React.useState('self');
+  const localPicked = React.useState(null);
+  const mode = props && typeof props.mode === 'string' ? props.mode : localMode[0];
+  const setMode = props && props.setMode ? props.setMode : localMode[1];
+  const pickedAgent = props && typeof props.pickedAgent !== 'undefined' ? props.pickedAgent : localPicked[0];
+  const setPickedAgent = props && props.setPickedAgent ? props.setPickedAgent : localPicked[1];
+  const propietario = (props && props.propietario) || { nombre: '', email: '', telefono: '', propiedad_titulo: '', tipo_propiedad: 'departamento', ciudad: '', barrio: '', mensaje: '' };
+  const setPropietario = (props && props.setPropietario) || (() => {});
+
   const [filter, setFilter] = React.useState('');
-  const filtered = AGENTS.filter(a =>
-    !filter || a.name.toLowerCase().includes(filter.toLowerCase()) || a.zone.toLowerCase().includes(filter.toLowerCase())
-  ).sort((a, b) => b.rating - a.rating);
+  // Agentes reales desde API; fallback al mock AGENTS si falla.
+  const [apiAgents, setApiAgents] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/public/alquiloya/agentes', { cache: 'no-store' });
+        const body = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        const list = (body && body.data && Array.isArray(body.data.agentes)) ? body.data.agentes : [];
+        if (list.length > 0) setApiAgents(list);
+      } catch (_) { /* fallback */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Normalizamos la fuente: real (API) tiene {id,nombre,telefono,whatsapp,foto_url,cargo,bio,activo}.
+  // Si no hay datos reales, usamos el mock AGENTS para preservar la demo visual.
+  const sourceList = apiAgents
+    ? apiAgents.map(a => ({
+        id: a.id,
+        name: a.nombre || '—',
+        zone: a.cargo || '',
+        verified: !!a.activo,
+        level: 'Pro',
+        rating: 4.8,
+        reviews: 0,
+        activeProperties: 0,
+        closedRentals: 0,
+        commissionRate: 5,
+        _real: true,
+      }))
+    : AGENTS;
+
+  const filtered = sourceList.filter(a =>
+    !filter || (a.name||'').toLowerCase().includes(filter.toLowerCase()) || (a.zone||'').toLowerCase().includes(filter.toLowerCase())
+  ).sort((a, b) => (b.rating||0) - (a.rating||0));
+
+  const upd = (k, v) => setPropietario(p => Object.assign({}, p, { [k]: v }));
 
   return (
     <div>
@@ -332,14 +454,56 @@ function StepManagement() {
             ))}
           </div>
           {pickedAgent && (
-            <div style={{ marginTop: 18, padding: 16, background: '#eaf6f0', borderRadius: 12, border: '1px solid #b6dec6' }}>
-              <div className="row gap-10">
-                <I.check s={18}/>
-                <div style={{ fontSize: 13.5 }}>
-                  <strong>Listo.</strong> Al publicar, le notificaremos a <strong>{AGENTS.find(a => a.id === pickedAgent)?.name}</strong> para que acepte la captación. Vas a poder ver el estado en tu panel.
+            <React.Fragment>
+              <div style={{ marginTop: 18, padding: 16, background: '#eaf6f0', borderRadius: 12, border: '1px solid #b6dec6' }}>
+                <div className="row gap-10">
+                  <I.check s={18}/>
+                  <div style={{ fontSize: 13.5 }}>
+                    <strong>Listo.</strong> Al enviar la solicitud, le notificaremos a <strong>{(sourceList.find(a => a.id === pickedAgent) || {}).name}</strong> para que se contacte con vos.
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Datos de contacto para que el agente te llegue */}
+              <div className="card" style={{ marginTop: 18, padding: 18 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Tus datos de contacto</div>
+                <FormGrid>
+                  <div className="field">
+                    <label>Tu nombre *</label>
+                    <input className="input" value={propietario.nombre} onChange={e => upd('nombre', e.target.value)} placeholder="Nombre y apellido"/>
+                  </div>
+                  <div className="field">
+                    <label>Email</label>
+                    <input className="input" type="email" value={propietario.email} onChange={e => upd('email', e.target.value)} placeholder="usuario@dominio.com"/>
+                  </div>
+                  <div className="field">
+                    <label>Teléfono / WhatsApp</label>
+                    <input className="input" value={propietario.telefono} onChange={e => upd('telefono', e.target.value)} placeholder="+595 ..."/>
+                  </div>
+                  <div className="field">
+                    <label>Ciudad</label>
+                    <input className="input" value={propietario.ciudad} onChange={e => upd('ciudad', e.target.value)} placeholder="Asunción, Encarnación…"/>
+                  </div>
+                  <div className="field">
+                    <label>Barrio</label>
+                    <input className="input" value={propietario.barrio} onChange={e => upd('barrio', e.target.value)} placeholder="opcional"/>
+                  </div>
+                  <div className="field">
+                    <label>Tipo de propiedad</label>
+                    <input className="input" value={propietario.tipo_propiedad} onChange={e => upd('tipo_propiedad', e.target.value)} placeholder="departamento, casa…"/>
+                  </div>
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label>Título de la propiedad</label>
+                    <input className="input" value={propietario.propiedad_titulo} onChange={e => upd('propiedad_titulo', e.target.value)} placeholder="Dúplex moderno en Villa Morra…"/>
+                  </div>
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label>Mensaje al agente (opcional)</label>
+                    <textarea className="input" value={propietario.mensaje} onChange={e => upd('mensaje', e.target.value)} rows={3} placeholder="Contale al agente lo que necesitás"/>
+                  </div>
+                </FormGrid>
+                <div className="muted xs" style={{ marginTop: 10 }}>Dejá al menos email o teléfono para que el agente pueda contactarte.</div>
+              </div>
+            </React.Fragment>
           )}
         </div>
       )}

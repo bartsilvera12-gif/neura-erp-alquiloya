@@ -754,6 +754,17 @@ function QueriesSection() {
 
 function CapturesSection() {
   const [showAll, setShowAll] = React.useState(false);
+  // Captaciones reales del agente logueado (Fase 12A). Si no hay sesión o falla, fallback al mock.
+  const [realCapt, setRealCapt] = React.useState(null);
+  const [realErr, setRealErr] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/agente/captaciones', { cache: 'no-store', credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(b => { if (cancelled) return; if (b && b.success && Array.isArray(b.captaciones)) setRealCapt(b.captaciones); })
+      .catch(e => { if (!cancelled) setRealErr((e && e.message) || 'error'); });
+    return () => { cancelled = true; };
+  }, []);
   const allCaptures = CAPTURES.filter(c => c.agentId === 'AG-001');
   // Generate extra historical captures for the "historial completo" view
   const extras = React.useMemo(() => {
@@ -812,6 +823,62 @@ function CapturesSection() {
           {showAll ? 'Ver solo activas ←' : 'Historial completo →'}
         </button>
       </div>
+
+      {/* Captaciones REALES desde /api/agente/captaciones (Fase 12A) */}
+      {realCapt && realCapt.length > 0 && (
+        <div className="card" style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+          <div className="row between" style={{ padding: '11px 14px', borderBottom: '1px solid var(--line-2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              Solicitudes recibidas ({realCapt.length})
+            </div>
+            <span className="badge" style={{ background: 'var(--blue-50)', color: 'var(--blue)', fontSize: 10 }}>datos reales</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-2)' }}>
+                <th style={{ ...th, textAlign: 'left' }}>Propietario</th>
+                <th style={{ ...th, textAlign: 'left' }}>Contacto</th>
+                <th style={{ ...th, textAlign: 'left' }}>Propiedad</th>
+                <th style={{ ...th, textAlign: 'left' }}>Ubicación</th>
+                <th style={{ ...th, textAlign: 'left' }}>Etapa</th>
+                <th style={{ ...th, textAlign: 'right' }}>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {realCapt.map(c => (
+                <tr key={c.id} style={{ borderTop: '1px solid var(--line-2)' }}>
+                  <td style={td}><strong>{c.propietario_nombre || '—'}</strong></td>
+                  <td style={{ ...td, fontSize: 12, color: 'var(--ink-3)' }}>
+                    {(c.propietario_email || c.propietario_telefono) ? (
+                      <React.Fragment>
+                        {c.propietario_email ? <div>{c.propietario_email}</div> : null}
+                        {c.propietario_telefono ? <div>{c.propietario_telefono}</div> : null}
+                      </React.Fragment>
+                    ) : '—'}
+                  </td>
+                  <td style={td}>
+                    <div style={{ fontWeight: 600 }}>{c.propiedad_titulo || '—'}</div>
+                    <div className="muted xs">{c.tipo_propiedad || ''}</div>
+                  </td>
+                  <td style={{ ...td, fontSize: 12 }}>
+                    {(c.ciudad || c.barrio) ? [c.ciudad, c.barrio].filter(Boolean).join(' · ') : '—'}
+                  </td>
+                  <td style={td}>
+                    <span className="badge" style={{
+                      background: c.etapa === 'cerrado' ? '#eaf6f0' : (c.etapa === 'perdido' ? '#fdecec' : 'var(--blue-50)'),
+                      color:      c.etapa === 'cerrado' ? 'var(--green)' : (c.etapa === 'perdido' ? '#a8312f' : 'var(--blue)'),
+                      fontSize: 10.5
+                    }}>{c.etapa}</span>
+                  </td>
+                  <td style={{ ...td, textAlign: 'right', fontSize: 12, color: 'var(--ink-3)' }}>
+                    {(c.created_at || '').slice(0, 10)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Compact KPI strip */}
       <div className="card" style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>

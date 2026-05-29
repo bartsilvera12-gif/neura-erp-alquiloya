@@ -129,6 +129,44 @@ async function tableHasColumn(schema: string, table: string, column: string): Pr
   return rows?.[0]?.exists === true;
 }
 
+export type ErpAgenteCaptacion = {
+  id: string;
+  propietario_nombre: string | null;
+  propietario_email: string | null;
+  propietario_telefono: string | null;
+  propiedad_titulo: string | null;
+  tipo_propiedad: string | null;
+  ciudad: string | null;
+  barrio: string | null;
+  etapa: string;
+  estado: string;
+  created_at: string | null;
+};
+
+export async function listErpAgenteCaptaciones(agenteId: string): Promise<ErpAgenteCaptacion[]> {
+  if (!uuidRe.test(agenteId)) return [];
+  const pool = getChatPostgresPool();
+  if (!pool) return [];
+  try {
+    if (!(await tableHasColumn("alquiloya", "agente_captaciones", "id"))) return [];
+    const { rows } = await queryWithRetry<ErpAgenteCaptacion>(
+      pool,
+      `SELECT id, propietario_nombre, propietario_email, propietario_telefono,
+              propiedad_titulo, tipo_propiedad, ciudad, barrio,
+              etapa, estado, created_at::text AS created_at
+         FROM ${q("agente_captaciones")}
+        WHERE empresa_id = $1::uuid AND agente_id = $2::uuid
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [ALQUILOYA_EMPRESA_ID, agenteId]
+    );
+    return rows ?? [];
+  } catch (e) {
+    console.warn("[listErpAgenteCaptaciones]", (e as Error).message);
+    return [];
+  }
+}
+
 export async function getErpAgenteInmobiliario(
   id: string
 ): Promise<ErpAgenteInmobiliarioDetail | null> {

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getErpAgenteInmobiliario } from "@/lib/alquiloya/erp-agentes-inmobiliarios";
+import {
+  getErpAgenteInmobiliario,
+  listErpAgenteCaptaciones,
+} from "@/lib/alquiloya/erp-agentes-inmobiliarios";
 import { AccesoBlock } from "../../_components/AccesoBlock";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +15,7 @@ export default async function AgenteDetailPage({ params }: Props) {
   const { id } = await params;
   const agente = await getErpAgenteInmobiliario(id);
   if (!agente) notFound();
+  const captaciones = await listErpAgenteCaptaciones(agente.id);
 
   return (
     <div className="px-6 py-6">
@@ -62,6 +66,73 @@ export default async function AgenteDetailPage({ params }: Props) {
           defaultEmail={agente.email}
         />
       </div>
+
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-700">Captaciones</h2>
+          <span className="text-[11px] text-slate-400">
+            {captaciones.length} {captaciones.length === 1 ? "registro" : "registros"}
+          </span>
+        </div>
+        {captaciones.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-500">
+            Sin captaciones todavía. Cuando un propietario solicite asesoría de este agente
+            desde la web pública, vas a verlo acá.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5">Propietario</th>
+                  <th className="px-4 py-2.5">Contacto</th>
+                  <th className="px-4 py-2.5">Propiedad</th>
+                  <th className="px-4 py-2.5">Ubicación</th>
+                  <th className="px-4 py-2.5">Etapa</th>
+                  <th className="px-4 py-2.5">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {captaciones.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-medium text-slate-900">{c.propietario_nombre ?? "—"}</td>
+                    <td className="px-4 py-2 text-xs text-slate-600">
+                      {c.propietario_email ? <div>{c.propietario_email}</div> : null}
+                      {c.propietario_telefono ? <div>{c.propietario_telefono}</div> : null}
+                      {!c.propietario_email && !c.propietario_telefono ? "—" : null}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="text-slate-800">{c.propiedad_titulo ?? "—"}</div>
+                      {c.tipo_propiedad ? (
+                        <div className="text-[11px] text-slate-400">{c.tipo_propiedad}</div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-slate-600">
+                      {[c.ciudad, c.barrio].filter(Boolean).join(" · ") || "—"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
+                          c.etapa === "cerrado"
+                            ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
+                            : c.etapa === "perdido"
+                            ? "bg-rose-100 text-rose-700 ring-1 ring-rose-200"
+                            : "bg-sky-100 text-sky-700 ring-1 ring-sky-200"
+                        }`}
+                      >
+                        {c.etapa}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-slate-500">
+                      {c.created_at?.slice(0, 10) ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
