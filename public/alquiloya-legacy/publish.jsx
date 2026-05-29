@@ -20,6 +20,8 @@ function PublishPage() {
     ciudad: '', barrio: '', mensaje: '',
   });
   const [submitState, setSubmitState] = React.useState({ loading: false, error: null, success: false });
+  // Modal de asesoría disponible desde el Paso 1 (CTA siempre visible en la columna derecha).
+  const [asesoriaOpen, setAsesoriaOpen] = React.useState(false);
 
   async function onPublicar() {
     setSubmitState({ loading: false, error: null, success: false });
@@ -154,8 +156,253 @@ function PublishPage() {
           </div>
         </div>
 
-        <div style={{ position: 'sticky', top: 92 }}>
+        <div style={{ position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <AsesoriaCTACard onOpen={() => { setMgmtMode('agent'); setAsesoriaOpen(true); }}/>
           <PreviewCard step={step}/>
+        </div>
+      </div>
+
+      {asesoriaOpen && (
+        <AsesoriaModal
+          onClose={() => setAsesoriaOpen(false)}
+          propietario={propietarioForm}
+          setPropietario={setPropietarioForm}
+          pickedAgentId={pickedAgentId}
+          setPickedAgentId={setPickedAgentId}
+          onAfterSuccess={() => {
+            // Cerramos el modal y mostramos el mensaje de éxito al pie del wizard.
+            setSubmitState({ loading: false, error: null, success: true });
+            setAsesoriaOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Card siempre visible en la columna derecha del wizard.
+// Abre el modal de asesoría desde cualquier paso (1..6).
+function AsesoriaCTACard({ onOpen }) {
+  return (
+    <div className="card" style={{
+      padding: 18,
+      background: 'linear-gradient(135deg, var(--blue-50), #fff)',
+      border: '1px solid var(--blue-100)',
+    }}>
+      <div className="row gap-10" style={{ alignItems: 'flex-start' }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'var(--blue)', color: '#fff',
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+        }}>
+          <I.shield s={18}/>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 15, lineHeight: 1.25 }}>
+            ¿Querés ayuda de un agente inmobiliario?
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.45 }}>
+            Un agente de AlquiloYa puede ayudarte a revisar, publicar y gestionar tu propiedad.
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="btn btn-blue"
+        style={{ marginTop: 14, width: '100%', justifyContent: 'center' }}
+      >
+        Solicitar asesoría <I.arrow s={14}/>
+      </button>
+    </div>
+  );
+}
+
+// Modal full-screen con selector de agentes + form de contacto + POST captación.
+function AsesoriaModal({ onClose, propietario, setPropietario, pickedAgentId, setPickedAgentId, onAfterSuccess }) {
+  const [apiAgents, setApiAgents] = React.useState(null);
+  const [filter, setFilter] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/public/alquiloya/agentes', { cache: 'no-store' });
+        const body = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        const list = (body && body.data && Array.isArray(body.data.agentes)) ? body.data.agentes : [];
+        setApiAgents(list);
+      } catch (_) { if (!cancelled) setApiAgents([]); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const sourceList = apiAgents
+    ? apiAgents.map(a => ({
+        id: a.id,
+        name: a.nombre || '—',
+        cargo: a.cargo || null,
+        telefono: a.telefono || null,
+        whatsapp: a.whatsapp || null,
+        propiedades: typeof a.propiedades_count === 'number' ? a.propiedades_count : null,
+        activo: !!a.activo,
+      }))
+    : [];
+  const filtered = sourceList.filter(a =>
+    !filter || (a.name || '').toLowerCase().includes(filter.toLowerCase()) || (a.cargo || '').toLowerCase().includes(filter.toLowerCase())
+  );
+
+  const upd = (k, v) => setPropietario(p => Object.assign({}, p, { [k]: v }));
+
+  async function onEnviar() {
+    setErr(null);
+    if (!pickedAgentId) { setErr('Elegí un agente.'); return; }
+    if (!(propietario.nombre || '').trim()) { setErr('Tu nombre es obligatorio.'); return; }
+    if (!(propietario.email || '').trim() && !(propietario.telefono || '').trim()) {
+      setErr('Dejá un email o teléfono para que el agente te contacte.'); return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/public/alquiloya/captaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agente_id: pickedAgentId,
+          propietario_nombre: propietario.nombre,
+          propietario_email: propietario.email || null,
+          propietario_telefono: propietario.telefono || null,
+          propiedad_titulo: propietario.propiedad_titulo || null,
+          tipo_propiedad: propietario.tipo_propiedad || null,
+          ciudad: propietario.ciudad || null,
+          barrio: propietario.barrio || null,
+          mensaje: propietario.mensaje || null,
+          origen: 'wizard_publicar_asesoria',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+      onAfterSuccess && onAfterSuccess();
+    } catch (e) {
+      setErr((e && e.message) || 'No se pudo enviar.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(11,22,34,.5)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        <div className="row between" style={{ padding: '16px 20px', borderBottom: '1px solid var(--line-2)' }}>
+          <div>
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>¿Querés ayuda de un agente?</div>
+            <div className="muted xs" style={{ marginTop: 2 }}>Elegí un agente y dejanos tus datos. El agente te contacta.</div>
+          </div>
+          <button onClick={onClose} className="btn btn-outline btn-sm" style={{ padding: '6px 10px' }} aria-label="Cerrar">✕</button>
+        </div>
+
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+          {/* Lista agentes */}
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Elegí un agente</div>
+            <input
+              className="input"
+              placeholder="Buscar…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              style={{ width: 200, padding: '6px 10px', fontSize: 13 }}
+            />
+          </div>
+          {apiAgents === null ? (
+            <div className="muted xs" style={{ padding: 20, textAlign: 'center' }}>Cargando agentes…</div>
+          ) : filtered.length === 0 ? (
+            <div className="muted xs" style={{ padding: 20, textAlign: 'center' }}>No hay agentes disponibles ahora.</div>
+          ) : (
+            <div className="col gap-8" style={{ maxHeight: 220, overflowY: 'auto', paddingRight: 4, marginBottom: 18 }}>
+              {filtered.map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setPickedAgentId(a.id)}
+                  className="card"
+                  style={{
+                    padding: 12, textAlign: 'left', cursor: 'pointer',
+                    border: '2px solid ' + (pickedAgentId === a.id ? 'var(--blue)' : 'var(--line)'),
+                    background: pickedAgentId === a.id ? 'var(--blue-50)' : '#fff',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}
+                >
+                  <Avatar name={a.name} size={36}/>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="row gap-6" style={{ alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</span>
+                      {a.activo && <span className="badge badge-verified" style={{ fontSize: 9.5 }}><I.check s={9}/> Verificado</span>}
+                    </div>
+                    <div className="muted xs" style={{ marginTop: 2 }}>
+                      {a.cargo ? <span>{a.cargo}</span> : null}
+                      {(a.telefono || a.whatsapp) ? <span> · {a.telefono || a.whatsapp}</span> : null}
+                      {typeof a.propiedades === 'number' ? <span> · {a.propiedades} propiedad{a.propiedades === 1 ? '' : 'es'}</span> : null}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Datos contacto */}
+          <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Tus datos de contacto</div>
+          <FormGrid>
+            <div className="field">
+              <label>Tu nombre *</label>
+              <input className="input" value={propietario.nombre} onChange={(e) => upd('nombre', e.target.value)} placeholder="Nombre y apellido"/>
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input className="input" type="email" value={propietario.email} onChange={(e) => upd('email', e.target.value)} placeholder="usuario@dominio.com"/>
+            </div>
+            <div className="field">
+              <label>Teléfono / WhatsApp</label>
+              <input className="input" value={propietario.telefono} onChange={(e) => upd('telefono', e.target.value)} placeholder="+595 ..."/>
+            </div>
+            <div className="field">
+              <label>Ciudad</label>
+              <input className="input" value={propietario.ciudad} onChange={(e) => upd('ciudad', e.target.value)} placeholder="Asunción…"/>
+            </div>
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <label>Título de la propiedad (opcional)</label>
+              <input className="input" value={propietario.propiedad_titulo} onChange={(e) => upd('propiedad_titulo', e.target.value)} placeholder="Dúplex moderno…"/>
+            </div>
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <label>Mensaje al agente (opcional)</label>
+              <textarea className="input" value={propietario.mensaje} onChange={(e) => upd('mensaje', e.target.value)} rows={3} placeholder="Contale lo que necesitás"/>
+            </div>
+          </FormGrid>
+          <div className="muted xs" style={{ marginTop: 10 }}>Dejá al menos email o teléfono para que el agente pueda contactarte.</div>
+
+          {err && (
+            <div style={{ marginTop: 12, padding: 10, background: '#fdecec', borderRadius: 10, border: '1px solid #f3c2c2', color: '#a8312f', fontSize: 13 }}>
+              {err}
+            </div>
+          )}
+        </div>
+
+        <div className="row between" style={{ padding: '14px 20px', borderTop: '1px solid var(--line-2)' }}>
+          <button onClick={onClose} className="btn btn-outline">Cancelar</button>
+          <button
+            onClick={onEnviar}
+            disabled={busy}
+            className="btn btn-primary"
+            style={busy ? { opacity: 0.6, cursor: 'wait' } : null}
+          >
+            {busy ? 'Enviando…' : 'Enviar solicitud al agente'} <I.check s={14}/>
+          </button>
         </div>
       </div>
     </div>
