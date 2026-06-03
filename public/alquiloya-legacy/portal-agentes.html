@@ -96,6 +96,52 @@
     .card { padding: 22px; border-radius: 16px; }
     h1 { font-size: 22px; }
   }
+
+  /* Modal Solicitar acceso */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(15,23,42,.55);
+    backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    width: 100%; max-width: 460px;
+    background: #fff; border-radius: 20px;
+    box-shadow: 0 24px 60px -10px rgba(15,23,42,.4);
+    padding: 24px;
+    max-height: 92vh; overflow-y: auto;
+  }
+  .modal h2 { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 20px; margin: 0; color: var(--ink); }
+  .modal p.lead { margin-top: 6px; font-size: 13.5px; color: var(--ink-3); }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px;
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    background: #fff;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(0,88,165,.15);
+  }
+  .field textarea { min-height: 70px; resize: vertical; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .seg button {
+    padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: #fff; cursor: pointer; font-family: inherit;
+    font-size: 13.5px; font-weight: 600; color: var(--ink-2);
+  }
+  .seg button.active { border-color: var(--blue); background: var(--blue-50); color: var(--blue); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-actions .btn { flex: 1; padding: 11px 16px; font-size: 14px; }
+  .modal-cancel { background: #f1f5f9; color: var(--ink-2); }
+  .modal-cancel:hover { background: #e2e8f0; }
+  .feedback { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: none; }
+  .feedback.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+  .feedback.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; display: block; }
 </style>
 </head>
 <body>
@@ -111,14 +157,145 @@
 
         <div class="actions">
           <a class="btn btn-primary" href="/portal-agentes/login">Ya tengo cuenta</a>
-          <a class="btn btn-outline"
-             href="https://wa.me/595981000000?text=Hola%2C%20quiero%20solicitar%20acceso%20como%20agente%20AlquiloYa."
-             target="_blank" rel="noopener noreferrer">Solicitar acceso</a>
+          <button type="button" class="btn btn-outline" id="open-solicitar-acceso">Solicitar acceso</button>
         </div>
       </div>
 
       <a class="back" href="/publico">← Volver al inicio</a>
     </div>
   </div>
+
+  <div class="modal-backdrop" id="solicitar-modal" role="dialog" aria-modal="true" aria-labelledby="sol-title">
+    <div class="modal">
+      <h2 id="sol-title">Solicitar acceso</h2>
+      <p class="lead">Contanos quién sos. Nuestro equipo revisa cada pedido y te contactamos.</p>
+
+      <form id="solicitar-form" novalidate>
+        <div class="field">
+          <label>¿Qué tipo de cuenta querés?</label>
+          <div class="seg" role="tablist">
+            <button type="button" data-tipo="propietario" class="active">Propietario</button>
+            <button type="button" data-tipo="agente">Agente inmobiliario</button>
+          </div>
+        </div>
+
+        <div class="field" id="field-subtipo" style="display:none">
+          <label for="sol-subtipo">Tipo de agente</label>
+          <select id="sol-subtipo">
+            <option value="Independiente">Independiente</option>
+            <option value="Inmobiliaria">Inmobiliaria</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="sol-nombre">Nombre completo *</label>
+          <input id="sol-nombre" type="text" required maxlength="160" />
+        </div>
+        <div class="field">
+          <label for="sol-email">Email</label>
+          <input id="sol-email" type="email" maxlength="160" placeholder="vos@ejemplo.com" />
+        </div>
+        <div class="field">
+          <label for="sol-telefono">Teléfono / WhatsApp</label>
+          <input id="sol-telefono" type="tel" maxlength="40" placeholder="+595 9XX XXX XXX" />
+        </div>
+        <div class="field" id="field-empresa" style="display:none">
+          <label for="sol-empresa">Inmobiliaria / Razón social</label>
+          <input id="sol-empresa" type="text" maxlength="160" />
+        </div>
+        <div class="field">
+          <label for="sol-ciudad">Ciudad</label>
+          <input id="sol-ciudad" type="text" maxlength="80" />
+        </div>
+        <div class="field">
+          <label for="sol-mensaje">Mensaje (opcional)</label>
+          <textarea id="sol-mensaje" maxlength="1200" placeholder="Contanos cuántos inmuebles tenés, qué buscás, etc."></textarea>
+        </div>
+
+        <div class="feedback" id="sol-feedback"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn modal-cancel" id="sol-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="sol-submit">Enviar solicitud</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var backdrop = document.getElementById('solicitar-modal');
+      var openBtn = document.getElementById('open-solicitar-acceso');
+      var cancelBtn = document.getElementById('sol-cancel');
+      var form = document.getElementById('solicitar-form');
+      var submitBtn = document.getElementById('sol-submit');
+      var feedback = document.getElementById('sol-feedback');
+      var segBtns = document.querySelectorAll('.seg button');
+      var fieldSub = document.getElementById('field-subtipo');
+      var fieldEmpresa = document.getElementById('field-empresa');
+      var tipo = 'propietario';
+
+      function openModal() { backdrop.classList.add('open'); }
+      function closeModal() {
+        backdrop.classList.remove('open');
+        feedback.className = 'feedback';
+        feedback.textContent = '';
+      }
+      openBtn.addEventListener('click', openModal);
+      cancelBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+      segBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          segBtns.forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          tipo = b.getAttribute('data-tipo');
+          fieldSub.style.display = tipo === 'agente' ? '' : 'none';
+          fieldEmpresa.style.display = tipo === 'agente' ? '' : 'none';
+        });
+      });
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        feedback.className = 'feedback';
+        feedback.textContent = '';
+
+        var nombre = document.getElementById('sol-nombre').value.trim();
+        var email = document.getElementById('sol-email').value.trim();
+        var telefono = document.getElementById('sol-telefono').value.trim();
+        var empresa = document.getElementById('sol-empresa').value.trim();
+        var ciudad = document.getElementById('sol-ciudad').value.trim();
+        var mensaje = document.getElementById('sol-mensaje').value.trim();
+        var subTipo = tipo === 'agente' ? document.getElementById('sol-subtipo').value : null;
+
+        if (!nombre) { feedback.className = 'feedback error'; feedback.textContent = 'Ingresá tu nombre.'; return; }
+        if (!email && !telefono) { feedback.className = 'feedback error'; feedback.textContent = 'Necesitamos al menos un email o un teléfono.'; return; }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando…';
+        try {
+          var res = await fetch('/api/public/alquiloya/solicitudes-acceso', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: tipo, sub_tipo: subTipo, nombre: nombre, email: email || null, telefono: telefono || null, empresa: empresa || null, ciudad: ciudad || null, mensaje: mensaje || null })
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok || !data || data.success === false) {
+            throw new Error((data && (data.error || (data.data && data.data.error))) || ('HTTP ' + res.status));
+          }
+          feedback.className = 'feedback success';
+          feedback.textContent = '¡Listo! Recibimos tu solicitud. Te vamos a contactar en breve.';
+          form.reset();
+        } catch (err) {
+          feedback.className = 'feedback error';
+          feedback.textContent = 'No pudimos registrar tu solicitud. ' + (err && err.message ? err.message : '');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar solicitud';
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

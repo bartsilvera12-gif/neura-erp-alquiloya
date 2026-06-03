@@ -881,6 +881,7 @@ function HowItWorks() {
 }
 
 function OwnersBlock({ onNav }) {
+  const [reqOpen, setReqOpen] = React.useState(false);
   return (
     <section className="container" style={{ padding: '64px 32px' }}>
       <div style={{
@@ -912,7 +913,9 @@ function OwnersBlock({ onNav }) {
             <div className="row gap-12" style={{ marginTop: 28 }}>
               <button className="btn btn-primary btn-lg" onClick={() => onNav('plans')}>Conocer planes <I.arrow s={16}/></button>
               <button className="btn btn-ghost btn-lg" onClick={() => onNav('publish')} style={{ color: '#fff', border: '1px solid rgba(255,255,255,.3)' }}>Publicar gratis</button>
+              <button className="btn btn-ghost btn-lg" onClick={() => setReqOpen(true)} style={{ color: 'var(--ink)', background: 'var(--yellow)', border: 'none' }}>Solicitar acceso</button>
             </div>
+            {reqOpen && <RequestAccessModal onClose={() => setReqOpen(false)}/>}
             <div className="row gap-32" style={{ marginTop: 32 }}>
               {[
                 ['+15.000','propietarios activos'],
@@ -1071,4 +1074,127 @@ function Faq() {
   );
 }
 
-Object.assign(window, { HomePage, QRPosterMock, MiniMap, SectionHead });
+function RequestAccessModal({ onClose }) {
+  const [tipo, setTipo] = React.useState('propietario');
+  const [subTipo, setSubTipo] = React.useState('Independiente');
+  const [form, setForm] = React.useState({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
+  const [busy, setBusy] = React.useState(false);
+  const [feedback, setFeedback] = React.useState(null); // {kind:'error'|'success', text}
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  React.useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  async function submit(e) {
+    e.preventDefault();
+    setFeedback(null);
+    if (!form.nombre.trim()) return setFeedback({ kind: 'error', text: 'Ingresá tu nombre.' });
+    if (!form.email.trim() && !form.telefono.trim()) return setFeedback({ kind: 'error', text: 'Ingresá email o teléfono.' });
+    setBusy(true);
+    try {
+      const payload = {
+        tipo, sub_tipo: tipo === 'agente' ? subTipo : null,
+        nombre: form.nombre.trim(),
+        email: form.email.trim() || null,
+        telefono: form.telefono.trim() || null,
+        empresa: form.empresa.trim() || null,
+        ciudad: form.ciudad.trim() || null,
+        mensaje: form.mensaje.trim() || null,
+      };
+      const res = await fetch('/api/public/alquiloya/solicitudes-acceso', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
+      setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu solicitud. Te contactamos en breve.' });
+      setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: 'No pudimos registrar tu solicitud. ' + (err.message || '') });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const overlay = {
+    position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,.55)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+  };
+  const modal = {
+    width: '100%', maxWidth: 480, background: '#fff', borderRadius: 20, padding: 24,
+    boxShadow: '0 24px 60px -10px rgba(15,23,42,.4)', maxHeight: '92vh', overflowY: 'auto', color: 'var(--ink)',
+  };
+  const fieldLabel = { fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 6, display: 'block' };
+  const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, color: 'var(--ink)', background: '#fff' };
+  const segBtn = (active) => ({ padding: 10, borderRadius: 10, border: '1px solid ' + (active ? 'var(--blue)' : 'var(--line)'), background: active ? 'var(--blue-50)' : '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: active ? 'var(--blue)' : 'var(--ink-2)' });
+
+  return (
+    <div style={overlay} onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div style={modal}>
+        <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>Solicitar acceso</h2>
+        <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)' }}>Contanos quién sos. Nuestro equipo revisa cada pedido y te contactamos.</p>
+        <form onSubmit={submit}>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>¿Qué tipo de cuenta querés?</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button type="button" style={segBtn(tipo === 'propietario')} onClick={() => setTipo('propietario')}>Propietario</button>
+              <button type="button" style={segBtn(tipo === 'agente')} onClick={() => setTipo('agente')}>Agente inmobiliario</button>
+            </div>
+          </div>
+          {tipo === 'agente' && (
+            <div style={{ marginTop: 14 }}>
+              <label style={fieldLabel}>Tipo de agente</label>
+              <select style={inputStyle} value={subTipo} onChange={e => setSubTipo(e.target.value)}>
+                <option value="Independiente">Independiente</option>
+                <option value="Inmobiliaria">Inmobiliaria</option>
+              </select>
+            </div>
+          )}
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Nombre completo *</label>
+            <input style={inputStyle} maxLength={160} value={form.nombre} onChange={e => set('nombre', e.target.value)} required/>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Email</label>
+            <input style={inputStyle} type="email" maxLength={160} placeholder="vos@ejemplo.com" value={form.email} onChange={e => set('email', e.target.value)}/>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Teléfono / WhatsApp</label>
+            <input style={inputStyle} type="tel" maxLength={40} placeholder="+595 9XX XXX XXX" value={form.telefono} onChange={e => set('telefono', e.target.value)}/>
+          </div>
+          {tipo === 'agente' && (
+            <div style={{ marginTop: 14 }}>
+              <label style={fieldLabel}>Inmobiliaria / Razón social</label>
+              <input style={inputStyle} maxLength={160} value={form.empresa} onChange={e => set('empresa', e.target.value)}/>
+            </div>
+          )}
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Ciudad</label>
+            <input style={inputStyle} maxLength={80} value={form.ciudad} onChange={e => set('ciudad', e.target.value)}/>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Mensaje (opcional)</label>
+            <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} maxLength={1200} value={form.mensaje} onChange={e => set('mensaje', e.target.value)} placeholder="Contanos cuántos inmuebles tenés, qué buscás, etc."/>
+          </div>
+
+          {feedback && (
+            <div style={{
+              marginTop: 12, padding: '10px 12px', borderRadius: 10, fontSize: 13,
+              background: feedback.kind === 'error' ? '#fef2f2' : '#ecfdf5',
+              color: feedback.kind === 'error' ? '#991b1b' : '#065f46',
+              border: '1px solid ' + (feedback.kind === 'error' ? '#fecaca' : '#a7f3d0'),
+            }}>{feedback.text}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+            <button type="button" disabled={busy} onClick={onClose} className="btn" style={{ flex: 1, background: '#f1f5f9', color: 'var(--ink-2)' }}>Cancelar</button>
+            <button type="submit" disabled={busy} className="btn btn-primary" style={{ flex: 1 }}>{busy ? 'Enviando…' : 'Enviar solicitud'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { HomePage, QRPosterMock, MiniMap, SectionHead, RequestAccessModal });

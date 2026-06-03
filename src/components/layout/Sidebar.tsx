@@ -35,6 +35,7 @@ import {
   Percent,
   Tags,
   Building,
+  Inbox,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
@@ -188,6 +189,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     label: "Agentes inmobiliarios",
     href: "/dashboard/agentes-inmobiliarios",
     icon: Users,
+  },
+  {
+    key: "solicitudes-acceso",
+    slug: "agentes-inmobiliarios",
+    label: "Solicitudes de acceso",
+    href: "/dashboard/solicitudes-acceso",
+    icon: Inbox,
   },
   {
     key: "referidos",
