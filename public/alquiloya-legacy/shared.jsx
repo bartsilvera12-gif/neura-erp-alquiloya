@@ -452,19 +452,20 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 200,
-      display: 'grid', placeItems: 'center', padding: 20, overflowY: 'auto'
+      display: 'grid', placeItems: 'center', padding: 20
     }}>
       <div onClick={(e) => e.stopPropagation()} className="card" style={{
-        padding: 28, maxWidth: 680, width: '100%', background: '#fff', position: 'relative',
-        maxHeight: 'calc(100vh - 40px)', overflowY: 'auto'
+        maxWidth: 680, width: '100%', background: '#fff', position: 'relative',
+        maxHeight: 'calc(100vh - 40px)',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0
       }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 14, right: 14, background: 'var(--bg-2)', border: 'none',
-          width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'grid', placeItems: 'center'
+          width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'grid', placeItems: 'center', zIndex: 2
         }}><I.x s={14}/></button>
 
         {step === 2 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ textAlign: 'center', padding: '40px 28px' }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--blue-50)', color: 'var(--blue)', display: 'grid', placeItems: 'center', margin: '0 auto' }}>
               <I.check s={36}/>
             </div>
@@ -478,21 +479,25 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
           </div>
         ) : (
           <>
-            <div className="tag">Verificación de inmueble</div>
-            <h3 style={{ fontSize: 22, marginTop: 6 }}>Solicitar badge "Verificado"</h3>
-            <p className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
-              Para obtener el badge azul "Verificado" y aparecer con prioridad en resultados, necesitamos confirmar la titularidad. Todos los campos son obligatorios.
-            </p>
+            {/* Header sticky */}
+            <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+              <div className="tag">Verificación de inmueble</div>
+              <h3 style={{ fontSize: 22, marginTop: 6 }}>Solicitar badge "Verificado"</h3>
+              <p className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+                Para obtener el badge azul "Verificado" y aparecer con prioridad en resultados, necesitamos confirmar la titularidad. Todos los campos son obligatorios.
+              </p>
+              {propertyTitle && (
+                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-2)', borderRadius: 10, fontSize: 13 }}>
+                  <span className="muted">Inmueble: </span>
+                  <strong>{propertyTitle}</strong>
+                  {propertyId && <span className="mono muted" style={{ marginLeft: 8 }}>{propertyId}</span>}
+                </div>
+              )}
+            </div>
 
-            {propertyTitle && (
-              <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-2)', borderRadius: 10, fontSize: 13 }}>
-                <span className="muted">Inmueble: </span>
-                <strong>{propertyTitle}</strong>
-                {propertyId && <span className="mono muted" style={{ marginLeft: 8 }}>{propertyId}</span>}
-              </div>
-            )}
-
-            <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* Body scrollable */}
+            <div style={{ padding: '20px 28px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <DocField
                 label="Cuenta Corriente Catastral (CCC)"
                 hint="Número de cuenta del inmueble en SET / Municipalidad"
@@ -537,7 +542,7 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
             </div>
 
             <div className="divider" style={{ margin: '20px 0 16px' }}/>
-            <div className="row gap-12" style={{ gridTemplateColumns: '1fr 1fr', display: 'grid' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="field">
                 <label>Nombre del titular</label>
                 <input className="input" placeholder="Nombre y apellido" value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)}/>
@@ -554,10 +559,18 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
                 Declaro que la documentación es auténtica y autorizo a AlquiloYa a verificar los datos con las entidades correspondientes. Una verificación fraudulenta puede dar de baja la cuenta.
               </span>
             </label>
+            </div>
 
-            <div className="row between" style={{ marginTop: 20 }}>
-              <div className="muted xs">Costo único: <strong style={{ color: 'var(--ink-2)' }}>Gs. 45.000</strong> · Vigencia: 12 meses</div>
-              <div className="row gap-10">
+            {/* Footer sticky */}
+            <div style={{
+              padding: '14px 28px', borderTop: '1px solid var(--line-2)', background: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+              flexShrink: 0
+            }}>
+              <div className="muted xs" style={{ minWidth: 0 }}>
+                Costo único: <strong style={{ color: 'var(--ink-2)' }}>Gs. 45.000</strong> · Vigencia: 12 meses
+              </div>
+              <div className="row gap-10" style={{ flexShrink: 0 }}>
                 <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
                 <button
                   className="btn btn-blue"
