@@ -148,7 +148,7 @@ function AgentesTab({
 
   const inactiveCount = useMemo(() => rows.filter((r) => !r.activo).length, [rows]);
   const visibleRows = useMemo(
-    () => (showInactive ? rows : rows.filter((r) => r.activo)),
+    () => (showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo)),
     [rows, showInactive]
   );
 

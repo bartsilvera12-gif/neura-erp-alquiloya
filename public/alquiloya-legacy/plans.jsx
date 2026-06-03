@@ -55,7 +55,28 @@ function PlansPage({ onNav }) {
         {filtered.map(p => <PlanCard key={p.tier} plan={p}/>)}
       </div>
 
-      <div className="card" style={{ marginTop: 56, padding: '32px 32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
+      <CompareTable/>
+      <PlansFaq/>
+      {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
+    </div>
+  );
+}
+
+function BoostPage({ onNav }) {
+  const [verifyOpen, setVerifyOpen] = React.useState(false);
+  return (
+    <div className="fade-in container" style={{ padding: '48px 32px' }}>
+      <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto' }}>
+        <div className="tag" style={{ color: 'var(--yellow)' }}>Destacar propiedad</div>
+        <h2 style={{ fontSize: 44, marginTop: 8, lineHeight: 1.1 }}>
+          Hacé que tu inmueble se vea más y mejor.
+        </h2>
+        <p style={{ marginTop: 16, fontSize: 17, color: 'var(--ink-3)' }}>
+          Sumá verificación, posición top e impulsos para multiplicar las vistas de tu publicación.
+        </p>
+      </div>
+
+      <div className="card" style={{ marginTop: 40, padding: '32px 32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
         <div>
           <div className="tag">Add-on</div>
           <h3 style={{ marginTop: 8, fontSize: 24 }}>Inmueble destacado / verificado</h3>
@@ -86,8 +107,6 @@ function PlansPage({ onNav }) {
       </div>
 
       <ImpulseSection/>
-      <CompareTable/>
-      <PlansFaq/>
       {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
     </div>
   );
@@ -287,4 +306,4 @@ function PlansFaq() {
   return null;
 }
 
-Object.assign(window, { PlansPage });
+Object.assign(window, { PlansPage, BoostPage });

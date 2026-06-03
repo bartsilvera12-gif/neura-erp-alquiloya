@@ -46,6 +46,7 @@ function App() {
       {route === 'detail' && <DetailPage p={property} onProperty={openProperty} onNav={nav}/>}
       {route === 'temporal' && <TemporalPage onProperty={openProperty}/>}
       {route === 'plans' && <PlansPage onNav={nav}/>}
+      {route === 'boost' && <BoostPage onNav={nav}/>}
       {route === 'help' && <HelpPage onNav={nav}/>}
       {route.startsWith('agent/') && <AgentProfilePage slug={route.slice('agent/'.length)} onNav={nav} onProperty={openProperty}/>}
       {route === 'publish' && <PublishPage/>}

@@ -6,6 +6,7 @@ function Header({ route, onNav, onPublish }) {
     { id: 'catalog', label: 'Alquileres' },
     { id: 'publish', label: 'Publicar propiedad' },
     { id: 'plans', label: 'Planes' },
+    { id: 'boost', label: 'Destacar propiedad' },
     { id: 'help', label: 'Ayuda' },
   ];
   return (

@@ -830,7 +830,35 @@ function AgentLevelBadge({ level }) {
 }
 
 function StepPlan({ form, setF }) {
-  const list = PLANS.filter(p => p.tier && String(p.tier).includes('owner'));
+  const [apiPlans, setApiPlans] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/public/alquiloya/planes-publicacion', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+      .then(body => {
+        if (cancelled) return;
+        const arr = body && body.success && body.data && Array.isArray(body.data.planes) ? body.data.planes : null;
+        if (!arr || arr.length === 0) return;
+        const mapped = arr.map(p => ({
+          tier: p.tier,
+          target: p.target,
+          name: p.nombre,
+          price: Number(p.precio) || 0,
+          billing: p.billing,
+          badge: p.badge,
+          bullets: Array.isArray(p.bullets) ? p.bullets : [],
+          excluded: Array.isArray(p.excluded) ? p.excluded : [],
+          cta: p.cta || 'Quiero este plan',
+          highlighted: !!p.highlighted,
+          freeBoosts: p.free_boosts != null ? Number(p.free_boosts) : undefined,
+        }));
+        setApiPlans(mapped);
+      })
+      .catch(() => { /* fallback PLANS mock */ });
+    return () => { cancelled = true; };
+  }, []);
+  const source = apiPlans || PLANS;
+  const list = source.filter(p => p.tier && String(p.tier).includes('owner'));
   return (
     <div>
       <div className="tag">Paso 4</div>
