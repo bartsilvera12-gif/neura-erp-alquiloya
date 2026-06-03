@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listErpPropiedades } from "@/lib/alquiloya/erp-propiedades";
+import DeletePropiedadButton from "./DeletePropiedadButton";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -84,17 +85,17 @@ export default async function PropiedadesPage() {
               <tr>
                 <th className="px-3 py-2.5">Foto</th>
                 <th className="px-3 py-2.5">Título</th>
-                <th className="px-3 py-2.5">Tipo</th>
+                <th className="hidden px-3 py-2.5 md:table-cell">Tipo</th>
                 <th className="px-3 py-2.5">Ciudad</th>
-                <th className="px-3 py-2.5">Barrio</th>
+                <th className="hidden px-3 py-2.5 xl:table-cell">Barrio</th>
                 <th className="px-3 py-2.5 text-right">Precio</th>
-                <th className="px-3 py-2.5">Estado</th>
-                <th className="px-3 py-2.5">Agente</th>
+                <th className="hidden px-3 py-2.5 lg:table-cell">Estado</th>
+                <th className="hidden px-3 py-2.5 lg:table-cell">Agente</th>
                 <th className="px-3 py-2.5">Activo</th>
                 <th className="px-3 py-2.5">Web</th>
-                <th className="px-3 py-2.5 text-center">Fotos</th>
-                <th className="px-3 py-2.5 text-center">Carac.</th>
-                <th className="px-3 py-2.5 text-right">Acciones</th>
+                <th className="hidden px-3 py-2.5 text-center xl:table-cell">Fotos</th>
+                <th className="hidden px-3 py-2.5 text-center xl:table-cell">Carac.</th>
+                <th className="sticky right-0 bg-slate-50 px-3 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -119,20 +120,24 @@ export default async function PropiedadesPage() {
                     {p.codigo ? (
                       <div className="mt-0.5 text-[11px] text-slate-400">{p.codigo}</div>
                     ) : null}
+                    <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+                      {p.tipo ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{p.tipo}</span> : null}
+                      {p.estado ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{p.estado}</span> : null}
+                    </div>
                   </td>
-                  <td className="px-3 py-2 text-slate-700">{p.tipo ?? "—"}</td>
+                  <td className="hidden px-3 py-2 text-slate-700 md:table-cell">{p.tipo ?? "—"}</td>
                   <td className="px-3 py-2 text-slate-700">{p.ciudad ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-700">{p.barrio ?? "—"}</td>
+                  <td className="hidden px-3 py-2 text-slate-700 xl:table-cell">{p.barrio ?? "—"}</td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-900">
                     {fmtPrecio(p.precio, p.moneda)}
                   </td>
-                  <td className="px-3 py-2 text-slate-700">{p.estado ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-700">{p.agente_nombre ?? "—"}</td>
+                  <td className="hidden px-3 py-2 text-slate-700 lg:table-cell">{p.estado ?? "—"}</td>
+                  <td className="hidden px-3 py-2 text-slate-700 lg:table-cell">{p.agente_nombre ?? "—"}</td>
                   <td className="px-3 py-2"><Badge on={p.activo} label={p.activo ? "Sí" : "No"} /></td>
                   <td className="px-3 py-2"><Badge on={p.visible_web} label={p.visible_web ? "Pub" : "Priv"} /></td>
-                  <td className="px-3 py-2 text-center text-slate-700 tabular-nums">{p.fotos_count}</td>
-                  <td className="px-3 py-2 text-center text-slate-700 tabular-nums">{p.caracteristicas_count}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="hidden px-3 py-2 text-center text-slate-700 tabular-nums xl:table-cell">{p.fotos_count}</td>
+                  <td className="hidden px-3 py-2 text-center text-slate-700 tabular-nums xl:table-cell">{p.caracteristicas_count}</td>
+                  <td className="sticky right-0 bg-white px-3 py-2 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)] group-hover:bg-slate-50">
                     <div className="inline-flex items-center gap-1.5">
                       <Link
                         href={`/dashboard/propiedades/${p.id}`}
@@ -146,6 +151,7 @@ export default async function PropiedadesPage() {
                       >
                         Editar
                       </Link>
+                      <DeletePropiedadButton id={p.id} titulo={p.titulo} />
                     </div>
                   </td>
                 </tr>

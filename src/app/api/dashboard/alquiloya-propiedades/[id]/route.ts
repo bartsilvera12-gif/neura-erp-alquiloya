@@ -222,3 +222,61 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await ctx.params;
+    if (!uuidRe.test(id)) return NextResponse.json({ error: "id invalido" }, { status: 400 });
+
+    const user = await getAuthUserForApiRoute(request);
+    if (!user?.id) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+    const pool = getChatPostgresPool();
+    if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const existing = await client.query(
+        `SELECT id FROM ${t("propiedades")} WHERE id = $1::uuid AND empresa_id = $2::uuid FOR UPDATE`,
+        [id, ALQUILOYA_EMPRESA_ID]
+      );
+      if (existing.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: "Propiedad no encontrada" }, { status: 404 });
+      }
+
+      // Borrado en cascada: fotos + características + propiedad. El propietario queda intacto.
+      await client.query(
+        `DELETE FROM ${t("propiedad_fotos")} WHERE empresa_id = $1::uuid AND propiedad_id = $2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      await client.query(
+        `DELETE FROM ${t("propiedad_caracteristicas")} WHERE empresa_id = $1::uuid AND propiedad_id = $2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      await client.query(
+        `DELETE FROM ${t("propiedades")} WHERE id = $1::uuid AND empresa_id = $2::uuid`,
+        [id, ALQUILOYA_EMPRESA_ID]
+      );
+
+      await client.query("COMMIT");
+      return NextResponse.json({ success: true, id });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("[api/dashboard/alquiloya-propiedades/[id] DELETE]", err instanceof Error ? err.message : err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error" },
+      { status: 500 }
+    );
+  }
+}
