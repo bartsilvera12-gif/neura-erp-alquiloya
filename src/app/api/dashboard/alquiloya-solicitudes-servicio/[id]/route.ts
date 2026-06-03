@@ -97,24 +97,42 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
       if (sol.kind === "cambio_plan") {
         if (!sol.plan_tier) throw new Error("la solicitud no tiene plan_tier");
-        const pr = await client.query<{ id: string }>(
-          `SELECT id FROM ${t("planes_publicacion")}
+        const pr = await client.query<{ id: string; billing: string | null }>(
+          `SELECT id, billing FROM ${t("planes_publicacion")}
             WHERE empresa_id=$1::uuid AND tier=$2 AND activo=true LIMIT 1`,
           [ALQUILOYA_EMPRESA_ID, sol.plan_tier]
         );
-        const planId = pr.rows[0]?.id;
-        if (!planId) throw new Error(`plan "${sol.plan_tier}" no existe`);
+        const planRow = pr.rows[0];
+        if (!planRow?.id) throw new Error(`plan "${sol.plan_tier}" no existe`);
+        const planId = planRow.id;
+        // vencimiento segun billing: gratis = null, unico/mensual = +30d, anual = +365d
+        const billing = (planRow.billing ?? "").toLowerCase();
+        const vencSql =
+          billing === "gratis"
+            ? "NULL"
+            : billing === "anual"
+              ? "now() + interval '365 days'"
+              : "now() + interval '30 days'";
 
         if (overridePropietario) {
           await client.query(
             `UPDATE ${t("propietarios")}
-                SET plan_publicacion_id=$3::uuid, updated_at=now()
+                SET plan_publicacion_id=$3::uuid,
+                    plan_vencimiento_at=${vencSql},
+                    updated_at=now()
               WHERE empresa_id=$1::uuid AND id=$2::uuid`,
             [ALQUILOYA_EMPRESA_ID, overridePropietario, planId]
           );
           resultadoId = overridePropietario;
         } else if (overrideAgente) {
-          // agentes no tiene plan; queda registrado en la solicitud.
+          await client.query(
+            `UPDATE ${t("agentes")}
+                SET plan_publicacion_id=$3::uuid,
+                    plan_vencimiento_at=${vencSql},
+                    updated_at=now()
+              WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+            [ALQUILOYA_EMPRESA_ID, overrideAgente, planId]
+          );
           resultadoId = overrideAgente;
         } else {
           throw new Error("Necesitás indicar propietario_id (o agente_id) al aprobar el cambio de plan");

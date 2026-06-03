@@ -85,33 +85,43 @@ export async function PATCH(request: Request, ctx: Ctx) {
     try {
       await client.query("BEGIN");
 
-      // Resolver plan tier → uuid si vino solicitado (puede ser null si el plan no existe).
+      // Resolver plan tier → uuid + billing para calcular vencimiento.
       let planId: string | null = null;
+      let billing = "";
       if (sol.plan_tier_solicitado) {
-        const pr = await client.query<{ id: string }>(
-          `SELECT id FROM ${t("planes_publicacion")}
+        const pr = await client.query<{ id: string; billing: string | null }>(
+          `SELECT id, billing FROM ${t("planes_publicacion")}
             WHERE empresa_id = $1::uuid AND tier = $2 AND activo = true LIMIT 1`,
           [ALQUILOYA_EMPRESA_ID, sol.plan_tier_solicitado]
         );
         planId = pr.rows[0]?.id ?? null;
+        billing = (pr.rows[0]?.billing ?? "").toLowerCase();
       }
+      const vencSql =
+        !planId || billing === "gratis"
+          ? "NULL"
+          : billing === "anual"
+            ? "now() + interval '365 days'"
+            : "now() + interval '30 days'";
 
       let resultadoId: string;
       if (sol.tipo === "agente") {
         const cargo = sol.sub_tipo ?? "Independiente";
         const r = await client.query<{ id: string }>(
           `INSERT INTO ${t("agentes")}
-             (empresa_id, nombre, email, telefono, whatsapp, cargo, activo)
-           VALUES ($1::uuid, $2, $3, $4, $4, $5, true)
+             (empresa_id, nombre, email, telefono, whatsapp, cargo, activo,
+              plan_publicacion_id, plan_vencimiento_at)
+           VALUES ($1::uuid, $2, $3, $4, $4, $5, true, $6, ${vencSql})
            RETURNING id`,
-          [ALQUILOYA_EMPRESA_ID, sol.nombre, sol.email, sol.telefono, cargo]
+          [ALQUILOYA_EMPRESA_ID, sol.nombre, sol.email, sol.telefono, cargo, planId]
         );
         resultadoId = r.rows[0].id;
       } else {
         const r = await client.query<{ id: string }>(
           `INSERT INTO ${t("propietarios")}
-             (empresa_id, nombre, email, telefono, tipo_persona, estado, activo, plan_publicacion_id)
-           VALUES ($1::uuid, $2, $3, $4, 'fisica', 'verificado', true, $5)
+             (empresa_id, nombre, email, telefono, tipo_persona, estado, activo,
+              plan_publicacion_id, plan_vencimiento_at)
+           VALUES ($1::uuid, $2, $3, $4, 'fisica', 'verificado', true, $5, ${vencSql})
            RETURNING id`,
           [ALQUILOYA_EMPRESA_ID, sol.nombre, sol.email, sol.telefono, planId]
         );
