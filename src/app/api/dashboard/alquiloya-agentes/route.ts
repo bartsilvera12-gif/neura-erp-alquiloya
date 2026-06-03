@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     const { rows: cols } = await queryWithRetry<{ column_name: string }>(
       pool,
       `SELECT column_name FROM information_schema.columns
-         WHERE table_schema='alquiloya' AND table_name='agentes'`
+         WHERE table_schema='alquiloya' AND table_name='agentes'`,
+      []
     );
     const colSet = new Set(cols.map((c) => c.column_name));
     const extras: { col: string; val: unknown }[] = [];

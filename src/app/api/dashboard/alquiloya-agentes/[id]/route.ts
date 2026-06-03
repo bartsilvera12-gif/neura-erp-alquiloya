@@ -156,7 +156,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const { rows: cols } = await queryWithRetry<{ column_name: string }>(
       pool,
       `SELECT column_name FROM information_schema.columns
-         WHERE table_schema='alquiloya' AND table_name='agentes'`
+         WHERE table_schema='alquiloya' AND table_name='agentes'`,
+      []
     );
     const colSet = new Set(cols.map((c) => c.column_name));
     if ("verificado" in body && colSet.has("verificado")) {

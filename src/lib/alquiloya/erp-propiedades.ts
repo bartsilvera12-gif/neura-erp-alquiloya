@@ -27,7 +27,8 @@ async function destacadaHastaExists(): Promise<boolean> {
       `SELECT EXISTS (
          SELECT 1 FROM information_schema.columns
           WHERE table_schema='alquiloya' AND table_name='propiedades' AND column_name='destacada_hasta'
-       ) AS ok`
+       ) AS ok`,
+      []
     );
     hasDestacadaHasta = rows[0]?.ok === true;
   } catch {
