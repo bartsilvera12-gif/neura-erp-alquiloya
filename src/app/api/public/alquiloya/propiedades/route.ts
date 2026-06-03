@@ -149,7 +149,23 @@ export async function POST(request: Request) {
         if (r.rows[0]) propietarioId = r.rows[0].id;
       }
 
-      const planId = s(body.plan_publicacion_id, 50);
+      // plan_publicacion_id puede llegar como UUID directo o como tier slug (ej. "gratuito-owner").
+      // Si no es UUID, resolvemos contra planes_publicacion por tier; si tampoco existe, queda null.
+      const planRaw = s(body.plan_publicacion_id, 80);
+      let planId: string | null = null;
+      if (planRaw) {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(planRaw)) {
+          planId = planRaw;
+        } else {
+          const r = await client.query<{ id: string }>(
+            `SELECT id FROM "alquiloya"."planes_publicacion"
+              WHERE empresa_id = $1::uuid AND tier = $2 AND activo = true
+              LIMIT 1`,
+            [ALQUILOYA_EMPRESA_ID, planRaw]
+          );
+          planId = r.rows[0]?.id ?? null;
+        }
+      }
       const notas = s(body.notas_propietario, 1000);
 
       if (!propietarioId) {
