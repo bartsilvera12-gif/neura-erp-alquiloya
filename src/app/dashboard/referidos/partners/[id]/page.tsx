@@ -31,6 +31,19 @@ type Commission = {
   id: string; periodo: string | null; monto: number; estado: string;
   generada_at: string | null; pagada_at: string | null;
 };
+type Conversion = {
+  id: string;
+  referido_nombre: string | null;
+  referido_email: string | null;
+  fuente: string | null;
+  plan_nombre: string | null;
+  plan_tier: string | null;
+  monto_base: number | null;
+  moneda: string | null;
+  comision_monto: number | null;
+  comision_estado: string | null;
+  converted_at: string | null;
+};
 
 async function load(id: string) {
   const pool = getChatPostgresPool();
@@ -46,7 +59,7 @@ async function load(id: string) {
   if (!p.rows || p.rows.length === 0) return null;
   const partner = p.rows[0];
 
-  const [links, rule, stats, comm, acceso] = await Promise.all([
+  const [links, rule, stats, comm, acceso, conversions] = await Promise.all([
     queryWithRetry<LinkRow>(
       pool,
       `SELECT id, slug, campania, cookie_dias, activo, created_at::text AS created_at
@@ -102,6 +115,42 @@ async function load(id: string) {
       );
       return r.rows?.[0] ?? null;
     })(),
+    queryWithRetry<Conversion>(
+      pool,
+      `SELECT
+         c.id,
+         COALESCE(u.nombre, p.nombre, a.nombre) AS referido_nombre,
+         COALESCE(u.email,  p.email,  a.email)  AS referido_email,
+         lk.campania AS fuente,
+         pp.nombre  AS plan_nombre,
+         pp.tier    AS plan_tier,
+         c.monto_base::float8 AS monto_base,
+         c.moneda,
+         cm.monto_comision::float8 AS comision_monto,
+         cm.estado                AS comision_estado,
+         c.converted_at::text     AS converted_at
+       FROM alquiloya.referral_conversions c
+       LEFT JOIN alquiloya.referral_links lk
+         ON lk.empresa_id=c.empresa_id AND lk.id=c.link_id
+       LEFT JOIN alquiloya.planes_publicacion pp
+         ON pp.empresa_id=c.empresa_id AND pp.id=c.plan_publicacion_id
+       LEFT JOIN alquiloya.usuarios u
+         ON u.empresa_id=c.empresa_id AND u.id=c.usuario_id
+       LEFT JOIN alquiloya.propietarios p
+         ON p.empresa_id=c.empresa_id AND c.target_tipo='propietario' AND p.id=c.target_id
+       LEFT JOIN alquiloya.agentes a
+         ON a.empresa_id=c.empresa_id AND c.target_tipo='agente' AND a.id=c.target_id
+       LEFT JOIN LATERAL (
+         SELECT monto_comision, estado
+           FROM alquiloya.referral_commissions
+          WHERE empresa_id=c.empresa_id AND conversion_id=c.id
+          ORDER BY generada_at DESC LIMIT 1
+       ) cm ON true
+       WHERE c.empresa_id=$1::uuid AND c.partner_id=$2::uuid
+       ORDER BY c.converted_at DESC
+       LIMIT 100`,
+      [ALQUILOYA_EMPRESA_ID, id]
+    ).catch(() => ({ rows: [] as Conversion[] })),
   ]);
 
   const st = stats.rows[0];
@@ -117,6 +166,7 @@ async function load(id: string) {
     } satisfies Stats,
     commissions: comm.rows ?? [],
     acceso,
+    conversions: conversions.rows ?? [],
   };
 }
 
@@ -146,8 +196,16 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
   if (!uuidRe.test(id)) notFound();
   const data = await load(id);
   if (!data) notFound();
-  const { partner, links, rule, stats, commissions, acceso } = data;
+  const { partner, links, rule, stats, commissions, acceso, conversions } = data;
   const primary = links.find((l) => l.activo) ?? links[0] ?? null;
+  const tierLabel = rule
+    ? rule.tipo === "porcentaje"
+      ? `${rule.valor}%${rule.recurrente ? ` · recurrente ${rule.meses_recurrencia ?? "?"}m` : ""}`
+      : `${rule.moneda ?? "PYG"} ${rule.valor.toLocaleString("es-PY")}${rule.recurrente ? " · recurrente" : ""}`
+    : "Sin tarifa";
+  const fullLink = primary ? `https://alquiloya.com.py/r/${primary.slug}` : null;
+  const convRate =
+    stats.clicks > 0 ? ((stats.conversiones / stats.clicks) * 100).toFixed(1) : "0";
 
   return (
     <div className="px-6 py-6">
@@ -212,11 +270,82 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
         </aside>
       </div>
 
-      <section className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card label="Clicks" value={fmt(stats.clicks)} />
-        <Card label="Conversiones" value={fmt(stats.conversiones)} />
-        <Card label="Comisión pendiente" value={fmtGs(stats.pendiente)} />
-        <Card label="Comisión pagada" value={fmtGs(stats.pagada)} />
+      {/* Link único + tier badge — estilo web */}
+      <section className="mt-6 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Tu link único de referido</span>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-300 px-3 py-1 text-xs font-bold text-slate-900">
+            ★ Tier {rule?.recurrente ? "Influencer" : "Estándar"} · {tierLabel}
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <code className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-blue-700 truncate">
+            {fullLink ?? "— sin link activo —"}
+          </code>
+          {primary ? <CopySlugButton slug={primary.slug} /> : null}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-slate-600">
+          <span>✓ Cookie de {primary?.cookie_dias ?? 60} días</span>
+          {rule?.recurrente ? <span>✓ Comisión recurrente ({rule.meses_recurrencia ?? "?"} meses)</span> : null}
+          <span>✓ Atribución automática</span>
+        </div>
+      </section>
+
+      {/* KPIs */}
+      <section className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard label="Clicks en el link" value={fmt(stats.clicks)} sub="Acumulado" tone="blue" />
+        <KpiCard label="Suscripciones" value={fmt(stats.conversiones)} sub={`${convRate}% conversión`} tone="emerald" />
+        <KpiCard label="Comisión cobrada" value={fmtGs(stats.pagada)} sub={`${commissions.filter((c) => c.estado === "pagada").length} pagos`} tone="violet" />
+        <KpiCard label="Comisión pendiente" value={fmtGs(stats.pendiente)} sub={`${commissions.filter((c) => c.estado === "pendiente").length} por cobrar`} tone="amber" />
+      </section>
+
+      {/* Tabla "Sus referidos" — espejo de la vista web */}
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-700">Referidos del partner</h2>
+          <span className="text-[11px] text-slate-400">{conversions.length} {conversions.length === 1 ? "conversión" : "conversiones"}</span>
+        </div>
+        {conversions.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-500">
+            Todavía no hay suscripciones atribuidas a este partner.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5">Referido</th>
+                  <th className="px-4 py-2.5">Se unió</th>
+                  <th className="px-4 py-2.5">Fuente</th>
+                  <th className="px-4 py-2.5">Plan</th>
+                  <th className="px-4 py-2.5 text-right">Pagó</th>
+                  <th className="px-4 py-2.5 text-right">Comisión</th>
+                  <th className="px-4 py-2.5">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {conversions.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-slate-900">{c.referido_nombre ?? "—"}</div>
+                      {c.referido_email ? <div className="text-[11px] text-slate-400">{c.referido_email}</div> : null}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-[12px] text-slate-600">{c.converted_at?.slice(0, 10) ?? "—"}</td>
+                    <td className="px-4 py-2 text-xs text-slate-500">{c.fuente ?? "—"}</td>
+                    <td className="px-4 py-2 text-slate-700">{c.plan_nombre ?? c.plan_tier ?? "—"}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{c.monto_base != null ? fmtGs(c.monto_base) : "—"}</td>
+                    <td className="px-4 py-2 text-right font-semibold tabular-nums text-blue-700">{c.comision_monto != null ? fmtGs(c.comision_monto) : "—"}</td>
+                    <td className="px-4 py-2">
+                      <CommBadge estado={c.comision_estado} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -309,11 +438,44 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
   );
 }
 
-function Card({ label, value }: { label: string; value: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone: "blue" | "emerald" | "violet" | "amber";
+}) {
+  const toneCls: Record<typeof tone, string> = {
+    blue: "text-blue-700",
+    emerald: "text-emerald-700",
+    violet: "text-violet-700",
+    amber: "text-amber-700",
+  };
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{value}</div>
+      <div className={`mt-1 text-2xl font-bold tracking-tight ${toneCls[tone]}`}>{value}</div>
+      {sub ? <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div> : null}
     </div>
+  );
+}
+
+function CommBadge({ estado }: { estado: string | null }) {
+  if (!estado) return <span className="text-xs text-slate-400">—</span>;
+  const map: Record<string, string> = {
+    pagada: "bg-emerald-100 text-emerald-700 ring-emerald-200",
+    pendiente: "bg-amber-100 text-amber-700 ring-amber-200",
+    cancelada: "bg-slate-100 text-slate-600 ring-slate-200",
+    rechazada: "bg-rose-100 text-rose-700 ring-rose-200",
+  };
+  const cls = map[estado] ?? "bg-slate-100 text-slate-600 ring-slate-200";
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${cls}`}>
+      {estado}
+    </span>
   );
 }

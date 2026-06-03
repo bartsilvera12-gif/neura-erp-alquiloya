@@ -11,7 +11,7 @@ function AdminLayout({ kind, route, onNav, title, subtitle, actions, children })
     { id: 'admin-agent', label: 'Resumen', icon: 'grid' },
     { id: 'admin-agent-properties', label: 'Mis propiedades', icon: 'house' },
     { id: 'admin-agent-captures', label: 'Captaciones', icon: 'shield' },
-    { id: 'admin-agent-referrals', label: 'Referidos', icon: 'trend' },
+    // Referidos: gestionado únicamente desde el ERP (/dashboard/referidos).
     // Consultas: ítem ocultado del menú del panel agente (limpieza UI legacy).
     // El componente QueriesSection sigue en el archivo pero ya no se accede vía menú.
     { id: 'admin-agent-qr', label: 'Carteles QR', icon: 'qr' },
@@ -298,7 +298,6 @@ function AdminAgentPage({ route, onNav }) {
     'admin-agent': 'overview',
     'admin-agent-properties': 'properties',
     'admin-agent-captures': 'captures',
-    'admin-agent-referrals': 'referrals',
     'admin-agent-queries': 'queries',
     'admin-agent-profile': 'profile',
   })[route] || 'overview';
@@ -307,7 +306,6 @@ function AdminAgentPage({ route, onNav }) {
     overview: ['', ''],
     properties: ['Mis propiedades', 'Editá, pausá o destacá tus inmuebles publicados.'],
     captures: ['Captaciones', 'Propiedades que capturaste de propietarios + comisión por cierre.'],
-    referrals: ['Referidos', 'Tu link único + tracking de suscripciones generadas.'],
     queries: ['Consultas', 'Mensajes de interesados en tus inmuebles.'],
     profile: ['Mi perfil', 'Información que ven los propietarios al elegirte como agente.'],
   };
@@ -479,7 +477,6 @@ function AdminAgentPage({ route, onNav }) {
       )}
 
       {view === 'captures' && <CapturesSection/>}
-      {view === 'referrals' && <ReferralsSection/>}
 
       {view === 'queries' && <QueriesSection/>}
 
