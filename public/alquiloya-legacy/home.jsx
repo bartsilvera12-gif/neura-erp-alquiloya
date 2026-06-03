@@ -79,7 +79,7 @@ function TrustStrip() {
     { label: 'Satisfacción',              value: '4.8 ★', sub: 'rating promedio de agentes', color: '#6e3ad1' },
   ];
   return (
-    <div className="card" style={{ marginTop: 48, padding: '20px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, maxWidth: 920, margin: '48px auto 0' }}>
+    <div className="card hero-stats-grid" style={{ marginTop: 48, padding: '20px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, maxWidth: 920, margin: '48px auto 0' }}>
       {items.map((it, i) => (
         <div key={it.label} style={{ padding: '8px 18px', borderRight: i < items.length - 1 ? '1px solid var(--line-2)' : 'none', textAlign: 'center' }}>
           <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 26, color: it.color }}>{it.value}</div>
@@ -153,7 +153,7 @@ function HeroSearch({ onSubmit }) {
         boxShadow: '0 24px 48px rgba(11,22,34,.10), 0 4px 12px rgba(11,22,34,.06)',
         overflow: 'hidden',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1.2fr 1fr auto', alignItems: 'stretch' }}>
+        <div className="hero-search-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1.2fr 1fr auto', alignItems: 'stretch' }}>
           <SearchCell label="Ciudad" value={ciudad} options={ALL_CITIES} onChange={setCiudad} icon="pin" divider/>
           <SearchCell label="Barrio" value={barrio} options={barriosCiudad} onChange={setBarrio} divider/>
           <RangeCell
@@ -628,7 +628,7 @@ function Categories({ properties = PROPERTIES, onNav }) {
   return (
     <section className="container" style={{ marginTop: 24, padding: '40px 32px' }}>
       <SectionHead eyebrow="Categorías" title="Explorá por tipo de inmueble" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginTop: 28 }}>
+      <div className="home-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginTop: 28 }}>
         {cats.map(c => (
           <button key={c.id} onClick={() => onNav('catalog')}
             style={{
