@@ -20,6 +20,19 @@ function s(v: unknown): string | null {
   const t = v.trim();
   return t.length > 0 ? t : null;
 }
+
+// Extrae la URL real cuando el campo viene como HTML embed (postimg, imgbb, etc.)
+function sanitizeImageUrl(v: unknown): string | null {
+  const raw = s(v);
+  if (!raw) return null;
+  if (!/[<>]/.test(raw)) return raw;
+  const img = raw.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+  if (img?.[1]) return img[1].trim();
+  const href = raw.match(/<a[^>]+href\s*=\s*["']([^"']+)["']/i);
+  if (href?.[1]) return href[1].trim();
+  const url = raw.match(/https?:\/\/[^\s"'<>]+/i);
+  return url ? url[0] : raw;
+}
 function n(v: unknown): number | null {
   if (v == null || v === "") return null;
   const x = Number(v);
@@ -133,7 +146,7 @@ export async function POST(request: Request) {
       const fotos = Array.isArray(body.fotos) ? body.fotos : [];
       let orden = 0;
       for (const f of fotos) {
-        const url = s(f?.url);
+        const url = sanitizeImageUrl(f?.url);
         if (!url) continue;
         await client.query(
           `INSERT INTO ${t("propiedad_fotos")} (empresa_id, propiedad_id, url, alt, orden, es_portada, activo)

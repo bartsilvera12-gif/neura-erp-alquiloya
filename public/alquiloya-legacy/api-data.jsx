@@ -34,6 +34,20 @@
     return Number.isFinite(n) ? n : fallback;
   };
 
+  // Extrae la URL real cuando alguien pegó un HTML embed (ej. postimg) en vez del link directo.
+  const sanitizeImageUrl = (raw) => {
+    if (!raw) return raw;
+    const str = String(raw).trim();
+    if (!str) return str;
+    if (!/[<>]/.test(str)) return str;
+    const imgMatch = str.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+    if (imgMatch && imgMatch[1]) return imgMatch[1].trim();
+    const hrefMatch = str.match(/<a[^>]+href\s*=\s*["']([^"']+)["']/i);
+    if (hrefMatch && hrefMatch[1]) return hrefMatch[1].trim();
+    const urlMatch = str.match(/https?:\/\/[^\s"'<>]+/i);
+    return urlMatch ? urlMatch[0] : str;
+  };
+
   const findFallbackAgent = (row) => {
     const name = String(row?.nombre || row?.name || '').trim().toLowerCase();
     const phone = String(row?.whatsapp || row?.telefono || row?.phone || '').trim();
@@ -86,10 +100,10 @@
 
   const photosFromRow = (row, fallback, cover) => {
     const apiPhotos = Array.isArray(row?.fotos)
-      ? row.fotos.map(f => f?.url).filter(Boolean)
+      ? row.fotos.map(f => sanitizeImageUrl(f?.url)).filter(Boolean)
       : null;
     if (apiPhotos && apiPhotos.length) return apiPhotos;
-    if (Array.isArray(row?.photos) && row.photos.length) return row.photos;
+    if (Array.isArray(row?.photos) && row.photos.length) return row.photos.map(sanitizeImageUrl).filter(Boolean);
     if (Array.isArray(fallback?.photos) && fallback.photos.length) return fallback.photos;
     return cover ? [cover] : [];
   };
@@ -107,7 +121,7 @@
   const normalizeProperty = (row, agents = state.agents) => {
     if (!row) return null;
     const fallback = findFallbackProperty(row);
-    const cover = row.cover?.url || row.cover || fallback?.cover || null;
+    const cover = sanitizeImageUrl(row.cover?.url || row.cover) || fallback?.cover || null;
     const features = featuresFromRow(row, fallback);
     const agent = row.agente
       ? normalizeAgent(row.agente)

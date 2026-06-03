@@ -24,6 +24,18 @@ const OPERACIONES_OK = new Set(["alquiler", "venta"]);
 const MAX_FOTOS = 20;
 const MAX_CARAC = 30;
 
+// Extrae la URL real cuando el campo viene como HTML embed (postimg, imgbb, etc.)
+function sanitizeImageUrl(v: unknown, max = 1024): string | null {
+  const raw = s(v, max);
+  if (!raw) return null;
+  if (!/[<>]/.test(raw)) return raw;
+  const img = raw.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+  if (img?.[1]) return img[1].trim().slice(0, max);
+  const href = raw.match(/<a[^>]+href\s*=\s*["']([^"']+)["']/i);
+  if (href?.[1]) return href[1].trim().slice(0, max);
+  const url = raw.match(/https?:\/\/[^\s"'<>]+/i);
+  return url ? url[0].slice(0, max) : raw;
+}
 function s(v: unknown, max = 1024): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
@@ -215,7 +227,7 @@ export async function POST(request: Request) {
       // 3. Fotos
       let orden = 0;
       for (const f of fotos) {
-        const url = s(f?.url, 1024);
+        const url = sanitizeImageUrl(f?.url, 1024);
         if (!url) continue;
         await client.query(
           `INSERT INTO "alquiloya"."propiedad_fotos"

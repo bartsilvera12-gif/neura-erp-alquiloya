@@ -1,5 +1,10 @@
 // Catálogo / Resultados de búsqueda
 
+// Normaliza strings para comparación tolerante (case + acentos + espacios)
+const normLoc = (s) => (s == null ? '' : String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+const eqLoc = (a, b) => normLoc(a) === normLoc(b);
+const isAll = (v) => !v || v === 'Todos' || v === 'Todos los barrios' || v === 'Todas las ciudades' || v === 'Todo el país';
+
 function CatalogPage({ onProperty }) {
   const { properties } = useAlquiloYaPublicData();
   const pending = (typeof window !== 'undefined' && window.__pendingSearch) || null;
@@ -7,10 +12,10 @@ function CatalogPage({ onProperty }) {
   const [sort, setSort] = React.useState('recent');
   const [view, setView] = React.useState('grid');
   const [filters, setFilters] = React.useState({
-    depto: pending?.depto || 'Central',
-    ciudad: pending?.ciudad || 'Asunción',
+    depto: pending?.depto || 'Todos',
+    ciudad: pending?.ciudad || 'Todos',
     barrio: pending?.barrio || 'Todos',
-    min: pending?.priceMin ?? 1500000, max: pending?.priceMax ?? 8000000,
+    min: pending?.priceMin ?? 0, max: pending?.priceMax ?? 20000000,
     areaMin: pending?.areaMin ?? 0, areaMax: pending?.areaMax ?? 500,
     beds: 0, baths: 0,
     amoblado: false, mascotas: false, verified: false, temporal: false,
@@ -18,8 +23,8 @@ function CatalogPage({ onProperty }) {
   React.useEffect(() => { if (window.__pendingSearch) delete window.__pendingSearch; }, []);
   const filtered = properties.filter(p =>
     (tipo === 'all' || p.tipo === tipo) &&
-    (!filters.ciudad || p.ciudad === filters.ciudad) &&
-    (!filters.barrio || filters.barrio === 'Todos' || filters.barrio === 'Todos los barrios' || p.barrio === filters.barrio) &&
+    (isAll(filters.ciudad) || eqLoc(p.ciudad, filters.ciudad)) &&
+    (isAll(filters.barrio) || eqLoc(p.barrio, filters.barrio)) &&
     p.price >= filters.min && p.price <= filters.max &&
     (!filters.areaMin || p.m2 >= filters.areaMin) &&
     (!filters.areaMax || p.m2 <= filters.areaMax) &&
@@ -38,7 +43,7 @@ function CatalogPage({ onProperty }) {
   });
   return (
     <div className="fade-in">
-      <CatalogHeader count={sorted.length} tipo={tipo} setTipo={setTipo} />
+      <CatalogHeader count={sorted.length} tipo={tipo} setTipo={setTipo} filters={filters} />
       <div className="container" style={{ padding: '24px 32px 32px', display: 'grid', gridTemplateColumns: '290px 1fr', gap: 28 }}>
         <FilterPanel filters={filters} setFilters={setFilters} />
         <div>
@@ -68,7 +73,11 @@ function CatalogPage({ onProperty }) {
   );
 }
 
-function CatalogHeader({ count, tipo, setTipo }) {
+function CatalogHeader({ count, tipo, setTipo, filters }) {
+  const locParts = [];
+  if (filters && !isAll(filters.ciudad)) locParts.push(filters.ciudad);
+  if (filters && !isAll(filters.depto))  locParts.push(filters.depto);
+  const locLabel = locParts.length ? locParts.join(' · ') : 'Todo el país';
   return (
     <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
       <div className="container" style={{ padding: '28px 32px 0' }}>
@@ -79,7 +88,7 @@ function CatalogHeader({ count, tipo, setTipo }) {
               <I.chev s={12}/>
               <span>Alquileres</span>
               <I.chev s={12}/>
-              <span style={{ color: 'var(--ink)' }}>Asunción · Central</span>
+              <span style={{ color: 'var(--ink)' }}>{locLabel}</span>
             </div>
             <h2 style={{ marginTop: 8, fontSize: 28 }}><span style={{ color: 'var(--blue)' }}>{count}</span> alquileres encontrados</h2>
             <div style={{ color: 'var(--ink-3)', fontSize: 14, marginTop: 4 }}>Mostrando inmuebles activos · actualizado hace 3 minutos</div>
@@ -123,14 +132,14 @@ function FilterPanel({ filters, setFilters }) {
       <div className="card" style={{ padding: 22 }}>
         <div className="row between" style={{ marginBottom: 16 }}>
           <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>Filtros</div>
-          <button onClick={() => setFilters({ depto: 'Central', ciudad: 'Asunción', barrio: 'Todos', min: 1500000, max: 8000000, beds: 0, baths: 0, amoblado: false, mascotas: false, verified: false, temporal: false })} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Limpiar</button>
+          <button onClick={() => setFilters({ depto: 'Todos', ciudad: 'Todos', barrio: 'Todos', min: 0, max: 20000000, areaMin: 0, areaMax: 500, beds: 0, baths: 0, amoblado: false, mascotas: false, verified: false, temporal: false })} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Limpiar</button>
         </div>
         <FilterGroup title="Ubicación">
           <div style={{ marginBottom: 10 }}>
-            <PrettySelect value={filters.depto} onChange={v => upd('depto', v)} options={DEPARTAMENTOS}/>
+            <PrettySelect value={filters.depto} onChange={v => setFilters(f => ({ ...f, depto: v, ciudad: 'Todos', barrio: 'Todos' }))} options={['Todos', ...DEPARTAMENTOS]}/>
           </div>
           <div style={{ marginBottom: 10 }}>
-            <PrettySelect value={filters.ciudad} onChange={v => upd('ciudad', v)} options={CIUDADES[filters.depto] || []}/>
+            <PrettySelect value={filters.ciudad} onChange={v => setFilters(f => ({ ...f, ciudad: v, barrio: 'Todos' }))} options={['Todos', ...((CIUDADES[filters.depto]) || [])]}/>
           </div>
           <PrettySelect value={filters.barrio} onChange={v => upd('barrio', v)} options={['Todos los barrios', ...BARRIOS]}/>
         </FilterGroup>
