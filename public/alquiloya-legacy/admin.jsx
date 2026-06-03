@@ -856,10 +856,28 @@ function CapturesSection() {
       .catch(e => { if (!cancelled) setRealErr((e && e.message) || 'error'); });
     return () => { cancelled = true; };
   }, []);
-  const allCaptures = CAPTURES.filter(c => c.agentId === 'AG-001');
+  // Si hay captaciones reales (sesion activa), las usamos. Sino mock de demo.
+  const realCaptMapped = (Array.isArray(realCapt) ? realCapt : []).map((r, i) => ({
+    propertyId: r.propiedad_titulo ? (r.propiedad_titulo.length > 28 ? r.propiedad_titulo.slice(0, 28) + '…' : r.propiedad_titulo) : `CAPT-${i + 1}`,
+    agentId: 'AG-REAL',
+    date: (r.created_at || '').slice(0, 10).split('-').reverse().join('/'),
+    status: /cerrad|alquilad|vendid/i.test(String(r.etapa || '')) ? 'cerrada' : 'gestionando',
+    owner: r.propietario_nombre || '—',
+    rentPrice: 0,
+    commission: 0,
+    paid: false,
+    _real: true,
+    _titulo: r.propiedad_titulo,
+    _ciudad: r.ciudad,
+    _barrio: r.barrio,
+    _email: r.propietario_email,
+    _telefono: r.propietario_telefono,
+  }));
+  const hasRealCapt = realCaptMapped.length > 0;
+  const allCaptures = hasRealCapt ? realCaptMapped : CAPTURES.filter(c => c.agentId === 'AG-001');
   // Generate extra historical captures for the "historial completo" view
   const extras = React.useMemo(() => {
-    if (!showAll) return [];
+    if (!showAll || hasRealCapt) return [];
     const owners = ['María L.', 'José P.', 'Andrés R.', 'Carolina V.', 'Tomás M.', 'Beatriz N.', 'Ricardo S.', 'Diana F.'];
     const dates = ['10/01/2026', '22/01/2026', '08/02/2026', '19/02/2026', '04/03/2026', '20/12/2025', '15/11/2025', '02/10/2025'];
     return owners.map((o, i) => ({
@@ -915,8 +933,8 @@ function CapturesSection() {
         </button>
       </div>
 
-      {/* Captaciones REALES desde /api/agente/captaciones (Fase 12A) */}
-      {realCapt && realCapt.length > 0 && (
+      {/* Tabla "Solicitudes recibidas" — oculta porque ahora la lista principal abajo usa los mismos datos reales */}
+      {false && realCapt && realCapt.length > 0 && (
         <div className="card" style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
           <div className="row between" style={{ padding: '11px 14px', borderBottom: '1px solid var(--line-2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
