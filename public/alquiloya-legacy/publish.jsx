@@ -2,6 +2,31 @@
 
 function PublishPage() {
   const [step, setStep] = React.useState(0);
+  // Detectar contexto: si entra desde el panel agente/propietario logueado,
+  // ocultar la card "Querés ayuda de un agente" y pre-seleccionar el plan.
+  const [ctxAgente, setCtxAgente] = React.useState(null); // {id, nombre, plan_publicacion_id, plan_tier}
+  const [ctxPropietario, setCtxPropietario] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/agente/me', { cache: 'no-store', credentials: 'include' });
+        if (r.ok) {
+          const b = await r.json();
+          if (!cancelled && b?.agente) { setCtxAgente(b.agente); return; }
+        }
+      } catch { /* ignore */ }
+      try {
+        const r2 = await fetch('/api/propietario/me', { cache: 'no-store', credentials: 'include' });
+        if (r2.ok) {
+          const b2 = await r2.json();
+          if (!cancelled && b2?.propietario) setCtxPropietario(b2.propietario);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const isLoggedPublisher = !!(ctxAgente || ctxPropietario);
   // Fase Publicar-1: wizard de 5 pasos (sin "Gestión").
   const steps = [
     { id: 0, title: 'Datos básicos', icon: 'doc' },
@@ -146,8 +171,8 @@ function PublishPage() {
         <div className="card" style={{ padding: 32 }}>
           {step === 0 && <StepBasics form={form} setF={setF}/>}
           {step === 1 && <StepLocation form={form} setF={setF}/>}
-          {step === 2 && <StepPhotos form={form} setF={setF}/>}
-          {step === 3 && <StepPlan form={form} setF={setF}/>}
+          {step === 2 && <StepPhotos form={form} setF={setF} isAgent={!!ctxAgente}/>}
+          {step === 3 && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario}/>}
           {step === 4 && <StepPreview form={form} setF={setF}/>}
 
           {submitState.success && (
@@ -189,7 +214,7 @@ function PublishPage() {
         </div>
 
         <div style={{ position: 'sticky', top: 92, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <AsesoriaCTACard onOpen={() => setAsesoriaOpen(true)}/>
+          {!isLoggedPublisher && <AsesoriaCTACard onOpen={() => setAsesoriaOpen(true)}/>}
           <PreviewCard step={step} form={form}/>
         </div>
       </div>
@@ -569,37 +594,86 @@ function StepLocation({ form, setF }) {
   );
 }
 
-function StepPhotos({ form, setF }) {
+function StepPhotos({ form, setF, isAgent }) {
   const [urlNew, setUrlNew] = React.useState('');
-  function addFoto() {
+  const [mode, setMode] = React.useState(isAgent ? 'url' : 'file');
+  const fileInputRef = React.useRef(null);
+  function addFotoUrl() {
     const url = (urlNew || '').trim();
     if (!url) return;
     setF(f => ({ fotos: [...(f.fotos || []), { url, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
     setUrlNew('');
   }
+  function addFotoFiles(fileList) {
+    const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    files.forEach(file => {
+      if (file.size > 4 * 1024 * 1024) {
+        window.alert('"' + file.name + '" supera los 4MB. Comprimila o subila como URL.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target && e.target.result;
+        if (typeof dataUrl !== 'string') return;
+        setF(f => ({ fotos: [...(f.fotos || []), { url: dataUrl, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   function removeFoto(idx) {
     setF(f => ({ fotos: (f.fotos || []).filter((_, i) => i !== idx) }));
   }
+  const segBtn = (active) => ({
+    padding: '8px 14px', borderRadius: 10, border: '1px solid ' + (active ? 'var(--blue)' : 'var(--line)'),
+    background: active ? 'var(--blue-50)' : '#fff', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 13, fontWeight: 600, color: active ? 'var(--blue)' : 'var(--ink-2)'
+  });
   return (
     <div>
       <div className="tag">Paso 3</div>
       <h3 style={{ fontSize: 22, marginTop: 6 }}>Sumá fotos de tu propiedad</h3>
       <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>
-        Pegá las URLs de las fotos (servidor de imágenes propio o Google Drive/Imgur con enlace público). La primera será la principal.
+        {isAgent
+          ? 'Como agente, recomendamos pegar URLs de tu servidor de imágenes para no inflar la base. También podés subir desde dispositivo.'
+          : 'Subí las fotos desde tu dispositivo (hasta 4 MB c/u). La primera será la principal.'}
       </p>
-      <div className="card" style={{ padding: 14, marginTop: 18, background: 'var(--bg-2)', border: '1px dashed var(--line)' }}>
-        <div className="row gap-8">
-          <input
-            className="input"
-            placeholder="https://..."
-            value={urlNew}
-            onChange={(e) => setUrlNew(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFoto(); } }}
-          />
-          <button type="button" className="btn btn-blue" onClick={addFoto}>+ Agregar</button>
-        </div>
-        <div className="muted xs" style={{ marginTop: 6 }}>Si todavía no tenés las fotos, podés saltear este paso y subirlas más tarde desde el panel.</div>
+
+      <div className="row gap-8" style={{ marginTop: 14 }}>
+        <button type="button" style={segBtn(mode === 'file')} onClick={() => setMode('file')}>Subir desde dispositivo</button>
+        <button type="button" style={segBtn(mode === 'url')} onClick={() => setMode('url')}>Pegar URL</button>
       </div>
+
+      {mode === 'file' ? (
+        <div className="card" style={{ padding: 18, marginTop: 14, background: 'var(--bg-2)', border: '1px dashed var(--line)', textAlign: 'center' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => { addFotoFiles(e.target.files); e.target.value = ''; }}
+          />
+          <button type="button" className="btn btn-blue" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+            <I.plus s={14}/> Elegir fotos
+          </button>
+          <div className="muted xs" style={{ marginTop: 8 }}>JPG / PNG / WebP — máx. 4 MB cada una</div>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 14, marginTop: 14, background: 'var(--bg-2)', border: '1px dashed var(--line)' }}>
+          <div className="row gap-8">
+            <input
+              className="input"
+              placeholder="https://..."
+              value={urlNew}
+              onChange={(e) => setUrlNew(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFotoUrl(); } }}
+            />
+            <button type="button" className="btn btn-blue" onClick={addFotoUrl}>+ Agregar</button>
+          </div>
+          <div className="muted xs" style={{ marginTop: 6 }}>Servidor de imágenes propio, Google Drive o Imgur con enlace público.</div>
+        </div>
+      )}
       {(form.fotos || []).length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 18 }}>
           {form.fotos.map((f, i) => (
@@ -829,7 +903,7 @@ function AgentLevelBadge({ level }) {
   return <span className="badge" style={{ background: c.bg, color: c.fg, fontSize: 9.5 }}>{level}</span>;
 }
 
-function StepPlan({ form, setF }) {
+function StepPlan({ form, setF, ctxAgente, ctxPropietario }) {
   const [apiPlans, setApiPlans] = React.useState(null);
   React.useEffect(() => {
     let cancelled = false;
@@ -853,12 +927,20 @@ function StepPlan({ form, setF }) {
           freeBoosts: p.free_boosts != null ? Number(p.free_boosts) : undefined,
         }));
         setApiPlans(mapped);
+        // Pre-seleccionar el plan del perfil si lo trae el contexto.
+        const ctxPlanId = (ctxAgente && ctxAgente.plan_publicacion_id) || (ctxPropietario && ctxPropietario.plan_publicacion_id);
+        if (ctxPlanId && !form.plan_id) {
+          const match = arr.find(p => p.id === ctxPlanId);
+          if (match) setF({ plan_id: match.tier });
+        }
       })
       .catch(() => { /* fallback PLANS mock */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [ctxAgente, ctxPropietario]);
   const source = apiPlans || PLANS;
-  const list = source.filter(p => p.tier && String(p.tier).includes('owner'));
+  // Si entró como agente, mostramos planes 'agent'. Si propietario o anónimo, 'owner'.
+  const audience = ctxAgente ? 'agent' : 'owner';
+  const list = source.filter(p => p.tier && String(p.tier).includes(audience));
   return (
     <div>
       <div className="tag">Paso 4</div>

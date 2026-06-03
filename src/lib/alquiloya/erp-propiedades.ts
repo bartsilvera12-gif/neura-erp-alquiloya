@@ -15,6 +15,27 @@ function q(table: string): string {
   return `"${ALQUILOYA_SCHEMA}"."${table}"`;
 }
 
+// Cache de existencia de columnas opcionales (la app vive hasta que reinicia).
+let hasDestacadaHasta: boolean | null = null;
+async function destacadaHastaExists(): Promise<boolean> {
+  if (hasDestacadaHasta != null) return hasDestacadaHasta;
+  const pool = getChatPostgresPool();
+  if (!pool) return false;
+  try {
+    const { rows } = await queryWithRetry<{ ok: boolean }>(
+      pool,
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema='alquiloya' AND table_name='propiedades' AND column_name='destacada_hasta'
+       ) AS ok`
+    );
+    hasDestacadaHasta = rows[0]?.ok === true;
+  } catch {
+    hasDestacadaHasta = false;
+  }
+  return hasDestacadaHasta;
+}
+
 export type ErpPropiedadListRow = {
   id: string;
   codigo: string | null;
@@ -79,6 +100,13 @@ export type ErpPropiedadDetail = ErpPropiedadListRow & {
 export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
   const pool = getChatPostgresPool();
   if (!pool) return [];
+  const hasDH = await destacadaHastaExists();
+  const dhSelect = hasDH
+    ? "p.destacada_hasta::text AS destacada_hasta,\n        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,"
+    : "NULL::text AS destacada_hasta,\n        p.destacada AS destacada_efectiva,";
+  const dhOrder = hasDH
+    ? "(p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now()))"
+    : "p.destacada";
   const { rows } = await queryWithRetry<ErpPropiedadListRow>(
     pool,
     `
@@ -88,8 +116,7 @@ export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
         p.precio::float8 AS precio, p.moneda,
         p.dormitorios, p.banos,
         p.destacada,
-        p.destacada_hasta::text AS destacada_hasta,
-        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,
+        ${dhSelect}
         p.visible_web, p.activo,
         p.created_at::text AS created_at,
         p.agente_id,
@@ -124,7 +151,7 @@ export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
           AND pc.activo = true
       ) ccnt ON true
       WHERE p.empresa_id = $1::uuid
-      ORDER BY (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) DESC NULLS LAST,
+      ORDER BY ${dhOrder} DESC NULLS LAST,
                p.created_at DESC NULLS LAST, p.titulo ASC
     `,
     [ALQUILOYA_EMPRESA_ID]
@@ -139,6 +166,10 @@ export async function getErpPropiedad(id: string): Promise<ErpPropiedadDetail | 
   const pool = getChatPostgresPool();
   if (!pool) return null;
 
+  const hasDH = await destacadaHastaExists();
+  const dhSelect = hasDH
+    ? "p.destacada_hasta::text AS destacada_hasta,\n        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,"
+    : "NULL::text AS destacada_hasta,\n        p.destacada AS destacada_efectiva,";
   const { rows } = await queryWithRetry<ErpPropiedadDetail>(
     pool,
     `
@@ -151,8 +182,7 @@ export async function getErpPropiedad(id: string): Promise<ErpPropiedadDetail | 
         p.superficie_m2::float8 AS superficie_m2,
         p.terreno_m2::float8 AS terreno_m2,
         p.destacada,
-        p.destacada_hasta::text AS destacada_hasta,
-        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,
+        ${dhSelect}
         p.visible_web, p.activo,
         p.created_at::text AS created_at, p.updated_at::text AS updated_at,
         p.agente_id,

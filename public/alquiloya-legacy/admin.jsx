@@ -295,6 +295,7 @@ function AdminAgentPage({ route, onNav }) {
       // Normalizar al shape consumido por las cards legacy (p.title/p.cover/p.price).
       const mapped = body.propiedades.map(p => ({
         id: p.id,
+        codigo: p.codigo || null,
         title: p.titulo || 'Sin título',
         cover: p.cover_url || (typeof photo === 'function' ? photo(0) : ''),
         price: Number(p.precio) || 0,
@@ -518,7 +519,7 @@ function AdminAgentPage({ route, onNav }) {
                       {verifiedIds[p.id] && <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--blue-50)', color: 'var(--blue)', fontSize: 9.5, fontWeight: 600 }}>✓ Verificada</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
-                      <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{p.id}</span>
+                      {p.codigo ? <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{p.codigo}</span> : null}
                       <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{formatGs(p.price)}<span style={{ color: 'var(--ink-4)', fontWeight: 500 }}> /mes</span></span>
                       <span style={{ color: 'var(--ink-4)' }}>·</span>
                       <span><I.eye s={11}/> <strong style={{ color: 'var(--ink-2)' }}>{vistas}</strong> vistas</span>
@@ -565,9 +566,11 @@ function AdminAgentPage({ route, onNav }) {
           {/* Footer / ver todas */}
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
             <span style={{ color: 'var(--ink-4)' }}>Mostrando {Math.min(6, propsForRender.length)} de {propsForRender.length}</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>
-              Ver todas →
-            </button>
+            {view === 'overview' && propsForRender.length > 6 && (
+              <button onClick={() => onNav && onNav('admin-agent-properties')} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>
+                Ver todas →
+              </button>
+            )}
           </div>
         </div>
 
@@ -595,34 +598,46 @@ function AdminAgentPage({ route, onNav }) {
 
       {view === 'queries' && <QueriesSection/>}
 
-      {view === 'profile' && (
+      {view === 'profile' && (() => {
+        const profile = isPropietario ? meData?.propietario : meData?.agente;
+        const profileName = profile?.nombre || meData?.usuario?.nombre || (isPropietario ? 'Propietario' : 'Agente');
+        const profileSubLines = [];
+        if (!isPropietario && profile?.cargo) profileSubLines.push(profile.cargo);
+        if (profile?.ciudad || profile?.barrio) profileSubLines.push([profile.barrio, profile.ciudad].filter(Boolean).join(', '));
+        if (profile?.created_at) profileSubLines.push(`En AlquiloYa desde ${new Date(profile.created_at).getFullYear()}`);
+        const slug = profile?.slug || (profileName || '').toLowerCase().replace(/\s+/g, '-');
+        return (
         <div>
           <div className="tag">Perfil</div>
-          <h3 style={{ fontSize: 20, marginTop: 4 }}>Mi perfil de agente</h3>
+          <h3 style={{ fontSize: 20, marginTop: 4 }}>{isPropietario ? 'Mi perfil' : 'Mi perfil de agente'}</h3>
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>Datos visibles en tu página pública. Estos datos los ven los propietarios cuando elijen un agente.</div>
           <div className="card" style={{ padding: 22, marginTop: 16, display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 18, alignItems: 'center' }}>
-            <Avatar name="Mariana López" size={68}/>
+            <Avatar name={profileName} size={68}/>
             <div>
-              <div className="row gap-10" style={{ alignItems: 'center' }}>
-                <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>Mariana López</div>
-                <span className="badge badge-verified" style={{ fontSize: 10 }}><I.check s={10}/> Verificada</span>
-                <span className="badge" style={{ background: 'var(--yellow)', color: 'var(--ink)', fontSize: 10 }}>Top Pro</span>
+              <div className="row gap-10" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>{profileName}</div>
+                {!isPropietario && profile?.verificado ? <span className="badge badge-verified" style={{ fontSize: 10 }}><I.check s={10}/> Verificado</span> : null}
+                {!isPropietario && profile?.nivel ? <span className="badge" style={{ background: 'var(--yellow)', color: 'var(--ink)', fontSize: 10 }}>{profile.nivel}</span> : null}
               </div>
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>Independiente · Villa Morra, Las Mercedes · En AlquiloYa desde 2022</div>
-              <div className="row gap-16" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-2)' }}>
-                <span><I.star s={12}/> <strong>4.8</strong> · 38 reseñas</span>
-                <span><I.house s={12}/> 18 activas</span>
-                <span><I.check s={12}/> 47 cerradas</span>
-                <span><I.doc s={12}/> 12 aportes blog</span>
+              {profileSubLines.length > 0 ? (
+                <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>{profileSubLines.join(' · ')}</div>
+              ) : null}
+              <div className="row gap-16" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-2)', flexWrap: 'wrap' }}>
+                <span><I.house s={12}/> <strong>{hasRealProps ? totalProps : 0}</strong> publicaciones</span>
+                {hasRealProps && cerradasCount > 0 ? <span><I.check s={12}/> {cerradasCount} cerradas</span> : null}
+                {meData?.usuario?.email ? <span><I.user s={12}/> {meData.usuario.email}</span> : null}
               </div>
             </div>
             <div className="col gap-8">
-              <button onClick={() => onNav('agent/mariana-lopez')} className="btn btn-blue btn-sm">Ver perfil público →</button>
+              {profile?.id && !isPropietario ? (
+                <button onClick={() => onNav('agent/' + slug + '?id=' + profile.id)} className="btn btn-blue btn-sm">Ver perfil público →</button>
+              ) : null}
               <button className="btn btn-outline btn-sm">Editar datos</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {buyOpen && <BuyImpulsesModal onClose={() => setBuyOpen(false)} onBuy={onBuy}/>}
       {verifyTarget && (
