@@ -152,6 +152,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if ("cargo" in body) push("cargo", s(body.cargo));
     if ("bio" in body) push("bio", s(body.bio));
     if ("foto_url" in body) push("foto_url", s(body.foto_url));
+    if ("verificado" in body) {
+      const v = b(body.verificado);
+      if (v !== undefined) push("verificado", v);
+    }
+    if ("nivel" in body) push("nivel", s(body.nivel));
+    if ("idiomas" in body) push("idiomas", s(body.idiomas));
+    if ("tiempo_respuesta" in body) push("tiempo_respuesta", s(body.tiempo_respuesta));
+    if ("tasa_respuesta" in body) push("tasa_respuesta", s(body.tasa_respuesta));
     if ("orden" in body) {
       const x = i(body.orden);
       if (x !== undefined) push("orden", x);

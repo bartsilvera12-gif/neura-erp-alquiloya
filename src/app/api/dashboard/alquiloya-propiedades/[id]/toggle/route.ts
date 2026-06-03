@@ -51,6 +51,28 @@ export async function POST(
     if (destacada !== undefined) {
       vals.push(destacada);
       sets.push(`destacada = $${vals.length}`);
+      // Duracion en dias: si activan con duracion, calculamos vencimiento.
+      // duracion_dias: number (1..365) o null = sin vencimiento.
+      if (destacada) {
+        const dRaw = body.duracion_dias;
+        let dias: number | null = null;
+        if (dRaw === null || dRaw === "" || dRaw === undefined) {
+          dias = null;
+        } else {
+          const x = Number(dRaw);
+          if (Number.isFinite(x) && x > 0 && x <= 365) dias = Math.trunc(x);
+          else if (x === 0) dias = null;
+        }
+        if (dias == null) {
+          sets.push(`destacada_hasta = NULL`);
+        } else {
+          vals.push(dias);
+          sets.push(`destacada_hasta = now() + ($${vals.length}::int * INTERVAL '1 day')`);
+        }
+      } else {
+        // Al desdestacar, limpiamos la fecha.
+        sets.push(`destacada_hasta = NULL`);
+      }
     }
     if (sets.length === 0) {
       return NextResponse.json({ error: "sin cambios" }, { status: 400 });
@@ -61,8 +83,8 @@ export async function POST(
     const sql = `UPDATE ${t("propiedades")} SET ${sets.join(", ")}, updated_at = now()
                   WHERE empresa_id = $${vals.length - 1}::uuid
                     AND id = $${vals.length}::uuid
-                  RETURNING id, activo, visible_web, destacada`;
-    const r = await queryWithRetry<{ id: string; activo: boolean; visible_web: boolean; destacada: boolean }>(
+                  RETURNING id, activo, visible_web, destacada, destacada_hasta::text AS destacada_hasta`;
+    const r = await queryWithRetry<{ id: string; activo: boolean; visible_web: boolean; destacada: boolean; destacada_hasta: string | null }>(
       pool,
       sql,
       vals

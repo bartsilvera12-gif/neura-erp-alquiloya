@@ -6,6 +6,7 @@ import {
 } from "@/lib/alquiloya/erp-agentes-inmobiliarios";
 import { AccesoBlock } from "../../_components/AccesoBlock";
 import { EtapaSelect } from "../../captaciones/_components/EtapaSelect";
+import AgentePerfilPanel from "./AgentePerfilPanel";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -67,6 +68,8 @@ export default async function AgenteDetailPage({ params }: Props) {
           defaultEmail={agente.email}
         />
       </div>
+
+      <AgentePerfilPanel agenteId={agente.id} />
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">

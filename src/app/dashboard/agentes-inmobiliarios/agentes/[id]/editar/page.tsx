@@ -39,6 +39,11 @@ export default async function EditarAgentePage({ params }: Props) {
           foto_url: a.foto_url ?? "",
           orden: a.orden ?? 0,
           activo: a.activo ?? true,
+          verificado: a.verificado ?? false,
+          nivel: a.nivel ?? "",
+          idiomas: a.idiomas ?? "",
+          tiempo_respuesta: a.tiempo_respuesta ?? "",
+          tasa_respuesta: a.tasa_respuesta ?? "",
         }}
       />
     </div>

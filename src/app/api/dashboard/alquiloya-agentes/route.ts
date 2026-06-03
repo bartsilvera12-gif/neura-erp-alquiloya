@@ -57,9 +57,11 @@ export async function POST(request: Request) {
       pool,
       `INSERT INTO ${t("agentes")} (
          empresa_id, nombre, email, telefono, whatsapp,
-         cargo, bio, foto_url, orden, activo
+         cargo, bio, foto_url, orden, activo,
+         verificado, nivel, idiomas, tiempo_respuesta, tasa_respuesta
        )
-       VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+               $11, $12, $13, $14, $15)
        RETURNING id`,
       [
         ALQUILOYA_EMPRESA_ID,
@@ -72,6 +74,11 @@ export async function POST(request: Request) {
         s(body.foto_url),
         i(body.orden, 0),
         b(body.activo, true),
+        b((body as Record<string, unknown>).verificado, false),
+        s((body as Record<string, unknown>).nivel),
+        s((body as Record<string, unknown>).idiomas),
+        s((body as Record<string, unknown>).tiempo_respuesta),
+        s((body as Record<string, unknown>).tasa_respuesta),
       ]
     );
     return NextResponse.json({ success: true, id: rows[0].id });

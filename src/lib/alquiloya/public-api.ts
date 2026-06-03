@@ -116,7 +116,8 @@ export async function listPublicPropiedades(request: NextRequest) {
           p.moneda, p.dormitorios, p.banos, p.cocheras,
           p.superficie_m2::float8 AS superficie_m2,
           p.terreno_m2::float8 AS terreno_m2,
-          p.destacada, p.visible_web, p.activo, p.created_at, p.updated_at,
+          (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada,
+          p.visible_web, p.activo, p.created_at, p.updated_at,
           CASE
             WHEN cover.id IS NULL THEN NULL
             ELSE json_build_object(
@@ -138,7 +139,8 @@ export async function listPublicPropiedades(request: NextRequest) {
           LIMIT 1
         ) cover ON true
         WHERE ${where.join(" AND ")}
-        ORDER BY p.destacada DESC, p.created_at DESC, p.titulo ASC
+        ORDER BY (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) DESC,
+                 p.created_at DESC, p.titulo ASC
       `,
       params
     );
@@ -170,7 +172,8 @@ export async function getPublicPropiedad(id: string) {
           p.moneda, p.dormitorios, p.banos, p.cocheras,
           p.superficie_m2::float8 AS superficie_m2,
           p.terreno_m2::float8 AS terreno_m2,
-          p.destacada, p.visible_web, p.activo, p.created_at, p.updated_at,
+          (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada,
+          p.visible_web, p.activo, p.created_at, p.updated_at,
           CASE
             WHEN a.id IS NULL THEN NULL
             ELSE json_build_object(
@@ -293,6 +296,41 @@ export async function getPublicAgente(id: string) {
         SELECT
           a.id, a.empresa_id, a.nombre, a.email, a.telefono, a.whatsapp,
           a.foto_url, a.cargo, a.bio, a.orden, a.activo, a.created_at, a.updated_at,
+          COALESCE(a.verificado, false) AS verificado,
+          a.nivel, a.idiomas, a.tiempo_respuesta, a.tasa_respuesta,
+          (SELECT count(*)::int FROM "alquiloya"."propiedades" pc
+             WHERE pc.empresa_id = a.empresa_id AND pc.agente_id = a.id
+               AND pc.estado IN ('alquilado','vendido','cerrado','cerrada','finalizado')
+          ) AS cierres_count,
+          COALESCE((
+            SELECT json_agg(json_build_object(
+              'id', z.id, 'ciudad', z.ciudad, 'barrio', z.barrio, 'orden', z.orden
+            ) ORDER BY z.orden ASC, z.created_at ASC)
+            FROM "alquiloya"."agente_zonas" z
+            WHERE z.empresa_id = a.empresa_id AND z.agente_id = a.id
+          ), '[]'::json) AS zonas,
+          COALESCE((
+            SELECT json_agg(json_build_object(
+              'id', tp.id, 'zona', tp.zona, 'titulo', tp.titulo, 'body', tp.body, 'orden', tp.orden
+            ) ORDER BY tp.orden ASC, tp.created_at ASC)
+            FROM "alquiloya"."agente_tips" tp
+            WHERE tp.empresa_id = a.empresa_id AND tp.agente_id = a.id AND tp.activo = true
+          ), '[]'::json) AS tips,
+          COALESCE((
+            SELECT json_agg(json_build_object(
+              'id', r.id, 'autor_nombre', r.autor_nombre, 'rol', r.rol,
+              'stars', r.stars, 'body', r.body, 'created_at', r.created_at
+            ) ORDER BY r.created_at DESC)
+            FROM "alquiloya"."agente_resenas" r
+            WHERE r.empresa_id = a.empresa_id AND r.agente_id = a.id AND r.estado = 'aprobada'
+          ), '[]'::json) AS resenas,
+          (SELECT count(*)::int FROM "alquiloya"."agente_resenas" rc
+             WHERE rc.empresa_id = a.empresa_id AND rc.agente_id = a.id AND rc.estado='aprobada'
+          ) AS resenas_count,
+          (SELECT COALESCE(round(avg(stars)::numeric, 1), 0)::float8
+             FROM "alquiloya"."agente_resenas" ra
+             WHERE ra.empresa_id = a.empresa_id AND ra.agente_id = a.id AND ra.estado='aprobada'
+          ) AS rating,
           COALESCE((
             SELECT json_agg(
               json_build_object(
@@ -314,7 +352,7 @@ export async function getPublicAgente(id: string) {
                 'banos', p.banos,
                 'cocheras', p.cocheras,
                 'superficie_m2', p.superficie_m2::float8,
-                'destacada', p.destacada,
+                'destacada', (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())),
                 'cover', CASE
                   WHEN cover.id IS NULL THEN NULL
                   ELSE json_build_object(
@@ -326,7 +364,8 @@ export async function getPublicAgente(id: string) {
                   )
                 END
               )
-              ORDER BY p.destacada DESC, p.created_at DESC, p.titulo ASC
+              ORDER BY (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) DESC,
+                 p.created_at DESC, p.titulo ASC
             )
             FROM ${t("propiedades")} p
             LEFT JOIN LATERAL (

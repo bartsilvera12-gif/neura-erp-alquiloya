@@ -16,6 +16,11 @@ export type AgenteFormData = {
   foto_url: string;
   orden: number;
   activo: boolean;
+  verificado: boolean;
+  nivel: string;
+  idiomas: string;
+  tiempo_respuesta: string;
+  tasa_respuesta: string;
 };
 
 const inputCls =
@@ -55,6 +60,11 @@ export function AgenteForm({
         foto_url: form.foto_url || null,
         orden: form.orden,
         activo: form.activo,
+        verificado: form.verificado,
+        nivel: form.nivel || null,
+        idiomas: form.idiomas || null,
+        tiempo_respuesta: form.tiempo_respuesta || null,
+        tasa_respuesta: form.tasa_respuesta || null,
       };
       const url =
         mode === "create"
@@ -136,7 +146,7 @@ export function AgenteForm({
               onChange={(e) => set("orden", Number(e.target.value) || 0)}
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-5">
             <label className="inline-flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -146,8 +156,48 @@ export function AgenteForm({
               />
               Activo
             </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] focus:ring-[#4FAEB2]"
+                checked={form.verificado}
+                onChange={(e) => set("verificado", e.target.checked)}
+              />
+              Verificado (badge azul)
+            </label>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-600">Perfil público</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={fieldCls}>
+            <label className={labelCls}>Nivel</label>
+            <select className={inputCls} value={form.nivel} onChange={(e) => set("nivel", e.target.value)}>
+              <option value="">— Automático (por cierres) —</option>
+              <option value="Junior">Junior</option>
+              <option value="Pro">Pro</option>
+              <option value="Top Pro">Top Pro</option>
+            </select>
+          </div>
+          <div className={fieldCls}>
+            <label className={labelCls}>Idiomas</label>
+            <input className={inputCls} value={form.idiomas} onChange={(e) => set("idiomas", e.target.value)} placeholder="Ej. Es · Gn · En" />
+          </div>
+          <div className={fieldCls}>
+            <label className={labelCls}>Tiempo de respuesta</label>
+            <input className={inputCls} value={form.tiempo_respuesta} onChange={(e) => set("tiempo_respuesta", e.target.value)} placeholder="Ej. ~ 12 min" />
+          </div>
+          <div className={fieldCls}>
+            <label className={labelCls}>Tasa de respuesta</label>
+            <input className={inputCls} value={form.tasa_respuesta} onChange={(e) => set("tasa_respuesta", e.target.value)} placeholder="Ej. 98%" />
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] text-slate-500">
+          Estos campos se muestran en la vista pública del agente. Si dejás <strong>nivel</strong> vacío, se calcula automáticamente
+          (Top Pro ≥ 10 cierres, Pro ≥ 3, sino Junior).
+        </p>
       </section>
 
       <div className="flex items-center gap-3">

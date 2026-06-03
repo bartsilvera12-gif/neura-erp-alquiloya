@@ -6,11 +6,37 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
   const apiAgent = useAlquiloYaPublicAgent(baseAgent?.id);
   const agent = apiAgent || baseAgent;
   const [tab, setTab] = React.useState('propiedades');
+  const tabsRef = React.useRef(null);
+  const [copied, setCopied] = React.useState(false);
   const props = (agent.propiedades && agent.propiedades.length
     ? agent.propiedades
     : properties.filter(p => p.agent?.id === agent.id || p.agent?.apiId === agent.id || p.agent?.name === agent.name)
   ).slice(0, 9);
   const firstName = agent.name.split(' ')[0];
+
+  const hasTips = Array.isArray(agent.tips) && agent.tips.length > 0;
+  const hasResenas = Array.isArray(agent.resenas) && agent.resenas.length > 0;
+
+  const stats = [
+    agent.tiempoRespuesta ? { label: 'Tiempo medio respuesta', value: agent.tiempoRespuesta, hint: 'horario hábil' } : null,
+    agent.closedRentals > 0 ? { label: 'Cierres acumulados', value: String(agent.closedRentals), hint: 'sobre ' + agent.activeProperties + ' activas' } : null,
+    agent.tasaRespuesta ? { label: 'Tasa de respuesta', value: agent.tasaRespuesta, hint: 'consultas recientes' } : null,
+    agent.idiomas ? { label: 'Idiomas', value: agent.idiomas, hint: '' } : null,
+  ].filter(Boolean);
+
+  const waUrl = agent.phone ? 'https://wa.me/' + String(agent.phone).replace(/[^\d]/g, '') : null;
+
+  const goToProps = () => {
+    setTab('propiedades');
+    if (tabsRef.current) tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const sharePerfil = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) { await navigator.share({ title: agent.name, url }); return; }
+    } catch {}
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
 
   return (
     <div className="fade-in" style={{ background: 'var(--bg-2)', minHeight: '100vh' }}>
@@ -62,52 +88,63 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
             </div>
 
             <div className="row gap-6" style={{ marginTop: 12, fontSize: 13.5, alignItems: 'center', color: 'var(--ink-2)' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--yellow-600)' }}>
-                <I.star s={14}/> <strong style={{ color: 'var(--ink)' }}>{agent.rating}</strong>
-              </span>
-              <span style={{ color: 'var(--ink-4)' }}>· {agent.reviews} reseñas</span>
-              <span style={{ color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
+              {agent.reviews > 0 ? (
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--yellow-600)' }}>
+                    <I.star s={14}/> <strong style={{ color: 'var(--ink)' }}>{agent.rating.toFixed(1)}</strong>
+                  </span>
+                  <span style={{ color: 'var(--ink-4)' }}>· {agent.reviews} reseña{agent.reviews !== 1 ? 's' : ''}</span>
+                  <span style={{ color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
+                </>
+              ) : null}
               <strong style={{ color: 'var(--ink)' }}>{agent.activeProperties}</strong>
               <span style={{ color: 'var(--ink-3)' }}>activas</span>
-              <span style={{ color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
-              <strong style={{ color: 'var(--ink)' }}>{agent.closedRentals}</strong>
-              <span style={{ color: 'var(--ink-3)' }}>cerradas</span>
+              {agent.closedRentals > 0 ? (
+                <>
+                  <span style={{ color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
+                  <strong style={{ color: 'var(--ink)' }}>{agent.closedRentals}</strong>
+                  <span style={{ color: 'var(--ink-3)' }}>cerradas</span>
+                </>
+              ) : null}
             </div>
 
             <p style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: 'var(--ink-2)', maxWidth: 640 }}>{agent.bio}</p>
           </div>
           <div className="col gap-8" style={{ alignItems: 'stretch', minWidth: 220 }}>
-            <button className="btn btn-wa" style={{ justifyContent: 'center' }}><I.whats s={14}/> WhatsApp</button>
-            <button className="btn btn-blue" style={{ justifyContent: 'center' }}>Ver inmuebles ({agent.activeProperties})</button>
-            <button className="btn btn-outline btn-sm" style={{ justifyContent: 'center' }}><I.share s={13}/> Compartir perfil</button>
+            {waUrl ? (
+              <a className="btn btn-wa" href={waUrl} target="_blank" rel="noopener noreferrer" style={{ justifyContent: 'center' }}><I.whats s={14}/> WhatsApp</a>
+            ) : (
+              <button className="btn btn-wa" disabled style={{ justifyContent: 'center', opacity: .5 }}><I.whats s={14}/> WhatsApp</button>
+            )}
+            <button className="btn btn-blue" onClick={goToProps} style={{ justifyContent: 'center' }}>Ver inmuebles ({agent.activeProperties})</button>
+            <button className="btn btn-outline btn-sm" onClick={sharePerfil} style={{ justifyContent: 'center' }}>
+              <I.share s={13}/> {copied ? '¡Enlace copiado!' : 'Compartir perfil'}
+            </button>
           </div>
         </div>
 
-        {/* Mini stats row (slim secondary) */}
-        <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {[
-            { label: 'Tiempo medio respuesta', value: '~ 12 min',  hint: 'horario hábil' },
-            { label: 'Cierres en últimos 30d',  value: '3 ventas',   hint: 'sobre 5 activas' },
-            { label: 'Tasa de respuesta',       value: '98%',        hint: 'últimas 100 consultas' },
-            { label: 'Idiomas',                 value: 'Es · Gn',    hint: 'también escribe en inglés' },
-          ].map(m => (
-            <div key={m.label} className="card" style={{ padding: '12px 14px' }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-4)', letterSpacing: '.04em', textTransform: 'uppercase' }}>{m.label}</div>
-              <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17, marginTop: 4, color: 'var(--ink)' }}>{m.value}</div>
-              <div className="muted" style={{ fontSize: 11, marginTop: 1 }}>{m.hint}</div>
-            </div>
-          ))}
-        </div>
+        {/* Mini stats row (solo si hay datos reales) */}
+        {stats.length > 0 && (
+          <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(' + stats.length + ', 1fr)', gap: 10 }}>
+            {stats.map(m => (
+              <div key={m.label} className="card" style={{ padding: '12px 14px' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-4)', letterSpacing: '.04em', textTransform: 'uppercase' }}>{m.label}</div>
+                <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17, marginTop: 4, color: 'var(--ink)' }}>{m.value}</div>
+                {m.hint ? <div className="muted" style={{ fontSize: 11, marginTop: 1 }}>{m.hint}</div> : null}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="container" style={{ marginTop: 24 }}>
+      <div className="container" ref={tabsRef} style={{ marginTop: 24 }}>
         <div className="row gap-6" style={{ padding: 4, background: '#fff', borderRadius: 999, border: '1px solid var(--line)', display: 'inline-flex' }}>
           {[
             ['propiedades', `Propiedades · ${props.length}`],
-            ['zona',        'Recomendaciones'],
-            ['reviews',     `Reseñas · ${agent.reviews}`],
-          ].map(([id, label]) => (
+            hasTips ? ['zona', 'Recomendaciones'] : null,
+            ['reviews', `Reseñas${agent.reviews > 0 ? ' · ' + agent.reviews : ''}`],
+          ].filter(Boolean).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
               padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
               fontFamily: 'inherit', fontWeight: 600, fontSize: 13,
@@ -127,7 +164,7 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
             ) : <EmptyTab text="Este agente todavía no tiene propiedades activas."/>
           )}
 
-          {tab === 'zona' && <AgentZoneTips agent={agent}/>}
+          {tab === 'zona' && hasTips && <AgentZoneTips agent={agent}/>}
           {tab === 'reviews' && <AgentReviews agent={agent}/>}
         </div>
       </div>
@@ -207,53 +244,74 @@ function AgentBlog({ agent }) {
 }
 
 function AgentZoneTips({ agent }) {
-  const zones = agent.zone.split(',').map(s => s.trim());
-  const tips = [
-    { zone: zones[0], title: 'Qué buscar al alquilar en ' + zones[0], body: 'Zona muy demandada por jóvenes profesionales y familias chicas. Recomiendo priorizar edificios con cochera cubierta y verificar conexión a fibra óptica. Precios promedio: Gs. 3.2M – 4.5M.' },
-    { zone: zones[1] || zones[0], title: 'Tendencia 2026 en ' + (zones[1] || zones[0]), body: 'La zona está creciendo en oferta de dúplex y mini-condominios. Para propietarios: ofrecer amueblado parcial sube la consulta promedio en un 35%.' },
-    { zone: zones[0], title: 'Servicios y conectividad en la zona', body: 'Líneas de buses A1, A2 y A3. Cercanía con supermercados Stock y Real, gimnasios SmartFit y Bodytech, y centros educativos como Goethe y Cristo Rey. Importante para inquilinos con familia.' },
-  ];
+  const tips = Array.isArray(agent.tips) ? agent.tips : [];
+  if (tips.length === 0) return <EmptyTab text="Este agente todavía no publicó recomendaciones."/>;
   return (
     <div className="col gap-14">
-      <div className="card" style={{ padding: 18, background: 'var(--yellow-50)', border: '1px solid #f1d97a' }}>
-        <div className="row gap-10">
-          <I.bolt s={20}/>
-          <div style={{ fontSize: 13.5 }}>
-            <strong>Conocimiento de zona:</strong> {agent.name.split(' ')[0]} se especializa en <strong>{agent.zone}</strong>. Sus recomendaciones se basan en {agent.closedRentals} cierres efectivos.
+      {agent.zone ? (
+        <div className="card" style={{ padding: 18, background: 'var(--yellow-50)', border: '1px solid #f1d97a' }}>
+          <div className="row gap-10">
+            <I.bolt s={20}/>
+            <div style={{ fontSize: 13.5 }}>
+              <strong>Conocimiento de zona:</strong> {agent.name.split(' ')[0]} cubre <strong>{agent.zone}</strong>
+              {agent.closedRentals > 0 ? <> · {agent.closedRentals} cierre{agent.closedRentals !== 1 ? 's' : ''} acumulado{agent.closedRentals !== 1 ? 's' : ''}</> : null}.
+            </div>
           </div>
         </div>
-      </div>
-      {tips.map((t, i) => (
-        <div key={i} className="card" style={{ padding: 22 }}>
-          <span className="badge badge-soft" style={{ fontSize: 10.5 }}><I.pin s={10}/> {t.zone}</span>
-          <h3 style={{ fontSize: 18, marginTop: 10 }}>{t.title}</h3>
-          <p style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6, color: 'var(--ink-2)' }}>{t.body}</p>
+      ) : null}
+      {tips.map((t) => (
+        <div key={t.id} className="card" style={{ padding: 22 }}>
+          {t.zona ? <span className="badge badge-soft" style={{ fontSize: 10.5 }}><I.pin s={10}/> {t.zona}</span> : null}
+          <h3 style={{ fontSize: 18, marginTop: 10 }}>{t.titulo}</h3>
+          <p style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>{t.body}</p>
         </div>
       ))}
     </div>
   );
 }
 
+function formatRelativeDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const diffMs = Date.now() - d.getTime();
+  const day = 86400000;
+  const days = Math.floor(diffMs / day);
+  if (days < 1) return 'Hoy';
+  if (days < 7) return `Hace ${days} día${days !== 1 ? 's' : ''}`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `Hace ${weeks} semana${weeks !== 1 ? 's' : ''}`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `Hace ${months} mes${months !== 1 ? 'es' : ''}`;
+  const years = Math.floor(days / 365);
+  return `Hace ${years} año${years !== 1 ? 's' : ''}`;
+}
+
 function AgentReviews({ agent }) {
-  const allReviews = [
-    { name: 'Pablo R.',  date: 'Hace 2 semanas', stars: 5, body: 'Excelente atención, respondió todas mis consultas por WhatsApp en minutos. La visita fue puntual y muy clara con los detalles del contrato.', role: 'Inquilino' },
-    { name: 'Sofía G.',  date: 'Hace 1 mes',     stars: 5, body: 'Cedí mi departamento para que lo gestione y lo alquiló en 11 días. Muy profesional y transparente con los reportes.', role: 'Propietaria' },
-    { name: 'Lucía M.',  date: 'Hace 2 meses',   stars: 4, body: 'Buen agente, conoce muy bien la zona. La única pega es que en horario nocturno tarda un poco más en responder.', role: 'Inquilina' },
-    { name: 'Damián V.', date: 'Hace 3 meses',   stars: 5, body: 'Recomiendo 100%. Filtró bien a los interesados y me consiguió un inquilino confiable rápido.', role: 'Propietario' },
-    { name: 'Camila R.', date: 'Hace 4 meses',   stars: 3, body: 'Respuesta media. La visita coordinada se postergó dos veces, aunque al final salió bien.', role: 'Inquilina' },
-    { name: 'Hugo G.',   date: 'Hace 5 meses',   stars: 5, body: 'Súper recomendable. Atento, claro y siempre disponible. Volvería a trabajar con él sin dudas.', role: 'Propietario' },
-  ];
+  const allReviews = (Array.isArray(agent.resenas) ? agent.resenas : []).map(r => ({
+    id: r.id,
+    name: r.autor_nombre || 'Anónimo',
+    role: r.rol || '',
+    stars: Number(r.stars) || 0,
+    body: r.body || '',
+    date: formatRelativeDate(r.created_at),
+  }));
   const [filter, setFilter] = React.useState('all');
   const [writeOpen, setWriteOpen] = React.useState(false);
   const filtered = filter === 'all' ? allReviews : allReviews.filter(r => r.stars === filter);
-  const dist = { 5: 78, 4: 16, 3: 4, 2: 1, 1: 1 };
+  const total = allReviews.length;
+  const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  if (total > 0) {
+    allReviews.forEach(r => { if (dist[r.stars] != null) dist[r.stars] += 1; });
+    Object.keys(dist).forEach(k => { dist[k] = Math.round(dist[k] / total * 100); });
+  }
 
   return (
     <div>
       <div className="card" style={{ padding: 22, marginBottom: 18 }}>
         <div className="row gap-24">
           <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid var(--line-2)' }}>
-            <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 48, color: 'var(--yellow-600)' }}>{agent.rating}</div>
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 48, color: 'var(--yellow-600)' }}>{total > 0 ? Number(agent.rating || 0).toFixed(1) : '—'}</div>
             <div className="row gap-2" style={{ justifyContent: 'center', color: 'var(--yellow)' }}>
               {[1,2,3,4,5].map(s => <I.star key={s} s={14}/>)}
             </div>
@@ -336,7 +394,33 @@ function WriteReviewModal({ agent, onClose }) {
   const [name, setName] = React.useState('');
   const [body, setBody] = React.useState('');
   const [sent, setSent] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState(null);
   const ready = stars > 0 && name.trim().length >= 2 && body.trim().length >= 15;
+
+  async function submit() {
+    if (!ready || submitting) return;
+    setError(null);
+    const targetId = agent.apiId || agent.id;
+    if (!targetId || !/^[0-9a-f]{8}-/i.test(String(targetId))) {
+      setError('Este agente no acepta reseñas todavía.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/public/alquiloya/agentes/' + encodeURIComponent(targetId) + '/resenas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autor_nombre: name.trim(), rol: role, stars, body: body.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
+      setSent(true);
+    } catch (e) {
+      setError('No pudimos enviar tu reseña. ' + (e.message || ''));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   React.useEffect(() => {
     const prev = document.body.style.overflow;
@@ -432,10 +516,10 @@ function WriteReviewModal({ agent, onClose }) {
           <span className="muted xs">Tu reseña se publica después de una revisión rápida.</span>
           <div className="row gap-10">
             <button onClick={onClose} className="btn btn-outline">Cancelar</button>
-            <button onClick={() => ready && setSent(true)} className="btn btn-blue"
-              disabled={!ready}
-              style={{ opacity: ready ? 1 : .5, cursor: ready ? 'pointer' : 'not-allowed' }}>
-              Enviar reseña <I.check s={14}/>
+            <button onClick={submit} className="btn btn-blue"
+              disabled={!ready || submitting}
+              style={{ opacity: ready && !submitting ? 1 : .5, cursor: ready && !submitting ? 'pointer' : 'not-allowed' }}>
+              {submitting ? 'Enviando…' : <>Enviar reseña <I.check s={14}/></>}
             </button>
           </div>
         </div>

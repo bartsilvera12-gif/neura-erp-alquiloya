@@ -32,6 +32,11 @@ export default function NuevoAgentePage() {
           foto_url: "",
           orden: 0,
           activo: true,
+          verificado: false,
+          nivel: "",
+          idiomas: "",
+          tiempo_respuesta: "",
+          tasa_respuesta: "",
         }}
       />
     </div>

@@ -29,6 +29,8 @@ export type ErpPropiedadListRow = {
   dormitorios: number | null;
   banos: number | null;
   destacada: boolean | null;
+  destacada_hasta: string | null;
+  destacada_efectiva: boolean | null;
   visible_web: boolean | null;
   activo: boolean | null;
   created_at: string | null;
@@ -85,7 +87,10 @@ export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
         p.ciudad, p.barrio,
         p.precio::float8 AS precio, p.moneda,
         p.dormitorios, p.banos,
-        p.destacada, p.visible_web, p.activo,
+        p.destacada,
+        p.destacada_hasta::text AS destacada_hasta,
+        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,
+        p.visible_web, p.activo,
         p.created_at::text AS created_at,
         p.agente_id,
         a.nombre AS agente_nombre,
@@ -119,7 +124,8 @@ export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
           AND pc.activo = true
       ) ccnt ON true
       WHERE p.empresa_id = $1::uuid
-      ORDER BY p.destacada DESC NULLS LAST, p.created_at DESC NULLS LAST, p.titulo ASC
+      ORDER BY (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) DESC NULLS LAST,
+               p.created_at DESC NULLS LAST, p.titulo ASC
     `,
     [ALQUILOYA_EMPRESA_ID]
   );
@@ -144,7 +150,10 @@ export async function getErpPropiedad(id: string): Promise<ErpPropiedadDetail | 
         p.dormitorios, p.banos, p.cocheras,
         p.superficie_m2::float8 AS superficie_m2,
         p.terreno_m2::float8 AS terreno_m2,
-        p.destacada, p.visible_web, p.activo,
+        p.destacada,
+        p.destacada_hasta::text AS destacada_hasta,
+        (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada_efectiva,
+        p.visible_web, p.activo,
         p.created_at::text AS created_at, p.updated_at::text AS updated_at,
         p.agente_id,
         a.nombre AS agente_nombre,

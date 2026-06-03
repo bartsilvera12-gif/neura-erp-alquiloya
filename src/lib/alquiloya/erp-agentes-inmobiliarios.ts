@@ -112,6 +112,11 @@ export type ErpAgenteAccesoUsuario = {
 
 export type ErpAgenteInmobiliarioDetail = ErpAgenteInmobiliarioRow & {
   bio: string | null;
+  verificado: boolean | null;
+  nivel: string | null;
+  idiomas: string | null;
+  tiempo_respuesta: string | null;
+  tasa_respuesta: string | null;
   acceso: ErpAgenteAccesoUsuario | null;
 };
 
@@ -174,12 +179,22 @@ export async function getErpAgenteInmobiliario(
   const pool = getChatPostgresPool();
   if (!pool) return null;
 
-  const { rows } = await queryWithRetry<ErpAgenteInmobiliarioRow & { bio: string | null }>(
+  const { rows } = await queryWithRetry<
+    ErpAgenteInmobiliarioRow & {
+      bio: string | null;
+      verificado: boolean | null;
+      nivel: string | null;
+      idiomas: string | null;
+      tiempo_respuesta: string | null;
+      tasa_respuesta: string | null;
+    }
+  >(
     pool,
     `
       SELECT
         a.id, a.nombre, a.email, a.telefono, a.whatsapp,
         a.cargo, a.foto_url, a.activo, a.orden, a.bio,
+        a.verificado, a.nivel, a.idiomas, a.tiempo_respuesta, a.tasa_respuesta,
         COALESCE(pc.n, 0)::int AS propiedades_count
       FROM ${q("agentes")} a
       LEFT JOIN LATERAL (

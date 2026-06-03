@@ -57,6 +57,20 @@
     ) || null;
   };
 
+  const computeAutoNivel = (cierres) => {
+    const c = Number(cierres) || 0;
+    if (c >= 10) return 'Top Pro';
+    if (c >= 3) return 'Pro';
+    return 'Junior';
+  };
+
+  const zoneLabelFromZonas = (zonas) => {
+    if (!Array.isArray(zonas) || zonas.length === 0) return '';
+    const parts = zonas.map(z => [z.barrio, z.ciudad].filter(Boolean).join(', ')).filter(Boolean);
+    const unique = Array.from(new Set(parts));
+    return unique.slice(0, 3).join(' · ');
+  };
+
   const normalizeAgent = (row, index = 0) => {
     if (!row) return null;
     const fallback = findFallbackAgent(row);
@@ -64,23 +78,33 @@
     const cargo = row.cargo || fallback?.type || 'Agente';
     const type = String(cargo).split(' - ')[0].split(' · ')[0].trim() || 'Agente';
     const createdYear = row.created_at ? new Date(row.created_at).getFullYear() : null;
+    const cierresCount = Number(row.cierres_count ?? 0) || 0;
+    const zonasArr = Array.isArray(row.zonas) ? row.zonas : [];
+    const tipsArr = Array.isArray(row.tips) ? row.tips : [];
+    const resenasArr = Array.isArray(row.resenas) ? row.resenas : [];
+    const zoneLabel = zoneLabelFromZonas(zonasArr) || fallback?.zone || '';
+    const nivelAuto = computeAutoNivel(cierresCount);
     return {
       id: row.id || fallback?.id || slugify(name),
       apiId: row.id || null,
       slug: fallback?.slug || slugify(name),
       name,
       type,
-      zone: fallback?.zone || 'Asuncion, Central',
+      zone: zoneLabel,
+      zonas: zonasArr,
+      tips: tipsArr,
+      resenas: resenasArr,
       avatar: fallback?.avatar ?? index,
-      verified: fallback?.verified ?? true,
-      joinedYear: fallback?.joinedYear || (Number.isFinite(createdYear) ? createdYear : 2026),
-      activeProperties: row.propiedades_count ?? fallback?.activeProperties ?? 0,
-      closedRentals: fallback?.closedRentals ?? 0,
-      blogPosts: fallback?.blogPosts ?? 0,
-      reviews: fallback?.reviews ?? 0,
-      rating: fallback?.rating ?? 4.8,
-      level: fallback?.level || 'Pro',
-      commissionRate: fallback?.commissionRate ?? 50,
+      verified: !!row.verificado,
+      joinedYear: row.created_at && Number.isFinite(createdYear) ? createdYear : (fallback?.joinedYear || 2026),
+      activeProperties: row.propiedades_count ?? 0,
+      closedRentals: cierresCount,
+      reviews: Number(row.resenas_count ?? 0) || 0,
+      rating: Number(row.rating ?? 0) || 0,
+      level: row.nivel || nivelAuto,
+      idiomas: row.idiomas || '',
+      tiempoRespuesta: row.tiempo_respuesta || '',
+      tasaRespuesta: row.tasa_respuesta || '',
       phone: row.whatsapp || row.telefono || fallback?.phone || '',
       email: row.email || fallback?.email || '',
       foto_url: row.foto_url || fallback?.foto_url || null,
