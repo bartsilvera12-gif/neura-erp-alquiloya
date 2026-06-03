@@ -109,7 +109,7 @@ function Footer({ onNav }) {
           <FootCol title="Buscar" items={['Departamentos','Casas','Salones comerciales','Temporales']} onClick={() => onNav('catalog')} />
           <FootCol title="Para propietarios" items={['Publicar inmueble','Planes y precios','Carteles QR','Centro de ayuda']} />
           <FootCol title="Empresa" items={['Sobre AlquiloYa','Términos','Política de privacidad','Trabajá con nosotros']} />
-          <FootCol title="Contacto" items={['hola@alquiloya.com.py','+595 21 555 0100','Asunción, Paraguay','Lun a Sáb 8–20 hs']} />
+          <FootCol title="Contacto" items={['Info@alquiloya.com.py','0983 000 292','Asunción, Paraguay','Lunes a Sábado 08:00 a 20:00']} />
         </div>
         <div style={{ borderTop: '1px solid #1b2a3a', marginTop: 40, paddingTop: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 12.5, color: '#6b7785', flexShrink: 0 }}>© 2026 AlquiloYa · Todos los derechos reservados</div>
