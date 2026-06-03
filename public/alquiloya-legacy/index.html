@@ -214,18 +214,18 @@
   /* Tablet */
   @media (max-width: 1100px) {
     .container, .container-wide { padding: 0 24px; }
-    h1 { font-size: 44px; }
-    h2 { font-size: 30px; }
-    h3 { font-size: 20px; }
+    h1 { font-size: 44px !important; line-height: 1.1 !important; }
+    h2 { font-size: 30px !important; }
+    h3 { font-size: 20px !important; }
   }
 
   /* Mobile */
   @media (max-width: 760px) {
     html, body { font-size: 15px; }
     .container, .container-wide { padding: 0 16px; max-width: 100%; }
-    h1 { font-size: 32px; line-height: 1.1; }
-    h2 { font-size: 24px; line-height: 1.15; }
-    h3 { font-size: 18px; }
+    h1 { font-size: 30px !important; line-height: 1.15 !important; }
+    h2 { font-size: 22px !important; line-height: 1.2 !important; }
+    h3 { font-size: 17px !important; }
     .btn { padding: 11px 16px; font-size: 14px; }
     .btn-lg { padding: 13px 18px; font-size: 15px; }
 
@@ -284,7 +284,7 @@
 
   /* Targeted mobile fixes — secciones del home con grid fijo */
   @media (max-width: 760px) {
-    /* Hero search: 5 columnas → 1 columna apilada */
+    /* Hero search: 5 columnas → 1 columna apilada y compacta */
     .hero-search-grid {
       grid-template-columns: 1fr !important;
       gap: 0 !important;
@@ -293,28 +293,54 @@
       border-right: none !important;
       border-bottom: 1px solid var(--line-2);
       width: 100% !important;
+      padding: 8px 14px !important;
     }
     .hero-search-grid > *:last-child { border-bottom: none; }
+    /* Etiquetas (CIUDAD, BARRIO, etc.) más chicas */
+    .hero-search-grid > * > div:first-child {
+      font-size: 10px !important;
+      margin-bottom: 2px !important;
+    }
+    /* Valor de los selects inline más chico */
+    .hero-search-grid button span,
     .hero-search-grid button {
-      margin: 12px !important;
-      padding: 12px 24px !important;
-      width: calc(100% - 24px) !important;
+      font-size: 13.5px !important;
+    }
+    .hero-search-grid > button {
+      margin: 10px !important;
+      padding: 11px 20px !important;
+      width: calc(100% - 20px) !important;
       justify-content: center !important;
+      font-size: 14px !important;
     }
 
-    /* Stats hero: 4 columnas → 2x2 */
+    /* Tabs de tipo de inmueble en el hero — más chiquitos */
+    .hero-search-grid + *, /* nada */
+    .row.gap-4 button[style*="border-radius: 14px 14px 0 0"],
+    .row.gap-4 button[style*="border-radius:14px 14px 0 0"] {
+      padding: 8px 12px 10px !important;
+      font-size: 12px !important;
+    }
+
+    /* Stats hero: 4 columnas → 2x2, números más chicos */
     .hero-stats-grid {
       grid-template-columns: 1fr 1fr !important;
       gap: 12px 0 !important;
     }
     .hero-stats-grid > * {
       border-right: none !important;
+      padding: 6px 10px !important;
     }
+    .hero-stats-grid > * > div:first-child { font-size: 20px !important; }
+    .hero-stats-grid > * > div:nth-child(2) { font-size: 11px !important; }
 
     /* Cualquier grid de 4 columnas (categorias, etc.) → 2 columnas */
     .home-grid-4 {
       grid-template-columns: 1fr 1fr !important;
       gap: 12px !important;
+    }
+    .home-grid-4 button {
+      padding: 16px !important;
     }
   }
 
