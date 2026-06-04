@@ -320,7 +320,7 @@ function NavItem({
           <Link
             href={item.href}
             className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 ${active ? "font-semibold" : "font-medium"}`}
-            title={item.label}
+            title={collapsed ? item.label : undefined}
           >
             <Icon
               className={`h-[18px] w-[18px] shrink-0 transition-colors ${
@@ -403,7 +403,7 @@ function NavItem({
           ? "bg-gradient-to-r from-[#7DCFD2]/22 via-[#7DCFD2]/12 to-transparent font-semibold text-white"
           : "font-medium text-slate-300 hover:bg-white/[0.04] hover:text-white"
       }`}
-      title={item.label}
+      title={collapsed ? item.label : undefined}
     >
       {isActive ? (
         <span
