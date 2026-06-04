@@ -53,20 +53,40 @@ export async function POST(request: Request) {
       return NextResponse.json(errorResponse("Pool no disponible"), { status: 500 });
     }
 
-    const { rows } = await queryWithRetry<{ id: string }>(
-      pool,
-      `INSERT INTO "alquiloya"."solicitudes_acceso"
-         (empresa_id, tipo, sub_tipo, nombre, email, telefono, empresa, ciudad, mensaje, plan_tier_solicitado, estado)
-       VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendiente')
-       RETURNING id`,
-      [ALQUILOYA_EMPRESA_ID, tipo, subTipo, nombre, email, telefono, empresa, ciudad, mensaje, planTier]
-    );
+    // Detectar si la columna plan_tier_solicitado existe (tolerar instancias sin la migration)
+    let hasPlanTier = false;
+    try {
+      const { rows: cols } = await queryWithRetry<{ ok: boolean }>(
+        pool,
+        `SELECT EXISTS (
+           SELECT 1 FROM information_schema.columns
+            WHERE table_schema='alquiloya' AND table_name='solicitudes_acceso' AND column_name='plan_tier_solicitado'
+         ) AS ok`,
+        []
+      );
+      hasPlanTier = cols[0]?.ok === true;
+    } catch {
+      hasPlanTier = false;
+    }
+
+    const sql = hasPlanTier
+      ? `INSERT INTO "alquiloya"."solicitudes_acceso"
+           (empresa_id, tipo, sub_tipo, nombre, email, telefono, empresa, ciudad, mensaje, plan_tier_solicitado, estado)
+         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendiente')
+         RETURNING id`
+      : `INSERT INTO "alquiloya"."solicitudes_acceso"
+           (empresa_id, tipo, sub_tipo, nombre, email, telefono, empresa, ciudad, mensaje, estado)
+         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente')
+         RETURNING id`;
+    const params = hasPlanTier
+      ? [ALQUILOYA_EMPRESA_ID, tipo, subTipo, nombre, email, telefono, empresa, ciudad, mensaje, planTier]
+      : [ALQUILOYA_EMPRESA_ID, tipo, subTipo, nombre, email, telefono, empresa, ciudad, mensaje];
+
+    const { rows } = await queryWithRetry<{ id: string }>(pool, sql, params);
     return NextResponse.json(successResponse({ id: rows[0].id }));
   } catch (err) {
-    console.error(
-      "[api/public/alquiloya/solicitudes-acceso POST]",
-      err instanceof Error ? err.message : err
-    );
-    return NextResponse.json(errorResponse("No se pudo registrar la solicitud"), { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[api/public/alquiloya/solicitudes-acceso POST]", msg);
+    return NextResponse.json(errorResponse("No se pudo registrar la solicitud: " + msg), { status: 500 });
   }
 }
