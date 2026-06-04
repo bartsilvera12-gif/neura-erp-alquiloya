@@ -69,21 +69,37 @@ export async function POST(
 
     // rechazar
     const motivo = s(body.motivo, 500);
-    const r = await queryWithRetry<{ id: string }>(
-      pool,
-      `UPDATE ${t("propiedades")} SET
-          estado = 'rechazada',
-          activo = false,
-          visible_web = false,
-          descripcion = CASE
-            WHEN $3::text IS NULL THEN descripcion
-            ELSE COALESCE(descripcion,'') || E'\n\n[Moderación] Rechazada: ' || $3::text
-          END,
-          updated_at = now()
-        WHERE empresa_id = $1::uuid AND id = $2::uuid
-        RETURNING id`,
-      [ALQUILOYA_EMPRESA_ID, id, motivo]
-    );
+    // Primero intentamos con estado='rechazada' (si la migration corrio). Si el
+    // CHECK constraint no lo permite, fallback a 'pausada' + nota en descripcion.
+    async function tryUpdate(estado: "rechazada" | "pausada") {
+      return queryWithRetry<{ id: string }>(
+        pool!,
+        `UPDATE ${t("propiedades")} SET
+            estado = $4::text,
+            activo = false,
+            visible_web = false,
+            descripcion = CASE
+              WHEN $3::text IS NULL THEN descripcion
+              ELSE COALESCE(descripcion,'') || E'\n\n[Moderación] Rechazada: ' || $3::text
+            END,
+            updated_at = now()
+          WHERE empresa_id = $1::uuid AND id = $2::uuid
+          RETURNING id`,
+        [ALQUILOYA_EMPRESA_ID, id, motivo, estado]
+      );
+    }
+    let r;
+    try {
+      r = await tryUpdate("rechazada");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/propiedades_estado_check|check constraint/i.test(msg)) {
+        console.warn("[moderacion] estado=rechazada no permitido por CHECK, fallback a pausada");
+        r = await tryUpdate("pausada");
+      } else {
+        throw e;
+      }
+    }
     if (!r.rows || r.rows.length === 0) {
       return NextResponse.json({ error: "no encontrada" }, { status: 404 });
     }

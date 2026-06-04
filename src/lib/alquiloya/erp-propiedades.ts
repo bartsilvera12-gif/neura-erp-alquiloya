@@ -155,7 +155,10 @@ export async function listErpPropiedadesPendientes(): Promise<ErpPropiedadPendie
       WHERE p.empresa_id = $1::uuid
         AND p.activo = false
         AND p.visible_web = false
-        AND (p.estado IS NULL OR p.estado <> 'rechazada')
+        -- Pendientes = recien creadas por el wizard publico (estado='inactiva' o NULL).
+        -- Excluimos 'rechazada' (rechazadas) y 'pausada' (fallback de rechazo cuando el
+        -- CHECK constraint aun no acepta 'rechazada').
+        AND (p.estado IS NULL OR p.estado IN ('inactiva'))
       ORDER BY p.created_at DESC NULLS LAST
     `,
     [ALQUILOYA_EMPRESA_ID]
@@ -172,7 +175,7 @@ export async function countErpPropiedadesPendientes(): Promise<number> {
       `SELECT count(*)::int AS n FROM ${q("propiedades")}
         WHERE empresa_id = $1::uuid
           AND activo = false AND visible_web = false
-          AND (estado IS NULL OR estado <> 'rechazada')`,
+          AND (estado IS NULL OR estado IN ('inactiva'))`,
       [ALQUILOYA_EMPRESA_ID]
     );
     return rows[0]?.n ?? 0;
