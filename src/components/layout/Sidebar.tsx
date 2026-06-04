@@ -184,6 +184,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Building,
   },
   {
+    key: "propiedades-pendientes",
+    slug: "propiedades",
+    label: "Pendientes de aprobación",
+    href: "/dashboard/propiedades-pendientes",
+    icon: ListChecks,
+  },
+  {
     key: "agentes-inmobiliarios",
     slug: "agentes-inmobiliarios",
     label: "Agentes inmobiliarios",

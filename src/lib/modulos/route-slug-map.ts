@@ -100,6 +100,7 @@ export function pathRequiresModuleSlug(pathname: string): string | null {
   if (p.startsWith("/dashboard")) {
     if (p.startsWith("/dashboard/marketing-ops")) return "marketing_ops";
     if (p.startsWith("/dashboard/proyectos")) return "proyectos";
+    if (p.startsWith("/dashboard/propiedades-pendientes")) return "propiedades";
     if (p.startsWith("/dashboard/propiedades")) return "propiedades";
     if (p.startsWith("/dashboard/agentes-inmobiliarios")) return "agentes-inmobiliarios";
     if (p.startsWith("/dashboard/solicitudes-acceso")) return "agentes-inmobiliarios";

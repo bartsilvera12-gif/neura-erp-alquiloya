@@ -98,6 +98,89 @@ export type ErpPropiedadDetail = ErpPropiedadListRow & {
   }>;
 };
 
+export type ErpPropiedadPendienteRow = ErpPropiedadListRow & {
+  propietario_id: string | null;
+  propietario_nombre: string | null;
+  propietario_email: string | null;
+  propietario_telefono: string | null;
+  descripcion: string | null;
+  precio_formateado?: string | null;
+};
+
+export async function listErpPropiedadesPendientes(): Promise<ErpPropiedadPendienteRow[]> {
+  const pool = getChatPostgresPool();
+  if (!pool) return [];
+  // Pendientes = cargadas desde el wizard publico u otro origen y aun no aprobadas.
+  // Criterio: activo=false AND visible_web=false AND (estado != 'rechazada' OR estado IS NULL).
+  const { rows } = await queryWithRetry<ErpPropiedadPendienteRow>(
+    pool,
+    `
+      SELECT
+        p.id, p.codigo, p.titulo, p.tipo, p.operacion, p.estado,
+        p.ciudad, p.barrio, p.descripcion,
+        p.precio::float8 AS precio, p.moneda,
+        p.dormitorios, p.banos,
+        p.destacada,
+        NULL::text AS destacada_hasta, p.destacada AS destacada_efectiva,
+        p.visible_web, p.activo,
+        p.created_at::text AS created_at,
+        p.agente_id,
+        a.nombre AS agente_nombre,
+        cover.url AS cover_url,
+        COALESCE(fcnt.n, 0)::int AS fotos_count,
+        COALESCE(ccnt.n, 0)::int AS caracteristicas_count,
+        p.propietario_id,
+        pr.nombre AS propietario_nombre,
+        pr.email AS propietario_email,
+        pr.telefono AS propietario_telefono
+      FROM ${q("propiedades")} p
+      LEFT JOIN ${q("agentes")} a
+        ON a.id = p.agente_id AND a.empresa_id = p.empresa_id
+      LEFT JOIN ${q("propietarios")} pr
+        ON pr.id = p.propietario_id AND pr.empresa_id = p.empresa_id
+      LEFT JOIN LATERAL (
+        SELECT pf.url FROM ${q("propiedad_fotos")} pf
+        WHERE pf.empresa_id = p.empresa_id AND pf.propiedad_id = p.id AND pf.activo = true
+        ORDER BY pf.es_portada DESC, pf.orden ASC, pf.created_at ASC, pf.id ASC
+        LIMIT 1
+      ) cover ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS n FROM ${q("propiedad_fotos")} pf
+        WHERE pf.empresa_id = p.empresa_id AND pf.propiedad_id = p.id AND pf.activo = true
+      ) fcnt ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS n FROM ${q("propiedad_caracteristicas")} pc
+        WHERE pc.empresa_id = p.empresa_id AND pc.propiedad_id = p.id AND pc.activo = true
+      ) ccnt ON true
+      WHERE p.empresa_id = $1::uuid
+        AND p.activo = false
+        AND p.visible_web = false
+        AND (p.estado IS NULL OR p.estado <> 'rechazada')
+      ORDER BY p.created_at DESC NULLS LAST
+    `,
+    [ALQUILOYA_EMPRESA_ID]
+  );
+  return rows ?? [];
+}
+
+export async function countErpPropiedadesPendientes(): Promise<number> {
+  const pool = getChatPostgresPool();
+  if (!pool) return 0;
+  try {
+    const { rows } = await queryWithRetry<{ n: number }>(
+      pool,
+      `SELECT count(*)::int AS n FROM ${q("propiedades")}
+        WHERE empresa_id = $1::uuid
+          AND activo = false AND visible_web = false
+          AND (estado IS NULL OR estado <> 'rechazada')`,
+      [ALQUILOYA_EMPRESA_ID]
+    );
+    return rows[0]?.n ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
   const pool = getChatPostgresPool();
   if (!pool) return [];
