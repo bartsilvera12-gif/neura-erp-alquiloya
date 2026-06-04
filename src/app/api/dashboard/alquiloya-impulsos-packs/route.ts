@@ -37,7 +37,8 @@ export async function GET(request: Request) {
          SELECT 1 FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = 'alquiloya' AND c.relname = 'impulsos_packs' AND c.relkind = 'r'
-       ) AS exists`
+       ) AS exists`,
+      []
     );
     if (!exists?.[0]?.exists) {
       return NextResponse.json({
