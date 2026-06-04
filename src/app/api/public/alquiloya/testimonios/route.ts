@@ -4,7 +4,8 @@ import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// Cache 60s — los testimonios cambian con baja frecuencia.
+export const revalidate = 60;
 
 const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 

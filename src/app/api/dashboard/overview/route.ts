@@ -9,6 +9,10 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 
+// Cache module-level: una vez que sabemos que una tabla existe en este schema,
+// no preguntamos más. Se invalida con cada deploy (cold start del proceso).
+const overviewTableExistsCache = new Map<string, boolean>();
+
 type Severity = "danger" | "warning" | "info";
 
 type Alerta = {
@@ -73,6 +77,9 @@ export async function GET(request: Request) {
     // Helpers tolerantes — nunca tiran, devuelven 0 / [] / false si falla.
     // ──────────────────────────────────────────────────────────────────────────
     async function tableExists(name: string): Promise<boolean> {
+      const cacheKey = `${schema}.${name}`;
+      const cached = overviewTableExistsCache.get(cacheKey);
+      if (cached !== undefined) return cached;
       try {
         const { rows } = await queryWithRetry<{ ok: boolean }>(
           pool!,
@@ -83,7 +90,9 @@ export async function GET(request: Request) {
            ) AS ok`,
           [schema, name]
         );
-        return rows[0]?.ok === true;
+        const ok = rows[0]?.ok === true;
+        overviewTableExistsCache.set(cacheKey, ok);
+        return ok;
       } catch {
         return false;
       }
