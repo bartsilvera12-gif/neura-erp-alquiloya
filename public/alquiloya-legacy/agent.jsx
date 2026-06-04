@@ -177,7 +177,7 @@ function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty })
         {[
           ['propiedades', `Propiedades · ${props.length}`],
           hasTips ? ['zona', 'Recomendaciones'] : null,
-          hasPosts ? ['blog', `Blog · ${posts.length}`] : null,
+          ['blog', `Blog${hasPosts ? ' · ' + posts.length : ''}`],
           ['reviews', `Reseñas${agent.reviews > 0 ? ' · ' + agent.reviews : ''}`],
         ].filter(Boolean).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
@@ -209,8 +209,11 @@ function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty })
 
 function AgentBlogPanel({ posts }) {
   const [active, setActive] = React.useState(null);
-  if (!posts || posts.length === 0) {
-    return <EmptyTab text="Este agente todavía no escribió posts."/>;
+  if (posts === null) {
+    return <EmptyTab text="Cargando posts…"/>;
+  }
+  if (posts.length === 0) {
+    return <EmptyTab text="Este agente todavía no publicó artículos en su blog. Volvé pronto."/>;
   }
   if (active) {
     return (
