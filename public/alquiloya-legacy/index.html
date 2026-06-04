@@ -431,6 +431,37 @@
     .hero-stats-grid { grid-template-columns: 1fr !important; }
     .home-grid-4 { grid-template-columns: 1fr !important; }
   }
+
+  /* === FIX responsive tablet (761–1024px): usar el mismo menú hamburguesa que en mobile === */
+  @media (max-width: 1024px) {
+    .nav-hamburger { display: inline-flex !important; }
+
+    /* Override del estado "scrollable" intermedio que desbordaba (usa selector con ID,
+       por eso acá también se incluye #neura-public-header nav para ganarle). */
+    #neura-public-header nav, header nav.row {
+      overflow-x: hidden !important;
+      max-width: 100% !important;
+      position: fixed !important;
+      top: 96px !important; left: 0 !important; right: 0 !important;
+      background: #fff !important;
+      border-bottom: 1px solid var(--line) !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 0 !important;
+      padding: 8px 16px !important;
+      box-shadow: 0 8px 20px rgba(0,0,0,.08) !important;
+      z-index: 39 !important;
+    }
+
+    /* Altura: baja especificidad para que .is-open pueda ganarle */
+    header nav.row { max-height: 0 !important; overflow-y: hidden !important; transition: max-height .2s ease, padding .2s ease !important; }
+    header nav.row.is-open { max-height: 70vh !important; overflow-y: auto !important; padding: 12px 16px !important; }
+
+    header nav.row button {
+      width: 100% !important; text-align: left !important;
+      padding: 12px 8px !important; border-bottom: 1px solid var(--line-2) !important;
+    }
+  }
 </style>
 </head>
 <body>
