@@ -65,6 +65,7 @@
     "@xmldom/xmldom": "^0.9.9",
     "fontkit": "^2.0.4",
     "framer-motion": "^12.36.0",
+    "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
