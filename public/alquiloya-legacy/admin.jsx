@@ -1,6 +1,6 @@
 // Administradores — Global y Propietario/Agente
 
-function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displayName, displayEmail, children }) {
+function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displayName, displayEmail, planInfo, children }) {
   const items = kind === 'global' ? [
     { id: 'admin-global', label: 'Dashboard', icon: 'grid' },
     { id: 'admin-global-properties', label: 'Inmuebles', icon: 'house' },
@@ -44,11 +44,20 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
           </nav>
           {kind === 'agent' && (
             <>
-              <div style={{ marginTop: 24, padding: 14, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 12.5 }}>
-                <div style={{ fontWeight: 700, color: '#8a5e00' }}>Plan Premium</div>
-                <div style={{ color: '#8a5e00', marginTop: 4 }}>Renueva el 30 de Junio</div>
-                <button className="btn btn-blue btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>Ver plan</button>
-              </div>
+              {planInfo && planInfo.name ? (
+                <div style={{ marginTop: 24, padding: 14, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 12.5 }}>
+                  <div style={{ fontWeight: 700, color: '#8a5e00' }}>Plan {planInfo.name}</div>
+                  {planInfo.vencimiento ? (
+                    <div style={{ color: '#8a5e00', marginTop: 4 }}>Renueva el {planInfo.vencimiento}</div>
+                  ) : null}
+                  <button onClick={() => onNav && onNav('plans')} className="btn btn-blue btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>Ver plan</button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 24, padding: 14, background: 'var(--bg-2)', borderRadius: 12, fontSize: 12.5, border: '1px dashed var(--line)' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--ink-3)' }}>Sin plan asignado</div>
+                  <button onClick={() => onNav && onNav('plans')} className="btn btn-blue btn-sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>Elegir un plan</button>
+                </div>
+              )}
               <button onClick={() => onNav('agent/mariana-lopez')} className="card" style={{ marginTop: 12, padding: 12, fontSize: 12.5, width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px dashed var(--blue-100)' }}>
                 <div className="row gap-8">
                   <I.eye s={14}/>
@@ -427,6 +436,17 @@ function AdminAgentPage({ route, onNav }) {
              || '')
           : ''
       }
+      planInfo={(() => {
+        const src = isPropietario ? meData?.propietario : meData?.agente;
+        if (!src || !src.plan_nombre) return null;
+        let venc = null;
+        if (src.plan_vencimiento_at) {
+          try {
+            venc = new Date(src.plan_vencimiento_at).toLocaleDateString('es-PY', { day: 'numeric', month: 'long' });
+          } catch { /* ignore */ }
+        }
+        return { name: src.plan_nombre, vencimiento: venc };
+      })()}
     >
       {view === 'overview' && <ImpulseBanner free={impulsesFree} paid={impulsesPaid} freeMax={10} onBuy={() => setBuyOpen(true)}/>}
 
@@ -587,7 +607,7 @@ function AdminAgentPage({ route, onNav }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 11.5 }}>Carteles QR</div>
-              <div style={{ fontSize: 10, color: 'var(--ink-4)' }}>14 generados · 318 escaneos esta semana</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-4) '}}>Generá carteles imprimibles para tus inmuebles</div>
             </div>
             <button onClick={() => onNav('admin-agent-qr')} style={{ background: 'transparent', border: '1px solid var(--line)', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: 'var(--ink-2)', fontFamily: 'inherit' }}>Ver</button>
           </div>

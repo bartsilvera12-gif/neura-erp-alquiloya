@@ -194,30 +194,42 @@
     return json?.data || {};
   };
 
+  // Lectura tolerante: cada endpoint falla independiente y no arrastra al otro.
+  const readDataSafe = async (url) => {
+    try {
+      return { ok: true, data: await readData(url) };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err), data: {} };
+    }
+  };
+
   async function refresh() {
     state.loading = true;
     notify();
-    try {
-      const [propData, agentData] = await Promise.all([
-        readData('/api/public/alquiloya/propiedades'),
-        readData('/api/public/alquiloya/agentes'),
-      ]);
-      const agents = (agentData.agentes || []).map(normalizeAgent).filter(Boolean);
-      const properties = (propData.propiedades || []).map(row => normalizeProperty(row, agents)).filter(Boolean);
+    const [propRes, agentRes] = await Promise.all([
+      readDataSafe('/api/public/alquiloya/propiedades'),
+      readDataSafe('/api/public/alquiloya/agentes'),
+    ]);
 
-      state.agents = agents.length ? agents : fallbackAgents;
-      state.properties = properties.length ? properties : fallbackProperties;
-      state.source = properties.length || agents.length ? 'api' : 'fallback';
-      state.error = null;
-    } catch (err) {
-      state.properties = fallbackProperties;
-      state.agents = fallbackAgents;
-      state.source = 'fallback';
-      state.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      state.loading = false;
-      notify();
-    }
+    const agents = (agentRes.data.agentes || []).map(normalizeAgent).filter(Boolean);
+    const properties = (propRes.data.propiedades || []).map(row => normalizeProperty(row, agents)).filter(Boolean);
+
+    // Por-endpoint: si tengo agentes reales, los uso aunque propiedades falle, y viceversa.
+    state.agents = agents.length ? agents : fallbackAgents;
+    state.properties = properties.length ? properties : fallbackProperties;
+
+    const propsFromApi = properties.length > 0;
+    const agentsFromApi = agents.length > 0;
+    if (propsFromApi && agentsFromApi) state.source = 'api';
+    else if (propsFromApi || agentsFromApi) state.source = 'mixed';
+    else state.source = 'fallback';
+
+    const errs = [];
+    if (!propRes.ok) errs.push('propiedades: ' + propRes.error);
+    if (!agentRes.ok) errs.push('agentes: ' + agentRes.error);
+    state.error = errs.length > 0 ? errs.join(' | ') : null;
+    state.loading = false;
+    notify();
   }
 
   async function getPropertyDetail(id) {

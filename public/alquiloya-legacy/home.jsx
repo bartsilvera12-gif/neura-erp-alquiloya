@@ -3,9 +3,10 @@
 function HomePage({ onNav, onProperty }) {
   const { properties } = useAlquiloYaPublicData();
   const featured = properties.filter(p => p.featured || p.verified).slice(0, 6);
+  const verifiedCount = properties.filter(p => p.verified).length;
   return (
     <div className="fade-in">
-      <Hero onNav={onNav}/>
+      <Hero onNav={onNav} verifiedCount={verifiedCount}/>
       <Featured properties={featured} onProperty={onProperty} onNav={onNav}/>
       <Categories properties={properties} onNav={onNav}/>
       <CatalogPreview properties={properties} onProperty={onProperty} onNav={onNav}/>
@@ -15,7 +16,7 @@ function HomePage({ onNav, onProperty }) {
   );
 }
 
-function Hero({ onNav }) {
+function Hero({ onNav, verifiedCount }) {
   return (
     <section style={{ background: 'linear-gradient(180deg, #fff 0%, var(--bg-2) 100%)', position: 'relative', overflow: 'hidden', paddingBottom: 56 }}>
       {/* background house image with very low opacity */}
@@ -58,7 +59,7 @@ function Hero({ onNav }) {
         </div>
 
         <div className="fade-up" style={{ marginTop: 40, maxWidth: 1040, margin: '40px auto 0' }}>
-          <HeroSearch onSubmit={() => onNav('catalog')} />
+          <HeroSearch onSubmit={() => onNav('catalog')} verifiedCount={verifiedCount}/>
         </div>
 
         <div className="row gap-32" style={{ marginTop: 24, color: 'var(--ink-3)', fontSize: 13.5, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -91,7 +92,7 @@ function TrustStrip() {
   );
 }
 
-function HeroSearch({ onSubmit }) {
+function HeroSearch({ onSubmit, verifiedCount }) {
   const [depto, setDepto] = React.useState('Central');
   const [ciudad, setCiudad] = React.useState('Asunción');
   const [barrio, setBarrio] = React.useState('Todos los barrios');
@@ -198,7 +199,9 @@ function HeroSearch({ onSubmit }) {
           <div className="row gap-20" style={{ fontSize: 13, color: 'var(--ink-3)' }}>
             <span className="row gap-6">
               <I.shield s={14}/> Solo inmuebles verificados
-              <span className="badge badge-soft" style={{ marginLeft: 4, fontSize: 10.5, padding: '2px 7px' }}>184</span>
+              {typeof verifiedCount === 'number' && verifiedCount > 0 ? (
+                <span className="badge badge-soft" style={{ marginLeft: 4, fontSize: 10.5, padding: '2px 7px' }}>{verifiedCount}</span>
+              ) : null}
             </span>
           </div>
           <button onClick={submit} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
