@@ -179,6 +179,8 @@
       agent,
       desc: row.descripcion || row.desc || fallback?.desc || '',
       features,
+      lat: typeof row.lat === 'number' ? row.lat : (row.lat != null ? Number(row.lat) || null : null),
+      lng: typeof row.lng === 'number' ? row.lng : (row.lng != null ? Number(row.lng) || null : null),
       raw: row,
     };
   };

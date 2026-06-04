@@ -150,7 +150,11 @@ function FullGalleryModal({ property, onClose }) {
           )}
           {tab === 'mapa' && (
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <MiniMap height={520}/>
+              {(typeof property.lat === 'number' && typeof property.lng === 'number') ? (
+                <LeafletReadOnlyMap lat={property.lat} lng={property.lng} height={520} approximate/>
+              ) : (
+                <MiniMap height={520}/>
+              )}
               <div style={{ padding: 16, fontSize: 14 }}>
                 <div style={{ fontWeight: 700 }}><I.pin s={14}/> {property.address}</div>
                 <div className="muted xs" style={{ marginTop: 4 }}>{property.ciudad} · {property.depto}</div>
@@ -341,6 +345,7 @@ function DetailDescription({ p }) {
 }
 
 function DetailMap({ p }) {
+  const hasCoords = typeof p.lat === 'number' && typeof p.lng === 'number';
   return (
     <div className="card" style={{ padding: 0, marginTop: 16, overflow: 'hidden' }}>
       <div style={{ padding: '20px 24px 16px' }}>
@@ -349,9 +354,44 @@ function DetailMap({ p }) {
           <I.pin s={14}/> {p.barrio}, {p.ciudad} — la ubicación exacta se comparte tras coordinar visita.
         </div>
       </div>
-      <MiniMap height={280} pins={1}/>
+      {hasCoords ? (
+        <LeafletReadOnlyMap lat={p.lat} lng={p.lng} height={280} approximate/>
+      ) : (
+        <MiniMap height={280} pins={1}/>
+      )}
     </div>
   );
+}
+
+// Mapa real (read-only) usando Leaflet via CDN. Si approximate=true, en lugar de un
+// pin exacto dibuja un circulo de ~250m de radio (para no exponer la direccion exacta).
+function LeafletReadOnlyMap({ lat, lng, height = 280, approximate = false }) {
+  const ref = React.useRef(null);
+  const mapRef = React.useRef(null);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.L) return;
+    if (!ref.current || mapRef.current) return;
+    const L = window.L;
+    const m = L.map(ref.current, { scrollWheelZoom: false }).setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+    }).addTo(m);
+    if (approximate) {
+      L.circle([lat, lng], {
+        radius: 250,
+        color: '#0058A5',
+        weight: 2,
+        fillColor: '#0058A5',
+        fillOpacity: 0.18,
+      }).addTo(m);
+    } else {
+      L.marker([lat, lng]).addTo(m);
+    }
+    mapRef.current = m;
+    return () => { try { m.remove(); } catch {} mapRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng]);
+  return <div ref={ref} style={{ height, width: '100%', background: 'var(--bg-2)' }}/>;
 }
 
 function DetailQR({ p }) {
