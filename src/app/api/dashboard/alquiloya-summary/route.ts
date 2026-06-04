@@ -13,6 +13,12 @@ function t(table: string): string {
   return `"${ALQUILOYA_SCHEMA}"."${table}"`;
 }
 
+// Cache de existencia de tablas/columnas a nivel de modulo. Persiste mientras el
+// proceso Next.js esté vivo. Una migration nueva requiere restart (cold start),
+// que ya ocurre tras cada deploy de Coolify. Esto evita 6+ queries por request.
+const tableExistsCache = new Map<string, boolean>();
+const colExistsCache = new Map<string, boolean>();
+
 export async function GET(request: Request) {
   try {
     const user = await getAuthUserForApiRoute(request);
@@ -25,8 +31,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
     }
 
-    // Helper: chequea si una tabla existe (no rompe si la migration aún no corrió).
+    // Helper: chequea si una tabla existe. Cacheado en módulo (1 query/proceso/tabla).
     const tableExists = async (name: string): Promise<boolean> => {
+      const cached = tableExistsCache.get(name);
+      if (cached !== undefined) return cached;
       const { rows } = await queryWithRetry<{ ok: boolean }>(
         pool,
         `SELECT EXISTS (
@@ -36,9 +44,14 @@ export async function GET(request: Request) {
         ) AS ok`,
         [name]
       );
-      return rows[0]?.ok === true;
+      const ok = rows[0]?.ok === true;
+      tableExistsCache.set(name, ok);
+      return ok;
     };
     const colExists = async (table: string, col: string): Promise<boolean> => {
+      const key = `${table}.${col}`;
+      const cached = colExistsCache.get(key);
+      if (cached !== undefined) return cached;
       const { rows } = await queryWithRetry<{ ok: boolean }>(
         pool,
         `SELECT EXISTS (
@@ -47,7 +60,9 @@ export async function GET(request: Request) {
         ) AS ok`,
         [table, col]
       );
-      return rows[0]?.ok === true;
+      const ok = rows[0]?.ok === true;
+      colExistsCache.set(key, ok);
+      return ok;
     };
     const safeCount = async (sql: string): Promise<number> => {
       try {
@@ -151,65 +166,10 @@ export async function GET(request: Request) {
       colExists("propietarios", "plan_publicacion_id"),
     ]);
 
-    // Acciones pendientes
-    const solAccesoPend = hasSolAcceso ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("solicitudes_acceso")}
-        WHERE empresa_id=$1::uuid AND estado='pendiente'`
-    ) : 0;
-    const solServicioPend = hasSolServicio ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("solicitudes_servicio")}
-        WHERE empresa_id=$1::uuid AND estado='pendiente'`
-    ) : 0;
-    const resenasPend = hasResenas ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("agente_resenas")}
-        WHERE empresa_id=$1::uuid AND estado='pendiente'`
-    ) : 0;
-    const captacionesPend = hasCaptaciones ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("agente_captaciones")}
-        WHERE empresa_id=$1::uuid AND COALESCE(estado,'') NOT IN ('cerrada','finalizada','descartada')`
-    ) : 0;
-
-    // Vencimientos de planes (propietarios + agentes combinados)
-    const venc7Prop = hasPlanVencProp ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("propietarios")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL
-          AND plan_vencimiento_at BETWEEN now() AND now() + interval '7 days'`
-    ) : 0;
-    const venc7Ag = hasPlanVencAg ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("agentes")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL
-          AND plan_vencimiento_at BETWEEN now() AND now() + interval '7 days'`
-    ) : 0;
-    const venc30Prop = hasPlanVencProp ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("propietarios")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL
-          AND plan_vencimiento_at BETWEEN now() AND now() + interval '30 days'`
-    ) : 0;
-    const venc30Ag = hasPlanVencAg ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("agentes")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL
-          AND plan_vencimiento_at BETWEEN now() AND now() + interval '30 days'`
-    ) : 0;
-    const vencidosProp = hasPlanVencProp ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("propietarios")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL AND plan_vencimiento_at < now()`
-    ) : 0;
-    const vencidosAg = hasPlanVencAg ? await safeCount(
-      `SELECT count(*)::int AS n FROM ${t("agentes")}
-        WHERE empresa_id=$1::uuid AND activo=true
-          AND plan_vencimiento_at IS NOT NULL AND plan_vencimiento_at < now()`
-    ) : 0;
-
-    // Distribución por plan (propietarios)
-    let porPlan: { label: string; value: number }[] = [];
-    if (hasPlanProp) {
-      try {
-        const { rows } = await queryWithRetry<{ label: string; value: number }>(
+    // Segunda fase: TODAS en paralelo. Antes eran 9 awaits seriales (~450ms).
+    // Cada safeCount ya hace try/catch internamente, asi que no rompe el Promise.all.
+    const porPlanPromise: Promise<{ label: string; value: number }[]> = hasPlanProp
+      ? queryWithRetry<{ label: string; value: number }>(
           pool,
           `SELECT COALESCE(pp.nombre, 'Sin plan') AS label, count(*)::int AS value
              FROM ${t("propietarios")} p
@@ -218,10 +178,66 @@ export async function GET(request: Request) {
             WHERE p.empresa_id=$1::uuid AND p.activo=true
             GROUP BY 1 ORDER BY value DESC, label ASC`,
           [ALQUILOYA_EMPRESA_ID]
-        );
-        porPlan = rows;
-      } catch {}
-    }
+        ).then((r) => r.rows).catch(() => [])
+      : Promise.resolve([]);
+
+    const [
+      solAccesoPend, solServicioPend, resenasPend, captacionesPend,
+      venc7Prop, venc7Ag, venc30Prop, venc30Ag, vencidosProp, vencidosAg,
+      porPlan,
+    ] = await Promise.all([
+      hasSolAcceso ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("solicitudes_acceso")}
+          WHERE empresa_id=$1::uuid AND estado='pendiente'`
+      ) : Promise.resolve(0),
+      hasSolServicio ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("solicitudes_servicio")}
+          WHERE empresa_id=$1::uuid AND estado='pendiente'`
+      ) : Promise.resolve(0),
+      hasResenas ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("agente_resenas")}
+          WHERE empresa_id=$1::uuid AND estado='pendiente'`
+      ) : Promise.resolve(0),
+      hasCaptaciones ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("agente_captaciones")}
+          WHERE empresa_id=$1::uuid AND COALESCE(estado,'') NOT IN ('cerrada','finalizada','descartada')`
+      ) : Promise.resolve(0),
+      hasPlanVencProp ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("propietarios")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL
+            AND plan_vencimiento_at BETWEEN now() AND now() + interval '7 days'`
+      ) : Promise.resolve(0),
+      hasPlanVencAg ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("agentes")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL
+            AND plan_vencimiento_at BETWEEN now() AND now() + interval '7 days'`
+      ) : Promise.resolve(0),
+      hasPlanVencProp ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("propietarios")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL
+            AND plan_vencimiento_at BETWEEN now() AND now() + interval '30 days'`
+      ) : Promise.resolve(0),
+      hasPlanVencAg ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("agentes")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL
+            AND plan_vencimiento_at BETWEEN now() AND now() + interval '30 days'`
+      ) : Promise.resolve(0),
+      hasPlanVencProp ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("propietarios")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL AND plan_vencimiento_at < now()`
+      ) : Promise.resolve(0),
+      hasPlanVencAg ? safeCount(
+        `SELECT count(*)::int AS n FROM ${t("agentes")}
+          WHERE empresa_id=$1::uuid AND activo=true
+            AND plan_vencimiento_at IS NOT NULL AND plan_vencimiento_at < now()`
+      ) : Promise.resolve(0),
+      porPlanPromise,
+    ]);
 
     return NextResponse.json({
       success: true,
