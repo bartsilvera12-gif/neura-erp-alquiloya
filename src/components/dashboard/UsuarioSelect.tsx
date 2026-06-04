@@ -106,13 +106,10 @@ export default function UsuarioSelect({
       >
         {active ? (
           <>
-            <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/alquiloya-legacy/assets/icono.png"
-                alt="AlquiloYa"
-                className="h-6 w-6 object-contain"
-              />
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ${avatarColor(active.nivel)}`}
+            >
+              {initials(active.nombre)}
             </span>
             <span className="text-slate-800">{active.nombre}</span>
             <span

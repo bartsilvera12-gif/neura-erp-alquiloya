@@ -104,8 +104,13 @@ export default function Header() {
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--zentra-sidebar)] text-white ring-1 ring-sky-400/35">
-              <span className="text-sm font-bold">{avatarInitial}</span>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/alquiloya-legacy/assets/icono.png"
+                alt="AlquiloYa"
+                className="h-7 w-7 object-contain"
+              />
             </div>
             <div className="hidden text-left sm:block">
               <p className="max-w-[180px] truncate text-sm font-medium text-[#0F172A]">{displayName}</p>
