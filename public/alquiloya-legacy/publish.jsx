@@ -2,6 +2,7 @@
 
 function PublishPage() {
   const [step, setStep] = React.useState(0);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   // Detectar contexto: si entra desde el panel agente/propietario logueado,
   // ocultar la card "Querés ayuda de un agente" y pre-seleccionar el plan.
   const [ctxAgente, setCtxAgente] = React.useState(null); // {id, nombre, plan_publicacion_id, plan_tier}
@@ -206,7 +207,11 @@ function PublishPage() {
                 <button
                   className="btn btn-primary btn-lg"
                   disabled={submitState.loading || !!submitState.success}
-                  onClick={onEnviar}
+                  onClick={() => {
+                    const err = validateAll();
+                    if (err) { setSubmitState({ loading: false, error: err, success: null }); return; }
+                    setConfirmOpen(true);
+                  }}
                   style={(submitState.loading || submitState.success) ? { opacity: 0.6, cursor: submitState.loading ? 'wait' : 'default' } : null}
                 >
                   {submitState.loading ? 'Enviando…' : (submitState.success ? 'Enviado ✓' : 'Enviar para revisión')}
@@ -231,6 +236,19 @@ function PublishPage() {
           pickedAgentId={pickedAgentId}
           setPickedAgentId={setPickedAgentId}
           onAfterSuccess={() => { setAsesoriaOpen(false); }}
+        />
+      )}
+
+      {confirmOpen && (
+        <ConfirmPublishModal
+          form={form}
+          loading={submitState.loading}
+          isAgent={!!ctxAgente}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={async () => {
+            await onEnviar();
+            setConfirmOpen(false);
+          }}
         />
       )}
     </div>
@@ -1382,4 +1400,66 @@ function PreviewCard({ step, form }) {
   );
 }
 
-Object.assign(window, { PublishPage, BrochurePreviewModal });
+function ConfirmPublishModal({ form, loading, isAgent, onCancel, onConfirm }) {
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !loading) onCancel(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [loading, onCancel]);
+  const cover = (form.fotos || []).find(f => f && f.url);
+  const precioNum = Number(String(form.precio || '').replace(/[^\d.]/g, ''));
+  const ubic = [form.barrio, form.ciudad].filter(Boolean).join(', ');
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget && !loading) onCancel(); }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 1000,
+        display: 'grid', placeItems: 'center', padding: 20, overflowY: 'auto',
+      }}
+    >
+      <div className="card" style={{ maxWidth: 520, width: '100%', padding: 0, background: '#fff', borderRadius: 20, overflow: 'hidden' }}>
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover.url} alt={form.titulo || ''} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block', background: 'var(--bg-2)' }}/>
+        ) : (
+          <div style={{ height: 140, background: 'linear-gradient(135deg, var(--blue-50), var(--bg-2))', display: 'grid', placeItems: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Sin foto principal</div>
+        )}
+        <div style={{ padding: 22 }}>
+          <div className="tag" style={{ color: 'var(--yellow-600)' }}>Confirmá tu publicación</div>
+          <h3 style={{ fontSize: 22, marginTop: 6 }}>{form.titulo || 'Tu propiedad'}</h3>
+          {ubic && <div className="muted" style={{ marginTop: 4, fontSize: 13 }}><I.pin s={13}/> {ubic}</div>}
+          {Number.isFinite(precioNum) && precioNum > 0 && (
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 900, fontSize: 24, color: 'var(--blue)', marginTop: 10 }}>
+              {formatGs(precioNum)}
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 500 }}>
+                {form.operacion === 'venta' ? '' : ' / mes'}
+              </span>
+            </div>
+          )}
+          <div className="row gap-12 muted xs" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+            {form.dormitorios && <span><I.bed s={11}/> {form.dormitorios} dorm.</span>}
+            {form.banos && <span><I.bath s={11}/> {form.banos} baños</span>}
+            {form.superficie_m2 && <span><I.ruler s={11}/> {form.superficie_m2} m²</span>}
+            {(form.fotos || []).length > 0 && <span><I.upload s={11}/> {form.fotos.length} foto{form.fotos.length > 1 ? 's' : ''}</span>}
+          </div>
+          <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'var(--bg-2)', border: '1px solid var(--line-2)', fontSize: 13, lineHeight: 1.45, color: 'var(--ink-2)' }}>
+            {isAgent ? (
+              <>Tu propiedad <strong>queda pendiente de revisión</strong> hasta que el equipo de AlquiloYa la apruebe. Una vez aprobada se publica en la web.</>
+            ) : (
+              <>Tu propiedad <strong>queda pendiente de revisión</strong>. Validamos los datos y te avisamos por WhatsApp/email cuando esté publicada. Suele tardar menos de 24 hs hábiles.</>
+            )}
+          </div>
+          <div className="row gap-10" style={{ marginTop: 18, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-outline" onClick={onCancel} disabled={loading}>Volver a editar</button>
+            <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={loading}>
+              {loading ? 'Enviando…' : 'Confirmar y enviar'}
+              <I.check s={14}/>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal });

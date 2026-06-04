@@ -212,6 +212,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Inbox,
   },
   {
+    key: "agente-blog",
+    slug: "agentes-inmobiliarios",
+    label: "Blog de agentes",
+    href: "/dashboard/agente-blog",
+    icon: ScrollText,
+  },
+  {
     key: "solicitudes-servicio",
     slug: "agentes-inmobiliarios",
     label: "Solicitudes de servicio",

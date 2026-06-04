@@ -142,35 +142,125 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
 
       {/* Tabs */}
       <div className="container" ref={tabsRef} style={{ marginTop: 24 }}>
-        <div className="row gap-6" style={{ padding: 4, background: '#fff', borderRadius: 999, border: '1px solid var(--line)', display: 'inline-flex' }}>
-          {[
-            ['propiedades', `Propiedades · ${props.length}`],
-            hasTips ? ['zona', 'Recomendaciones'] : null,
-            ['reviews', `Reseñas${agent.reviews > 0 ? ' · ' + agent.reviews : ''}`],
-          ].filter(Boolean).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
-              fontFamily: 'inherit', fontWeight: 600, fontSize: 13,
-              background: tab === id ? 'var(--ink)' : 'transparent',
-              color: tab === id ? '#fff' : 'var(--ink-3)',
-              transition: 'background .12s, color .12s'
-            }}>{label}</button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 24, paddingBottom: 60 }}>
-          {tab === 'propiedades' && (
-            props.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
-                {props.map(p => <PropertyCard key={p.id} p={p} onClick={() => onProperty && onProperty(p)}/>)}
-              </div>
-            ) : <EmptyTab text="Este agente todavía no tiene propiedades activas."/>
-          )}
-
-          {tab === 'zona' && hasTips && <AgentZoneTips agent={agent}/>}
-          {tab === 'reviews' && <AgentReviews agent={agent}/>}
-        </div>
+        <AgentTabsAndContent
+          agent={agent}
+          props={props}
+          tab={tab}
+          setTab={setTab}
+          hasTips={hasTips}
+          onProperty={onProperty}
+        />
       </div>
+    </div>
+  );
+}
+
+function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty }) {
+  const [posts, setPosts] = React.useState(null);
+  React.useEffect(() => {
+    if (!agent.apiId) { setPosts([]); return; }
+    let cancelled = false;
+    fetch('/api/public/alquiloya/agentes/' + agent.apiId + '/posts', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(body => {
+        if (cancelled) return;
+        const arr = body && body.success && body.data && Array.isArray(body.data.posts) ? body.data.posts : [];
+        setPosts(arr);
+      })
+      .catch(() => setPosts([]));
+    return () => { cancelled = true; };
+  }, [agent.apiId]);
+  const hasPosts = Array.isArray(posts) && posts.length > 0;
+  return (
+    <>
+      <div className="row gap-6" style={{ padding: 4, background: '#fff', borderRadius: 999, border: '1px solid var(--line)', display: 'inline-flex' }}>
+        {[
+          ['propiedades', `Propiedades · ${props.length}`],
+          hasTips ? ['zona', 'Recomendaciones'] : null,
+          hasPosts ? ['blog', `Blog · ${posts.length}`] : null,
+          ['reviews', `Reseñas${agent.reviews > 0 ? ' · ' + agent.reviews : ''}`],
+        ].filter(Boolean).map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
+            fontFamily: 'inherit', fontWeight: 600, fontSize: 13,
+            background: tab === id ? 'var(--ink)' : 'transparent',
+            color: tab === id ? '#fff' : 'var(--ink-3)',
+            transition: 'background .12s, color .12s'
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 24, paddingBottom: 60 }}>
+        {tab === 'propiedades' && (
+          props.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+              {props.map(p => <PropertyCard key={p.id} p={p} onClick={() => onProperty && onProperty(p)}/>)}
+            </div>
+          ) : <EmptyTab text="Este agente todavía no tiene propiedades activas."/>
+        )}
+
+        {tab === 'zona' && hasTips && <AgentZoneTips agent={agent}/>}
+        {tab === 'blog' && <AgentBlogPanel posts={posts}/>}
+        {tab === 'reviews' && <AgentReviews agent={agent}/>}
+      </div>
+    </>
+  );
+}
+
+function AgentBlogPanel({ posts }) {
+  const [active, setActive] = React.useState(null);
+  if (!posts || posts.length === 0) {
+    return <EmptyTab text="Este agente todavía no escribió posts."/>;
+  }
+  if (active) {
+    return (
+      <div className="card" style={{ padding: 28, maxWidth: 760 }}>
+        <button type="button" onClick={() => setActive(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 13, padding: 0 }}>
+          ← Volver al blog
+        </button>
+        {active.cover_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={active.cover_url} alt={active.titulo} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 12, marginTop: 14 }}/>
+        )}
+        <h2 style={{ fontSize: 28, marginTop: 16, lineHeight: 1.2 }}>{active.titulo}</h2>
+        {active.publicado_at && (
+          <div className="muted xs" style={{ marginTop: 6 }}>
+            {new Date(active.publicado_at).toLocaleDateString('es-PY', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </div>
+        )}
+        {active.resumen && (
+          <p style={{ fontSize: 15.5, color: 'var(--ink-2)', marginTop: 14, lineHeight: 1.55, fontWeight: 500 }}>{active.resumen}</p>
+        )}
+        {active.contenido && (
+          <div style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 16, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{active.contenido}</div>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18 }}>
+      {posts.map(p => (
+        <button key={p.id} type="button" onClick={() => setActive(p)} className="card" style={{ padding: 0, textAlign: 'left', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer' }}>
+          {p.cover_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={p.cover_url} alt={p.titulo} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', background: 'var(--bg-2)' }}/>
+          ) : (
+            <div style={{ height: 160, background: 'linear-gradient(135deg, var(--blue-50), var(--bg-2))' }}/>
+          )}
+          <div style={{ padding: 18 }}>
+            {p.destacado && (
+              <span className="badge badge-featured" style={{ fontSize: 10 }}>Destacado</span>
+            )}
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17, marginTop: p.destacado ? 8 : 0, lineHeight: 1.25 }}>{p.titulo}</div>
+            {p.resumen && <div className="muted" style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.5 }}>{p.resumen}</div>}
+            {p.publicado_at && (
+              <div className="muted xs" style={{ marginTop: 10 }}>
+                {new Date(p.publicado_at).toLocaleDateString('es-PY', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            )}
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
