@@ -186,6 +186,25 @@ export async function POST(request: Request) {
           );
         }
         authUserId = existing.id;
+
+        // CRITICO: si el admin definio password (caso referido_partner), lo
+        // aplicamos al auth.user existente. Sin esto el referido no puede
+        // entrar con la contrasenia recien definida -> "Credenciales
+        // incorrectas". Solo lo hacemos cuando el admin definio password
+        // explicitamente, para no pisar contrasenias de agentes/propietarios
+        // que ya estaban usando su cuenta.
+        if (passwordWasAdminProvided) {
+          const upd = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+            password: passwordToUse,
+            email_confirm: true,
+          });
+          if (upd.error) {
+            return NextResponse.json(
+              { error: `No se pudo actualizar la contrasenia: ${upd.error.message}` },
+              { status: 500 }
+            );
+          }
+        }
       } else {
         return NextResponse.json({ error: created.error.message }, { status: 500 });
       }
