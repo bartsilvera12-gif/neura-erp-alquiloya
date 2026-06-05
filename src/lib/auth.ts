@@ -2,6 +2,7 @@ import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session"
 import { serializeUnknownError } from "@/lib/errors/serialize-unknown-error";
 import { clearBrowserEmpresaDataSchemaCache } from "@/lib/supabase/browser-data-client";
 import { usuarioEmailLookupVariants } from "@/lib/auth/usuario-email-variants";
+import { invalidateCachedFetch } from "@/lib/api/cached-session-fetch";
 import { supabase } from "./supabase";
 
 /** Fila mínima de zentra_erp.usuarios usada en el cliente. */
@@ -19,11 +20,17 @@ export type CurrentUsuario = {
 };
 
 export async function signIn(email: string, password: string) {
+  // Limpiamos cache de sessionStorage antes de loguear: si el tab tenia
+  // datos cacheados de un usuario previo (slugs, /me, etc.) podian filtrar
+  // al usuario nuevo y producir redirect loop /login -> / -> /login.
+  invalidateCachedFetch();
   clearBrowserEmpresaDataSchemaCache();
   return supabase.auth.signInWithPassword({ email, password });
 }
 
 export async function signOut() {
+  // Limpiamos cache antes de desloguear por la misma razon.
+  invalidateCachedFetch();
   clearBrowserEmpresaDataSchemaCache();
   return supabase.auth.signOut();
 }

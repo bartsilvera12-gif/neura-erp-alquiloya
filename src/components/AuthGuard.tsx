@@ -86,8 +86,10 @@ function AuthGuardInner({ children }: { children: React.ReactNode }) {
 
       // GUARD CRITICO: publicadores (portal externo) NUNCA entran al ERP.
       // Independiente de los slugs que tengan, los mandamos a su portal.
+      // NUNCA aplicamos esto si el usuario es superAdmin: por defensa contra
+      // datos corruptos / lecturas obsoletas de getCurrentUser.
       const esPublicador = userRol === "publicador" || userRol.startsWith("publicador-");
-      if (esPublicador && !cancelled) {
+      if (esPublicador && !superAdmin && !cancelled) {
         router.replace("/publico#admin-agent");
         setLoading(false);
         return;
@@ -99,7 +101,7 @@ function AuthGuardInner({ children }: { children: React.ReactNode }) {
         userRol === "referido" ||
         userRol === "referido_partner" ||
         userRol.startsWith("referido-");
-      if (esReferido && !cancelled) {
+      if (esReferido && !superAdmin && !cancelled) {
         router.replace("/portal-referidos/dashboard");
         setLoading(false);
         return;
