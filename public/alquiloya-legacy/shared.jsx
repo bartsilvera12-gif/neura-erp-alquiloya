@@ -145,7 +145,8 @@ function Footer({ onNav }) {
           <FootCol title="Empresa" items={[
             { label: 'Inicio', onClick: () => onNav('home') },
             { label: 'Solicitar acceso', href: '/portal-agentes' },
-            { label: 'Ingresar', href: '/portal-agentes/login' },
+            { label: 'Ingresar agentes', href: '/portal-agentes/login' },
+            { label: 'Acceso referidos', href: '/portal-referidos/login' },
             { label: 'Centro de ayuda', onClick: () => onNav('help') },
           ]} />
           <FootCol title="Contacto" items={[
