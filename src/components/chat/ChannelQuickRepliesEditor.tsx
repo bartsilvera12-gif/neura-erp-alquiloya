@@ -8,6 +8,7 @@ import {
   updateChannelQuickReply,
   type ChannelQuickReplyRow,
 } from "@/lib/chat/quick-replies-actions";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 type Props = {
   channelId: string;
@@ -229,7 +230,12 @@ function QuickReplyRowEditor({
   }
 
   async function remove() {
-    if (!confirm("¿Eliminar esta respuesta rápida?")) return;
+    const ok = await confirmDialog({
+      title: "¿Eliminar esta respuesta rápida?",
+      confirmText: "Eliminar",
+      tone: "danger",
+    });
+    if (!ok) return;
     onBusy(row.id);
     try {
       await deleteChannelQuickReply(row.id);

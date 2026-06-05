@@ -12,6 +12,7 @@ import {
   type RecontactDryRunRow,
 } from "@/lib/chat/recontact-dry-run-shared";
 import { WA_META_REPLY_BUTTON_MAX, WA_META_REPLY_TITLE_MAX } from "@/lib/chat/whatsapp-send-service";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 export type FlowRecontactPickerNode = {
   node_code: string;
@@ -474,7 +475,13 @@ export function FlowRecontactAutomationsPanel(props: {
   }
 
   async function removeRule(row: RecontactRuleRowOut) {
-    if (!window.confirm(`¿Eliminar la automatización «${row.nombre}»?`)) return;
+    const ok = await confirmDialog({
+      title: "¿Eliminar la automatización?",
+      message: `Vas a eliminar «${row.nombre}». Esta acción no se puede deshacer.`,
+      confirmText: "Eliminar",
+      tone: "danger",
+    });
+    if (!ok) return;
     setError(null);
     try {
       const res = await fetchWithSupabaseSession(`${baseUrl}/${encodeURIComponent(row.id)}`, {

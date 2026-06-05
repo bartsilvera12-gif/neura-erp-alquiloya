@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 import {
   fetchSupervisionLinks,
   linkAgentToSupervisor,
@@ -99,7 +100,12 @@ export default function OmnicanalEquiposPage() {
   }
 
   async function handleRemove(id: string) {
-    if (!window.confirm("¿Quitar este agente del supervisor?")) return;
+    const ok = await confirmDialog({
+      title: "¿Quitar este agente del supervisor?",
+      confirmText: "Quitar",
+      tone: "warning",
+    });
+    if (!ok) return;
     setError(null);
     try {
       await removeSupervisionLink(id);

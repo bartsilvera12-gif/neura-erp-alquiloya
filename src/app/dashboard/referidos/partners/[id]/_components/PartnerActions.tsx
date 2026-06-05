@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 /**
  * Acciones del detalle de un partner: activar/desactivar, eliminar (soft o hard
@@ -53,7 +54,14 @@ export function PartnerActions({
   }
 
   async function doDelete() {
-    if (!confirm("¿Eliminar este referido? Si tiene historial se desactivará automáticamente.")) return;
+    const ok = await confirmDialog({
+      title: "¿Eliminar este referido?",
+      message: "Si tiene historial de clicks o comisiones se desactivará automáticamente en lugar de borrarse.",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    });
+    if (!ok) return;
     setErr(null); setInfo(null); setBusy("delete");
     try {
       const res = await fetchWithSupabaseSession(

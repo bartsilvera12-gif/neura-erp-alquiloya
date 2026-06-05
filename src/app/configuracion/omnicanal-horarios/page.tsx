@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 import {
   deleteOmnicanalWorkSchedule,
   listOmnicanalWorkSchedules,
@@ -124,7 +125,13 @@ export default function OmnicanalHorariosPage() {
   }
 
   async function eliminar(id: string) {
-    if (!confirm("¿Eliminar este horario? Los usuarios que lo usaban quedarán sin turno asignado.")) return;
+    const ok = await confirmDialog({
+      title: "¿Eliminar este horario?",
+      message: "Los usuarios que lo usaban quedarán sin turno asignado.",
+      confirmText: "Eliminar",
+      tone: "danger",
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await deleteOmnicanalWorkSchedule(id);

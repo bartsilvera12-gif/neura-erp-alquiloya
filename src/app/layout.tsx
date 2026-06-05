@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import AppShell from "../components/AppShell";
 import { ThemeProvider } from "../components/ThemeProvider";
 import AuthGuard from "../components/AuthGuard";
+import UiDialogsRoot from "../components/ui/UiDialogsRoot";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -33,6 +34,7 @@ export default function RootLayout({
           <AuthGuard>
             <AppShell>{children}</AppShell>
           </AuthGuard>
+          <UiDialogsRoot />
         </ThemeProvider>
       </body>
     </html>

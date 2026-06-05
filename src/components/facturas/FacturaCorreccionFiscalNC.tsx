@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import type { NotaCreditoListItemDTO, SifenPrevueloFacturaNcDTO } from "@/lib/nota-credito/types";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 const MSG_BLOQUEO_TIMBRADO_ORIGEN =
   "No se puede generar la NC porque el timbrado de la factura origen es inválido o inconsistente.";
@@ -297,7 +298,14 @@ export function FacturaCorreccionFiscalNC({
   }
 
   async function anularBorrador(nc: NotaCreditoListItemDTO) {
-    if (!confirm("¿Anular esta nota de crédito en borrador? Podrás crear otra después.")) return;
+    const ok = await confirmDialog({
+      title: "¿Anular esta nota de crédito?",
+      message: "Solo se anula la NC en borrador. Vas a poder crear otra después.",
+      confirmText: "Anular NC",
+      cancelText: "Cancelar",
+      tone: "warning",
+    });
+    if (!ok) return;
     setFlash(null);
     try {
       const res = await fetchWithSupabaseSession(`/api/facturas/${facturaId}/notas-credito/${nc.id}`, {

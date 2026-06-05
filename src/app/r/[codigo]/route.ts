@@ -36,27 +36,50 @@ async function handleAlquiloyaReferralRedirect(
     id: string;
     partner_id: string;
     cookie_dias: number;
+    link_activo: boolean;
     partner_activo: boolean;
   };
+  // Buscamos sin filtrar por `activo` para poder loguear el motivo cuando
+  // alguno este desactivado (link o partner). Asi diagnosticamos rapido si
+  // un soft-delete previo dejo el link en activo=false aunque el partner
+  // luego se haya reactivado.
   const { rows } = await queryWithRetry<LinkRow>(
     pool,
     `SELECT l.id, l.partner_id, l.cookie_dias,
+            l.activo AS link_activo,
             p.activo AS partner_activo
        FROM alquiloya.referral_links l
        JOIN alquiloya.referral_partners p ON p.id = l.partner_id
       WHERE l.empresa_id = $1::uuid
-        AND lower(l.slug) = lower($2)
-        AND l.activo = true
+        AND lower(trim(l.slug)) = lower(trim($2))
+      ORDER BY l.activo DESC, l.created_at ASC
       LIMIT 1`,
     [ALQUILOYA_EMPRESA_ID, slug]
   );
 
   const link = rows?.[0];
-  if (!link || !link.partner_activo) {
-    return new NextResponse("Link de referido no válido.", {
-      status: 404,
-      headers: { "content-type": "text/plain; charset=utf-8" },
+  const valid = !!link && link.link_activo && link.partner_activo;
+  if (!valid) {
+    // Log detallado para que veamos el motivo en Coolify logs.
+    console.warn("[r/aly-referral] link invalido", {
+      slug,
+      found: !!link,
+      link_activo: link?.link_activo ?? null,
+      partner_activo: link?.partner_activo ?? null,
     });
+    // UX: en vez de mostrar un text/plain, redirigimos al sitio publico
+    // con un flag para que el visitante no quede en una pagina rota.
+    const fwdProto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      request.nextUrl.protocol.replace(":", "") ||
+      "https";
+    const fwdHost =
+      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+      request.headers.get("host") ||
+      request.nextUrl.host;
+    const dest = new URL("/publico", `${fwdProto}://${fwdHost}`);
+    dest.searchParams.set("ref_invalid", "1");
+    return NextResponse.redirect(dest.toString(), 302);
   }
 
   // Cookie del visitante: si ya tiene una vigente, reusamos para no romper

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
-type Zona = { id: string; ciudad: string; barrio: string | null; orden: number };
+type Zona ={ id: string; ciudad: string; barrio: string | null; orden: number };
 type Tip = { id: string; zona: string | null; titulo: string; body: string; orden: number; activo: boolean };
 
 const inputCls =
@@ -70,7 +71,8 @@ export default function AgentePerfilPanel({ agenteId }: { agenteId: string }) {
     }
   }
   async function deleteZona(id: string) {
-    if (!confirm("¿Eliminar esta zona?")) return;
+    const ok = await confirmDialog({ title: "¿Eliminar esta zona?", confirmText: "Eliminar", tone: "danger" });
+    if (!ok) return;
     const res = await fetchWithSupabaseSession(`/api/dashboard/alquiloya-agentes/${agenteId}/zonas/${id}`, { method: "DELETE" });
     if (res.ok) load();
   }
@@ -100,7 +102,8 @@ export default function AgentePerfilPanel({ agenteId }: { agenteId: string }) {
     }
   }
   async function deleteTip(id: string) {
-    if (!confirm("¿Eliminar esta recomendación?")) return;
+    const ok = await confirmDialog({ title: "¿Eliminar esta recomendación?", confirmText: "Eliminar", tone: "danger" });
+    if (!ok) return;
     const res = await fetchWithSupabaseSession(`/api/dashboard/alquiloya-agentes/${agenteId}/tips/${id}`, { method: "DELETE" });
     if (res.ok) load();
   }

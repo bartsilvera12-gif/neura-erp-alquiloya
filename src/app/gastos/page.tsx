@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getGastos, deleteGasto } from "@/lib/gastos/actions";
 import type { Gasto } from "@/lib/gastos/actions";
 import GastoModal from "./components/GastoModal";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 function formatGs(valor: number) {
   return `${Math.round(valor).toLocaleString("es-PY")} ₲`;
@@ -75,7 +76,14 @@ export default function GastosPage() {
   }, []);
 
   async function handleEliminar(g: Gasto) {
-    if (!confirm(`¿Eliminar el gasto "${g.descripcion || g.categoria || "sin descripción"}"?`)) return;
+    const ok = await confirmDialog({
+      title: "¿Eliminar este gasto?",
+      message: `Vas a eliminar "${g.descripcion || g.categoria || "sin descripción"}". Esta acción no se puede deshacer.`,
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    });
+    if (!ok) return;
     setEliminando(g.id);
     try {
       await deleteGasto(g.id);

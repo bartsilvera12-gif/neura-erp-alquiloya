@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 type TicketRow = {
   id: string;
@@ -118,7 +119,13 @@ export default function SorteosTicketsPage() {
   }
 
   async function resendTicket(ticketId: string) {
-    if (!confirm("¿Reenviar la imagen por WhatsApp al cliente?")) return;
+    const ok = await confirmDialog({
+      title: "¿Reenviar la imagen por WhatsApp?",
+      message: "Se va a enviar nuevamente el ticket al cliente.",
+      confirmText: "Reenviar",
+      tone: "neutral",
+    });
+    if (!ok) return;
     setBusyId(ticketId);
     setErr(null);
     try {
@@ -136,7 +143,13 @@ export default function SorteosTicketsPage() {
   }
 
   async function regenerateTicket(ticketId: string) {
-    if (!confirm("¿Regenerar el PNG (nueva revisión)? No se reenvía solo.")) return;
+    const ok = await confirmDialog({
+      title: "¿Regenerar el PNG?",
+      message: "Se va a crear una nueva revisión del ticket. No se reenvía automáticamente.",
+      confirmText: "Regenerar",
+      tone: "warning",
+    });
+    if (!ok) return;
     setBusyId(ticketId);
     setErr(null);
     try {

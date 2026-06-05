@@ -205,6 +205,19 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!r.rows || r.rows.length === 0) {
       return NextResponse.json({ error: "no encontrado" }, { status: 404 });
     }
+
+    // Si se reactivo el partner, reactivamos tambien sus links. El soft-delete
+    // previo dejaba ambos en activo=false; al reactivar el partner sin esto
+    // el /r/{slug} seguia tirando 404 porque l.activo seguia en false.
+    if ("activo" in body && b(body.activo) === true) {
+      await queryWithRetry(
+        pool,
+        `UPDATE ${t("referral_links")} SET activo=true
+          WHERE empresa_id=$1::uuid AND partner_id=$2::uuid AND activo=false`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+    }
+
     return NextResponse.json({ success: true, id: r.rows[0].id });
   } catch (err) {
     console.error("[api alquiloya-referral-partners/[id] PATCH]", err);
