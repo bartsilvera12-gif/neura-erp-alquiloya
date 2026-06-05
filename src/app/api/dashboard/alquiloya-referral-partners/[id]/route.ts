@@ -94,6 +94,46 @@ export async function DELETE(request: Request, ctx: Ctx) {
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
 
+    // ?force=true permite borrar definitivamente aunque tenga historial: limpia
+    // clicks, conversiones, comisiones y luego el partner (CASCADE en links/reglas).
+    const url = new URL(request.url);
+    const force = url.searchParams.get("force") === "true";
+
+    if (force) {
+      // Borrado en orden seguro. Las FK de clicks/conversiones/comisiones
+      // no necesariamente cascadean al partner, asi que las limpiamos a mano.
+      await queryWithRetry(
+        pool,
+        `DELETE FROM ${t("referral_commissions")}
+          WHERE empresa_id=$1::uuid AND partner_id=$2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      await queryWithRetry(
+        pool,
+        `DELETE FROM ${t("referral_conversions")}
+          WHERE empresa_id=$1::uuid AND partner_id=$2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      await queryWithRetry(
+        pool,
+        `DELETE FROM ${t("referral_clicks")}
+          WHERE empresa_id=$1::uuid
+            AND link_id IN (SELECT id FROM ${t("referral_links")} WHERE partner_id=$2::uuid)`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      const r = await queryWithRetry<{ id: string }>(
+        pool,
+        `DELETE FROM ${t("referral_partners")}
+          WHERE empresa_id=$1::uuid AND id=$2::uuid
+          RETURNING id`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+      if (!r.rows || r.rows.length === 0) {
+        return NextResponse.json({ error: "no encontrado" }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, mode: "force" });
+    }
+
     // Verificar actividad. Si hay clicks/conversiones/comisiones → soft delete (activo=false).
     const activity = await queryWithRetry<{
       clicks: number;
@@ -134,6 +174,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
         success: true,
         mode: "soft",
         reason: `Tiene historial (clicks=${clicks}, conversiones=${conversiones}, comisiones=${comisiones}). Marcado inactivo en lugar de borrar.`,
+        history: { clicks, conversiones, comisiones },
       });
     }
 

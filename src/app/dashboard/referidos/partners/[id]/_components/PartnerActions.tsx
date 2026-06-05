@@ -53,10 +53,27 @@ export function PartnerActions({
     }
   }
 
+  async function deleteRequest(force: boolean) {
+    const qs = force ? "?force=true" : "";
+    const res = await fetchWithSupabaseSession(
+      `/api/dashboard/alquiloya-referral-partners/${partnerId}${qs}`,
+      { method: "DELETE" }
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      mode?: "soft" | "hard" | "force";
+      reason?: string;
+      error?: string;
+      history?: { clicks: number; conversiones: number; comisiones: number };
+    };
+    if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
+    return data;
+  }
+
   async function doDelete() {
     const ok = await confirmDialog({
       title: "¿Eliminar este referido?",
-      message: "Si tiene historial de clicks o comisiones se desactivará automáticamente en lugar de borrarse.",
+      message: "Si tiene historial de clicks o comisiones se desactivará en lugar de borrarse (te lo aviso después).",
       confirmText: "Eliminar",
       cancelText: "Cancelar",
       tone: "danger",
@@ -64,15 +81,30 @@ export function PartnerActions({
     if (!ok) return;
     setErr(null); setInfo(null); setBusy("delete");
     try {
-      const res = await fetchWithSupabaseSession(
-        `/api/dashboard/alquiloya-referral-partners/${partnerId}`,
-        { method: "DELETE" }
-      );
-      const data = (await res.json().catch(() => ({}))) as {
-        success?: boolean; mode?: string; reason?: string; error?: string;
-      };
-      if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const data = await deleteRequest(false);
+
       if (data.mode === "soft") {
+        // Tiene historial -> ofrecemos borrado definitivo (con todo).
+        const h = data.history;
+        const detalle = h
+          ? `Tiene ${h.clicks} click(s), ${h.conversiones} conversión(es) y ${h.comisiones} comisión(es).`
+          : "Tiene historial asociado.";
+        const force = await confirmDialog({
+          title: "¿Borrar definitivamente?",
+          message:
+            `Por ahora quedó marcado como inactivo. ${detalle}\n\n` +
+            `Si lo borrás definitivamente se eliminan también todos sus clicks, conversiones y comisiones. ` +
+            `Esta acción no se puede deshacer.`,
+          confirmText: "Borrar todo",
+          cancelText: "Dejar inactivo",
+          tone: "danger",
+        });
+        if (force) {
+          await deleteRequest(true);
+          router.push("/dashboard/referidos");
+          router.refresh();
+          return;
+        }
         setInfo(data.reason ?? "Marcado inactivo (tiene historial).");
         router.refresh();
       } else {
