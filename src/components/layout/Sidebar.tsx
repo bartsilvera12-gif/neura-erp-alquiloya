@@ -36,6 +36,10 @@ import {
   Tags,
   Building,
   Inbox,
+  Wrench,
+  Rocket,
+  MessageSquareQuote,
+  Share2,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
@@ -224,28 +228,28 @@ const MENU_STRUCTURE: MenuItem[] = [
     slug: "agentes-inmobiliarios",
     label: "Solicitudes de servicio",
     href: "/dashboard/solicitudes-servicio",
-    icon: Inbox,
+    icon: Wrench,
   },
   {
     key: "impulsos-packs",
     slug: "planes",
     label: "Packs de impulsos",
     href: "/dashboard/impulsos-packs",
-    icon: Sparkles,
+    icon: Rocket,
   },
   {
     key: "agente-resenas",
     slug: "agentes-inmobiliarios",
     label: "Reseñas de agentes",
     href: "/dashboard/agente-resenas",
-    icon: Star,
+    icon: MessageSquareQuote,
   },
   {
     key: "referidos",
     slug: "referidos",
     label: "Referidos",
     href: "/dashboard/referidos",
-    icon: Sparkles,
+    icon: Share2,
   },
   {
     key: "sorteos",
