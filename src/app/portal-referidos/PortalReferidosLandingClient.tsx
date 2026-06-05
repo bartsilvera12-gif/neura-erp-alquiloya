@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Canal = "instagram" | "tiktok" | "whatsapp" | "web" | "otro";
 
@@ -14,7 +15,29 @@ const CANALES: { value: Canal; label: string }[] = [
 ];
 
 export default function PortalReferidosLandingClient() {
-  const [mode, setMode] = useState<"landing" | "form" | "sent">("landing");
+  return (
+    <Suspense fallback={null}>
+      <PortalReferidosLandingInner />
+    </Suspense>
+  );
+}
+
+function PortalReferidosLandingInner() {
+  const searchParams = useSearchParams();
+  // Si vienen desde /portal-referidos/login -> "Solicitar credenciales" con
+  // ?solicitar=1, abrimos directo el form sin pasar por la landing.
+  const initialMode: "landing" | "form" | "sent" =
+    searchParams?.get("solicitar") === "1" ? "form" : "landing";
+  const [mode, setMode] = useState<"landing" | "form" | "sent">(initialMode);
+
+  // Si cambia el query param mientras estamos en la pagina, sincronizamos.
+  useEffect(() => {
+    if (searchParams?.get("solicitar") === "1" && mode === "landing") {
+      setMode("form");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -104,10 +127,12 @@ export default function PortalReferidosLandingClient() {
         {mode === "form" ? (
           <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.25)] sm:p-7">
             <h1 className="text-center text-xl font-bold text-[#0F172A] sm:text-2xl">
-              Sumate al programa
+              {initialMode === "form" ? "Solicitar credenciales" : "Sumate al programa"}
             </h1>
             <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
-              Cuando aprobemos tu solicitud te enviamos tu link único y credenciales por WhatsApp.
+              {initialMode === "form"
+                ? "Llená el formulario y el equipo de AlquiloYa te envía las credenciales por WhatsApp."
+                : "Cuando aprobemos tu solicitud te enviamos tu link único y credenciales por WhatsApp."}
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">

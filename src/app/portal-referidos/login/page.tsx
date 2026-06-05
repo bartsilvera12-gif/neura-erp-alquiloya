@@ -111,19 +111,12 @@ export default function PortalReferidosLoginPage() {
         </div>
 
         <div className="flex w-full flex-col items-center gap-3">
-          <a
-            href={
-              "https://wa.me/595983000292?text=" +
-              encodeURIComponent(
-                "Hola, soy referido de AlquiloYa y necesito mis credenciales de acceso al portal."
-              )
-            }
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/portal-referidos?solicitar=1"
             className="text-sm font-semibold text-[#0058A5] underline-offset-4 hover:underline"
           >
             Solicitar credenciales
-          </a>
+          </Link>
           <Link
             href="/portal-referidos"
             className="text-sm text-slate-500 underline-offset-4 hover:text-[#0058A5] hover:underline"
