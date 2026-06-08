@@ -154,8 +154,8 @@ function Footer({ onNav }) {
             // Mantiene los mismos valores actuales para no cambiar nada visible.
             const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
               email: 'Info@alquiloya.com.py',
-              telefono: '0983 000 292',
-              telefonoWa: '595983000292',
+              telefono: '0985 489 178',
+              telefonoWa: '595985489178',
               direccion: 'Asunción, Paraguay',
               horario: 'Lunes a Sábado 08:00 a 20:00',
             };
@@ -175,7 +175,7 @@ function Footer({ onNav }) {
           <div className="row gap-16" style={{ fontSize: 12.5, flexShrink: 0 }}>
             <a href="https://instagram.com/alquiloya" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>Instagram</a>
             <a href="https://facebook.com/alquiloya" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>Facebook</a>
-            <a href={'https://wa.me/' + ((typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.telefonoWa) || '595983000292')} target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>WhatsApp</a>
+            <a href={'https://wa.me/' + ((typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.telefonoWa) || '595985489178')} target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>WhatsApp</a>
             <a href="https://tiktok.com/@alquiloya" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>TikTok</a>
           </div>
         </div>
@@ -735,7 +735,7 @@ function FileInput({ label, file, onChange, compact }) {
 // WhatsApp de soporte AlquiloYa — centralizado en data.jsx (CONTACTO_ALQUILOYA).
 // Mantenemos fallback al valor actual por si data.jsx aun no cargo cuando
 // VIVIO inicializa.
-const VIVIO_WA = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595981555000';
+const VIVIO_WA = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595985489178';
 
 const VIVIO_INITIAL_STATE = {
   step: 'intro',
