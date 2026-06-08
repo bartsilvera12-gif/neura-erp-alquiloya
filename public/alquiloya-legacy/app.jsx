@@ -55,7 +55,10 @@ function App() {
       {route.startsWith('admin-agent') && route !== 'admin-agent-qr' && <AdminAgentPage route={route} onNav={nav}/>}
       {!hideHeader && <Footer onNav={nav}/>}
 
-      {!hideHeader && <VivioChatbot/>}
+      {/* P2B: VIVIO chatbot apagado como widget global. Lo reemplaza un
+          boton directo a WhatsApp (decision del cliente). El componente
+          VivioChatbot sigue definido en shared.jsx por si se reactiva. */}
+      {!hideHeader && <WhatsAppLauncher/>}
     </div>
   );
 }

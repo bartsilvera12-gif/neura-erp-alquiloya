@@ -1268,7 +1268,7 @@ function BuyImpulsesModal({ onClose, onBuy }) {
           ))}
         </div>
         <div className="muted xs" style={{ marginTop: 16, textAlign: 'center' }}>
-          Pago seguro vía Bancard / Pagopar · Los impulsos quedan disponibles al instante
+          El pago se coordina por WhatsApp. Una vez confirmado, el equipo activa los impulsos en tu cuenta.
         </div>
       </div>
     </div>
