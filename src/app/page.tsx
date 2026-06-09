@@ -32,6 +32,7 @@ import {
   toCalendarDateStr,
 } from "@/lib/fechas/calendario";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
 import GerencialOverview from "@/components/dashboard/GerencialOverview";
 import GerencialActividadReciente from "@/components/dashboard/GerencialActividadReciente";
 import { ListChecks } from "lucide-react";
@@ -2550,27 +2551,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchWithSupabaseSession("/api/empresas/mis-dashboard-views", { cache: "no-store" })
-      .then(async (r) => {
-        if (!r.ok) {
-          if (!cancelled) setDashScope({ kind: "legacy" });
-          return;
-        }
-        const j = (await r.json()) as {
-          views?: { slug: string }[];
-          defaultSlug?: string | null;
-        };
+    // Perf: cacheado 5 min en sessionStorage — los views asignados a la
+    // empresa NO cambian en cada navegacion del dashboard.
+    cachedSessionFetch<{ views?: { slug: string }[]; defaultSlug?: string | null }>(
+      "/api/empresas/mis-dashboard-views",
+      5 * 60 * 1000
+    )
+      .then((j) => {
+        if (cancelled) return;
         const slugs = (j.views ?? [])
           .map((v) => v.slug)
           .filter((s): s is TabDash => isDashboardTabSlug(s));
         if (slugs.length === 0) {
-          if (!cancelled) setDashScope({ kind: "empty" });
+          setDashScope({ kind: "empty" });
           return;
         }
         const defRaw = j.defaultSlug ?? null;
         const defaultTab =
           defRaw && isDashboardTabSlug(defRaw) && slugs.includes(defRaw) ? defRaw : slugs[0];
-        if (!cancelled) setDashScope({ kind: "scoped", tabs: slugs, defaultTab });
+        setDashScope({ kind: "scoped", tabs: slugs, defaultTab });
       })
       .catch(() => {
         if (!cancelled) setDashScope({ kind: "legacy" });
@@ -2602,10 +2601,46 @@ export default function DashboardPage() {
     const savedId = saved ? parseInt(saved, 10) : null;
     const defaultUser = us.find(u => u.nivel === "administrador") ?? us[0] ?? null;
     setUsuarioId(savedId ?? defaultUser?.id ?? null);
+  }, []);
 
-    // Datos de módulos desde Supabase
+  /**
+   * Perf: getDashboardData() trae TODAS las tablas operativas (clientes,
+   * facturas, ventas, compras, gastos, suscripciones, productos, pagos,
+   * tipificaciones, notas_credito) + prospectos del CRM. Es una llamada
+   * pesada (~varios MB en empresas con historial). Para AlquiloYa los
+   * tabs visibles son solo "propiedades" + "captaciones" — ninguno consume
+   * esos datos. Saltamos la llamada cuando el scope NO incluye ningun tab
+   * ERP, y la disparamos cuando si.
+   *
+   * Tabs ERP que SI consumen estos datos: comercial, financiero,
+   * inventario, ventas.
+   */
+  useEffect(() => {
+    if (dashScope.kind === "pending") return;
+    const erpTabs: TabDash[] = ["comercial", "financiero", "inventario", "ventas"];
+    const scopeTabs: TabDash[] =
+      dashScope.kind === "scoped" ? dashScope.tabs : TAB_VALID;
+    const needsErp = scopeTabs.some((t) => erpTabs.includes(t));
+    if (!needsErp) {
+      // Limpiamos por las dudas (idempotente: ya estaban en estado vacio).
+      setProspectos([]);
+      setClientes([]);
+      setFacturas([]);
+      setNotasCredito([]);
+      setSuscripciones([]);
+      setPagos([]);
+      setTipificaciones([]);
+      setProductos([]);
+      setVentas([]);
+      setCompras([]);
+      setGastos([]);
+      return;
+    }
+
+    let cancelled = false;
     getDashboardData()
       .then((data) => {
+        if (cancelled) return;
         setProspectos(data.prospectos);
         setClientes(data.clientes);
         setFacturas(data.facturas);
@@ -2619,6 +2654,7 @@ export default function DashboardPage() {
         setGastos(data.gastos);
       })
       .catch(() => {
+        if (cancelled) return;
         setProspectos([]);
         setClientes([]);
         setFacturas([]);
@@ -2631,7 +2667,10 @@ export default function DashboardPage() {
         setCompras([]);
         setGastos([]);
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [dashScope]);
 
   function handleUsuarioChange(id: number) {
     setUsuarioId(id);

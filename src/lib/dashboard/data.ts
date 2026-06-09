@@ -256,7 +256,11 @@ async function fetchProspectos(): Promise<ProspectoRaw[]> {
  * No depende del cliente browser + RLS en esquemas `erp_*`.
  */
 export async function getDashboardData(): Promise<DashboardData> {
-  const prospectos = await fetchProspectos();
+  // Perf: prospectos (CRM) y tenant-tables (ERP) son fetches independientes.
+  // Antes corrian seriales (~2 round-trips secuenciales). Ahora arrancamos
+  // los dos al mismo tiempo y esperamos al primero solo cuando ya hay paso
+  // siguiente en serie.
+  const prospectosPromise = fetchProspectos().catch(() => [] as ProspectoRaw[]);
 
   let clientes: ClienteRaw[] = [];
   let facturas: FacturaRaw[] = [];
@@ -272,8 +276,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   let notasCredito: NotaCreditoDashRow[] = [];
 
   if (typeof window === "undefined") {
+    // SSR: no tocamos prospectos para evitar fetch sin sesion en el servidor.
     return {
-      prospectos,
+      prospectos: [],
       clientes,
       facturas,
       pagos,
@@ -461,8 +466,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     }));
   } catch (err) {
     console.warn("[dashboard] Error cargando tablas empresa (clientes, facturas, etc.):", err);
-    // prospectos ya cargados; clientes, facturas, etc. quedan vacíos
+    // tenant-tables fallo: clientes, facturas, etc. quedan vacios.
   }
+
+  // Esperamos prospectos AHORA (al final), arrancaron en paralelo con
+  // tenant-tables al inicio de la funcion.
+  const prospectos = await prospectosPromise;
 
   return {
     prospectos,
