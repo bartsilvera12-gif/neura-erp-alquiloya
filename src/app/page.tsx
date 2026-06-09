@@ -35,7 +35,29 @@ import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session"
 import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
 import GerencialOverview from "@/components/dashboard/GerencialOverview";
 import GerencialActividadReciente from "@/components/dashboard/GerencialActividadReciente";
-import { ListChecks, Inbox as InboxIcon, Wrench as WrenchIcon, MessageSquareQuote, Target as TargetIcon } from "lucide-react";
+import {
+  ListChecks,
+  Inbox as InboxIcon,
+  Wrench as WrenchIcon,
+  MessageSquareQuote,
+  Target as TargetIcon,
+  Activity as ActivityIcon,
+  PhoneCall as PhoneCallIcon,
+  Handshake as HandshakeIcon,
+  CheckCheck as CheckCheckIcon,
+  XCircle as XCircleIcon,
+  TrendingUp as TrendingUpIcon,
+  CalendarDays as CalendarDaysIcon,
+  CalendarRange as CalendarRangeIcon,
+  Layers as LayersIcon,
+  FileText as FileTextIcon,
+  CircleDollarSign as CircleDollarSignIcon,
+  Clock as ClockIcon,
+  Percent as PercentIcon,
+  Receipt as ReceiptIcon,
+  Package as PackageIcon,
+  ShoppingCart as ShoppingCartIcon,
+} from "lucide-react";
 import UsuarioSelect from "@/components/dashboard/UsuarioSelect";
 import { etiquetaVisibleTipoServicio } from "@/lib/clientes/tipo-servicio-catalogo";
 import { useMapNombreTipoServicioCatalogo } from "@/lib/clientes/use-map-nombre-tipo-servicio";
@@ -1483,19 +1505,15 @@ function DashFinanciero({
   return (
     <div className="space-y-6 rounded-2xl border border-[#4FAEB2]/45 bg-gradient-to-b from-slate-50 to-white p-4 sm:space-y-8 sm:p-6 md:p-8">
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
-        {/* Facturado */}
+        {/* Facturado — accent teal (mismo look que DensoKpi de Propiedades) */}
         <motion.div
           whileHover={{ y: -2 }}
-          className={`${finKpiBase} border border-[#4FAEB2]/45 bg-white`}
+          className={`${finKpiBase} border border-slate-200 bg-white ring-1 ${ACCENT_BG.teal}`}
         >
           <div className="flex items-start justify-between gap-2">
             <p className={finKpiLabel}>Facturado del período</p>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M8 13h8M8 17h6" />
-              </svg>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON.teal}`}>
+              <FileTextIcon className="h-5 w-5" />
             </span>
           </div>
           <div className={`mt-auto ${finKpiValueWrap}`}>
@@ -1504,29 +1522,22 @@ function DashFinanciero({
           <p className={`mt-1 ${finKpiSub}`}>Total emitido</p>
         </motion.div>
 
-        {/* Cobrado — card destacada */}
+        {/* Cobrado — accent indigo */}
         <motion.div
           whileHover={{ y: -2 }}
-          className={`${finKpiBase} border border-[#4FAEB2]/60 bg-gradient-to-br from-white via-white to-[#4FAEB2]/12 shadow-[0_4px_20px_rgba(79,174,178,0.10)]`}
+          className={`${finKpiBase} border border-slate-200 bg-white ring-1 ${ACCENT_BG.indigo}`}
         >
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#4FAEB2] via-[#4FAEB2]/70 to-[#4FAEB2]/30"
-          />
           <div className="flex items-start justify-between gap-2">
             <p className={finKpiLabel}>Cobrado del período</p>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#4FAEB2]/30 bg-[#4FAEB2]/12 text-[#4FAEB2]">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <path d="m9 11 3 3L22 4" />
-              </svg>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON.indigo}`}>
+              <CircleDollarSignIcon className="h-5 w-5" />
             </span>
           </div>
           <div className={`mt-auto ${finKpiValueWrap}`}>
-            <FinMontoGs kpi monto={recaudadoCohortPeriodo} className="text-[#3F8E91]" />
+            <FinMontoGs kpi monto={recaudadoCohortPeriodo} className="text-slate-900" />
           </div>
           <p className={`mt-1 ${finKpiSub}`}>
-            <span className="font-medium text-[#3F8E91]">
+            <span className="font-medium text-indigo-700">
               {facturadoCohortPeriodo > 0
                 ? `${((recaudadoCohortPeriodo / facturadoCohortPeriodo) * 100).toFixed(0)}%`
                 : "—"}
@@ -1535,18 +1546,15 @@ function DashFinanciero({
           </p>
         </motion.div>
 
-        {/* Pendiente */}
+        {/* Pendiente — accent amber */}
         <motion.div
           whileHover={{ y: -2 }}
-          className={`${finKpiBase} border border-amber-200 bg-gradient-to-br from-white via-white to-amber-50/40`}
+          className={`${finKpiBase} border border-slate-200 bg-white ring-1 ${ACCENT_BG.amber}`}
         >
           <div className="flex items-start justify-between gap-2">
             <p className={finKpiLabel}>Pendiente del período</p>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON.amber}`}>
+              <ClockIcon className="h-5 w-5" />
             </span>
           </div>
           <div className={`mt-auto ${finKpiValueWrap}`}>
@@ -1554,31 +1562,21 @@ function DashFinanciero({
               kpi
               monto={carteraPendienteCohort}
               negativo={carteraPendienteCohort < 0}
-              className={
-                carteraPendienteCohort > 0
-                  ? "text-amber-600"
-                  : carteraPendienteCohort < 0
-                    ? "text-emerald-600"
-                    : "text-slate-900"
-              }
+              className="text-slate-900"
             />
           </div>
           <p className={`mt-1 ${finKpiSub}`}>Por cobrar</p>
         </motion.div>
 
-        {/* % de cobranza — con gauge */}
+        {/* % de cobranza — accent sky, con gauge */}
         <motion.div
           whileHover={{ y: -2 }}
-          className={`${finKpiBase} border border-[#4FAEB2]/45 bg-white`}
+          className={`${finKpiBase} border border-slate-200 bg-white ring-1 ${ACCENT_BG.sky}`}
         >
           <div className="flex items-start justify-between gap-2">
             <p className={finKpiLabel}>% de cobranza</p>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <line x1="19" y1="5" x2="5" y2="19" />
-                <circle cx="6.5" cy="6.5" r="2.5" />
-                <circle cx="17.5" cy="17.5" r="2.5" />
-              </svg>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON.sky}`}>
+              <PercentIcon className="h-5 w-5" />
             </span>
           </div>
           <div className="mt-auto flex items-center gap-4">
@@ -2281,34 +2279,33 @@ function DashVentas({
     <div className="space-y-6">
       {/* KPIs principales */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          icon={<Icon.Calendar className="h-4 w-4" />}
+        <CardSt
+          accent="teal"
+          icon={<CalendarDaysIcon className="h-5 w-5" />}
           label="Ventas del día"
           value={`Gs. ${formatGsFull(totalHoy)}`}
           sub={`${ventasHoy.length} transacciones`}
-          color="text-slate-900"
         />
-        <KpiCard
-          icon={<Icon.Calendar className="h-4 w-4" />}
+        <CardSt
+          accent="indigo"
+          icon={<CalendarRangeIcon className="h-5 w-5" />}
           label="Ventas del mes"
           value={`Gs. ${formatGsFull(totalMes)}`}
           sub={`${ventasMes.length} transacciones`}
-          color="text-[#3F8E91]"
-          accent="featured"
         />
-        <KpiCard
-          icon={<Icon.Ticket className="h-4 w-4" />}
+        <CardSt
+          accent="sky"
+          icon={<ReceiptIcon className="h-5 w-5" />}
           label="Ticket promedio"
           value={`Gs. ${formatGsFull(ticketProm)}`}
           sub={`Periodo: ${periodo}`}
-          color="text-slate-900"
         />
-        <KpiCard
-          icon={<Icon.Box className="h-4 w-4" />}
+        <CardSt
+          accent="amber"
+          icon={<PackageIcon className="h-5 w-5" />}
           label="Unidades vendidas"
           value={formatGs(unidades)}
           sub="En el periodo"
-          color="text-slate-900"
         />
       </div>
 
@@ -3461,12 +3458,48 @@ const CAPT_COLORS: Record<string, string> = {
   rechazado: "bg-rose-100 text-rose-800 ring-rose-200",
 };
 
-function CardSt({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/**
+ * CardSt — KPI card visualmente coherente con DensoKpi del dash de
+ * Propiedades (a pedido del cliente, todos los tabs comparten el mismo
+ * look colorido). Reusa ACCENT_BG / ACCENT_ICON. El icono es opcional;
+ * si no se pasa accent, queda en el estilo neutro original.
+ */
+function CardSt({
+  label,
+  value,
+  sub,
+  accent,
+  icon,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: KpiAccent;
+  icon?: React.ReactNode;
+}) {
+  if (!accent) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
+        <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{value}</div>
+        {sub ? <div className="mt-0.5 text-[11px] text-slate-400">{sub}</div> : null}
+      </div>
+    );
+  }
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{value}</div>
-      {sub ? <div className="mt-0.5 text-[11px] text-slate-400">{sub}</div> : null}
+    <div className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ${ACCENT_BG[accent]}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">{label}</p>
+          <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{value}</p>
+          {sub ? <p className="mt-1 text-[11px] text-slate-500">{sub}</p> : null}
+        </div>
+        {icon ? (
+          <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON[accent]}`}>
+            {icon}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -3535,18 +3568,18 @@ function DashCaptaciones() {
       ) : null}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <CardSt label="Total" value={String(c.total)} />
-        <CardSt label="Nuevas" value={String(c.nuevo)} />
-        <CardSt label="En contacto" value={String(c.contacto)} />
-        <CardSt label="Negocio activo" value={String(c.negocio_activo)} />
-        <CardSt label="Cerradas" value={String(c.cerrado)} />
-        <CardSt label="Rechazadas" value={String(c.rechazado)} />
+        <CardSt accent="teal" icon={<LayersIcon className="h-5 w-5" />} label="Total" value={String(c.total)} />
+        <CardSt accent="indigo" icon={<ActivityIcon className="h-5 w-5" />} label="Nuevas" value={String(c.nuevo)} />
+        <CardSt accent="sky" icon={<PhoneCallIcon className="h-5 w-5" />} label="En contacto" value={String(c.contacto)} />
+        <CardSt accent="amber" icon={<HandshakeIcon className="h-5 w-5" />} label="Negocio activo" value={String(c.negocio_activo)} />
+        <CardSt accent="emerald" icon={<CheckCheckIcon className="h-5 w-5" />} label="Cerradas" value={String(c.cerrado)} />
+        <CardSt accent="rose" icon={<XCircleIcon className="h-5 w-5" />} label="Rechazadas" value={String(c.rechazado)} />
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <CardSt label="Tasa de cierre" value={`${c.tasa_cierre}%`} sub="cerradas / (cerradas + rechazadas)" />
-        <CardSt label="Últimos 7 días" value={String(c.ult_7)} sub="nuevas captaciones" />
-        <CardSt label="Últimos 30 días" value={String(c.ult_30)} sub="nuevas captaciones" />
+        <CardSt accent="teal" icon={<TrendingUpIcon className="h-5 w-5" />} label="Tasa de cierre" value={`${c.tasa_cierre}%`} sub="cerradas / (cerradas + rechazadas)" />
+        <CardSt accent="indigo" icon={<CalendarDaysIcon className="h-5 w-5" />} label="Últimos 7 días" value={String(c.ult_7)} sub="nuevas captaciones" />
+        <CardSt accent="sky" icon={<CalendarRangeIcon className="h-5 w-5" />} label="Últimos 30 días" value={String(c.ult_30)} sub="nuevas captaciones" />
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
