@@ -128,7 +128,8 @@ const MENU_STRUCTURE: MenuItem[] = [
     { label: "Categorías", href: "/inventario/categorias" },
     { label: "Depósitos / Ubicaciones", href: "/inventario/ubicaciones" },
   ]},
-  { key: "clientes", slug: "clientes", label: "Clientes", href: "/clientes", icon: Users },
+  // Oculto a pedido del cliente (ruta /clientes sigue activa por si se reactiva):
+  // { key: "clientes", slug: "clientes", label: "Clientes", href: "/clientes", icon: Users },
   {
     key: "compras",
     slug: "compras",
@@ -140,7 +141,8 @@ const MENU_STRUCTURE: MenuItem[] = [
       { label: "Proveedores", href: "/proveedores" },
     ],
   },
-  { key: "gastos", slug: "gastos", label: "Gastos", href: "/gastos", icon: Receipt },
+  // Oculto a pedido del cliente (ruta /gastos sigue activa por si se reactiva):
+  // { key: "gastos", slug: "gastos", label: "Gastos", href: "/gastos", icon: Receipt },
   { key: "pagos", slug: "pagos", label: "Pagos", href: "/pagos", icon: Banknote },
   { key: "comisiones", slug: "comisiones", label: "Comisiones", href: "/comisiones", icon: Percent },
   {
@@ -162,8 +164,20 @@ const MENU_STRUCTURE: MenuItem[] = [
       { label: "Equipos y supervisión", href: "/configuracion/omnicanal-equipos" },
     ],
   },
-  { key: "planes", slug: "planes", label: "Planes", href: "/planes", icon: FileText },
-  { key: "gestion-clientes", slug: "gestion-clientes", label: "Gestión Clientes", href: "/gestion-clientes", icon: Users },
+  // Planes incluye ahora "Packs de impulsos" como sub-item (a pedido del cliente).
+  {
+    key: "planes",
+    slug: "planes",
+    label: "Planes",
+    href: "/planes",
+    icon: FileText,
+    children: [
+      { label: "Planes de publicación", href: "/planes", exactMatch: true },
+      { label: "Packs de impulsos", href: "/dashboard/impulsos-packs" },
+    ],
+  },
+  // Oculto a pedido del cliente (ruta /gestion-clientes sigue activa por si se reactiva):
+  // { key: "gestion-clientes", slug: "gestion-clientes", label: "Gestión Clientes", href: "/gestion-clientes", icon: Users },
   { key: "crm", slug: "crm", label: "CRM Funnel", href: "/crm", icon: Sparkles },
   { key: "marketing", slug: "marketing", label: "Marketing Legacy", href: "/marketing", icon: Megaphone },
   { key: "marketing_ops", slug: "marketing_ops", label: "Marketing Ops", href: "/dashboard/marketing-ops", icon: Megaphone },
@@ -195,13 +209,14 @@ const MENU_STRUCTURE: MenuItem[] = [
     href: "/dashboard/propiedades-pendientes",
     icon: ListChecks,
   },
-  {
-    key: "testimonios",
-    slug: "propiedades",
-    label: "Testimonios",
-    href: "/dashboard/testimonios",
-    icon: Star,
-  },
+  // Oculto a pedido del cliente (ruta /dashboard/testimonios sigue activa):
+  // {
+  //   key: "testimonios",
+  //   slug: "propiedades",
+  //   label: "Testimonios",
+  //   href: "/dashboard/testimonios",
+  //   icon: Star,
+  // },
   {
     key: "agentes-inmobiliarios",
     slug: "agentes-inmobiliarios",
@@ -216,13 +231,14 @@ const MENU_STRUCTURE: MenuItem[] = [
     href: "/dashboard/solicitudes-acceso",
     icon: Inbox,
   },
-  {
-    key: "agente-blog",
-    slug: "agentes-inmobiliarios",
-    label: "Blog de agentes",
-    href: "/dashboard/agente-blog",
-    icon: ScrollText,
-  },
+  // Oculto a pedido del cliente (ruta /dashboard/agente-blog sigue activa):
+  // {
+  //   key: "agente-blog",
+  //   slug: "agentes-inmobiliarios",
+  //   label: "Blog de agentes",
+  //   href: "/dashboard/agente-blog",
+  //   icon: ScrollText,
+  // },
   {
     key: "solicitudes-servicio",
     slug: "agentes-inmobiliarios",
@@ -230,13 +246,15 @@ const MENU_STRUCTURE: MenuItem[] = [
     href: "/dashboard/solicitudes-servicio",
     icon: Wrench,
   },
-  {
-    key: "impulsos-packs",
-    slug: "planes",
-    label: "Packs de impulsos",
-    href: "/dashboard/impulsos-packs",
-    icon: Rocket,
-  },
+  // "Packs de impulsos" se renderiza ahora como sub-item de "Planes" (ver arriba).
+  // El item independiente queda comentado a pedido del cliente:
+  // {
+  //   key: "impulsos-packs",
+  //   slug: "planes",
+  //   label: "Packs de impulsos",
+  //   href: "/dashboard/impulsos-packs",
+  //   icon: Rocket,
+  // },
   {
     key: "agente-resenas",
     slug: "agentes-inmobiliarios",
