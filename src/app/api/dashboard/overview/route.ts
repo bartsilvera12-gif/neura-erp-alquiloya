@@ -183,11 +183,11 @@ export async function GET(request: Request) {
       cVencidosProp, cVencidosAg, cVenc7Prop, cVenc7Ag,
       cPagos, cStock,
       // KPIs propiedades
-      kpiPropTot, kpiPropHoy, kpiPropSemana,
+      kpiPropTot, kpiPropHoy,
       // KPIs consultas
-      kpiConsHoy, kpiConsAyer, kpiConsMes,
+      kpiConsHoy, kpiConsAyer,
       // KPIs altas
-      kpiAltasMes, kpiAltasTotalMes,
+      kpiAltasMes, kpiAltasHoy,
       // KPI facturas
       kpiFact,
       // Actividad
@@ -206,13 +206,11 @@ export async function GET(request: Request) {
       hasProductos ? safeCount(`SELECT count(*)::int AS n FROM ${sq("productos")} WHERE empresa_id=$1::uuid AND COALESCE(stock,0) <= COALESCE(stock_minimo, 0) AND COALESCE(stock_minimo,0) > 0`) : Z,
       hasPropiedades ? safeRows<{ total: number; activas: number; destacadas: number }>(`SELECT count(*)::int AS total, count(*) FILTER (WHERE activo=true AND visible_web=true)::int AS activas, count(*) FILTER (WHERE destacada=true)::int AS destacadas FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid`) : ZR,
       hasPropiedades ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid AND created_at::date = current_date`) : Z,
-      hasPropiedades ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid AND created_at >= date_trunc('week', current_date)`) : Z,
       hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND created_at::date = current_date`) : Z,
       hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND created_at::date = current_date - interval '1 day'`) : Z,
-      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND created_at >= date_trunc('month', current_date)`) : Z,
       hasSolAcceso ? safeCount(`SELECT count(*)::int AS n FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid AND estado='aprobada' AND created_at >= date_trunc('month', current_date)`) : Z,
-      hasSolAcceso ? safeCount(`SELECT count(*)::int AS n FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid AND created_at >= date_trunc('month', current_date)`) : Z,
-      hasFacturas ? safeRows<{ hoy: string; mes: string }>(`SELECT COALESCE(sum(monto_total) FILTER (WHERE fecha::date = current_date), 0)::text AS hoy, COALESCE(sum(monto_total) FILTER (WHERE fecha >= date_trunc('month', current_date)), 0)::text AS mes FROM ${sq("facturas")} WHERE empresa_id=$1::uuid AND COALESCE(estado,'') <> 'anulada'`) : ZR,
+      hasSolAcceso ? safeCount(`SELECT count(*)::int AS n FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid AND estado='aprobada' AND created_at::date = current_date`) : Z,
+      hasFacturas ? safeRows<{ hoy: string }>(`SELECT COALESCE(sum(monto_total) FILTER (WHERE fecha::date = current_date), 0)::text AS hoy FROM ${sq("facturas")} WHERE empresa_id=$1::uuid AND COALESCE(estado,'') <> 'anulada'`) : ZR,
       hasPropiedades ? safeRows<{ id: string; titulo: string | null; created_at: string }>(`SELECT id, titulo, created_at::text AS created_at FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
       hasSolAcceso ? safeRows<{ id: string; nombre: string; tipo: string; created_at: string }>(`SELECT id, nombre, tipo, created_at::text AS created_at FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
       hasResenas ? safeRows<{ id: string; autor_nombre: string; stars: number; created_at: string }>(`SELECT id, autor_nombre, stars, created_at::text AS created_at FROM ${sq("agente_resenas")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
@@ -237,23 +235,20 @@ export async function GET(request: Request) {
     const kpis: Kpi[] = [];
     if (hasPropiedades) {
       const t = (kpiPropTot as { total: number; activas: number; destacadas: number }[])[0] ?? { total: 0, activas: 0, destacadas: 0 };
-      kpis.push({ key: "propiedades_total", label: "Propiedades publicadas", value: `${t.activas}`, sub: `${t.total} totales · ${t.destacadas} destacadas`, href: "/dashboard/propiedades" });
-      kpis.push({ key: "propiedades_nuevas", label: "Nuevas esta semana", value: String(kpiPropSemana), sub: kpiPropHoy === 1 ? "1 cargada hoy" : `${kpiPropHoy} cargadas hoy`, href: "/dashboard/propiedades" });
+      kpis.push({ key: "propiedades_hoy", label: "Propiedades publicadas hoy", value: String(kpiPropHoy), sub: `${t.activas} activas · ${t.total} totales`, href: "/dashboard/propiedades" });
     }
     if (hasConsultasProp) {
       const delta = (kpiConsHoy as number) - (kpiConsAyer as number);
-      kpis.push({ key: "consultas_hoy", label: "Consultas hoy", value: String(kpiConsHoy), sub: `${kpiConsMes} este mes`, delta: { value: Math.abs(delta), sign: delta > 0 ? "up" : delta < 0 ? "down" : "flat", suffix: "vs ayer" } });
+      kpis.push({ key: "consultas_hoy", label: "Consultas hoy", value: String(kpiConsHoy), delta: { value: Math.abs(delta), sign: delta > 0 ? "up" : delta < 0 ? "down" : "flat", suffix: "vs ayer" } });
     }
     if (hasSolAcceso) {
-      const ratio = (kpiAltasTotalMes as number) > 0 ? Math.round(((kpiAltasMes as number) / (kpiAltasTotalMes as number)) * 100) : 0;
-      kpis.push({ key: "altas_mes", label: "Altas aprobadas (mes)", value: String(kpiAltasMes), sub: (kpiAltasTotalMes as number) > 0 ? `${ratio}% de ${kpiAltasTotalMes} solicitudes` : "sin solicitudes este mes", href: "/dashboard/solicitudes-acceso" });
+      kpis.push({ key: "altas_hoy", label: "Altas aprobadas hoy", value: String(kpiAltasHoy), sub: (kpiAltasMes as number) > 0 ? `${kpiAltasMes} este mes` : "0 este mes", href: "/dashboard/solicitudes-acceso" });
     }
     if (hasFacturas) {
-      const r = (kpiFact as { hoy: string; mes: string }[])[0] ?? { hoy: "0", mes: "0" };
+      const r = (kpiFact as { hoy: string }[])[0] ?? { hoy: "0" };
       const hoyN = Number(r.hoy) || 0;
-      const mesN = Number(r.mes) || 0;
       const fmtGs = new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 });
-      kpis.push({ key: "ventas_dia", label: "Ventas del día", value: fmtGs.format(hoyN), sub: `${fmtGs.format(mesN)} este mes` });
+      kpis.push({ key: "ventas_dia", label: "Ventas del día", value: fmtGs.format(hoyN) });
     }
 
     // ── Construir ACTIVIDAD ─────────────────────────────────────────────────
