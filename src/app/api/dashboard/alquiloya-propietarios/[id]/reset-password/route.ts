@@ -221,10 +221,13 @@ export async function POST(request: Request, ctx: Ctx) {
       if (byAuth[0]) {
         usuarioRowId = byAuth[0].id;
         if (!byAuth[0].propietario_id) {
+          // No tocamos updated_at: en algunas instancias de produccion la
+          // columna no existe (la migracion que la agrega no esta corrida)
+          // y el UPDATE fallaria con SQLSTATE 42703.
           await queryWithRetry(
             pool,
             `UPDATE ${t("usuarios")}
-                SET propietario_id = $1::uuid, updated_at = now()
+                SET propietario_id = $1::uuid
               WHERE id = $2::uuid`,
             [id, usuarioRowId]
           );
