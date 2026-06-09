@@ -381,8 +381,12 @@ export async function getPublicAgente(id: string) {
             ) cover ON true
             WHERE p.empresa_id = a.empresa_id
               AND p.agente_id = a.id
+              -- En el perfil del agente alcanza con activo=true (no exigimos
+              -- visible_web). Asi si el admin activo la propiedad pero
+              -- olvido el toggle visible_web, igual aparece en su portfolio.
+              -- El listado publico /propiedades sigue exigiendo ambos.
               AND p.activo = true
-              AND p.visible_web = true
+              AND COALESCE(p.estado, 'disponible') NOT IN ('rechazada', 'pausada')
           ), '[]'::json) AS propiedades
         FROM ${t("agentes")} a
         WHERE a.empresa_id = $1::uuid
