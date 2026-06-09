@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listErpAgenteResenas, type ErpAgenteResena } from "@/lib/alquiloya/erp-agente-resenas";
 import AgenteResenasClient from "./AgenteResenasClient";
 
@@ -17,6 +18,12 @@ export default async function AgenteResenasPage() {
   return (
     <div className="px-6 py-6">
       <header className="mb-6">
+        <Link
+          href="/"
+          className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
+        >
+          ← Volver al dashboard
+        </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reseñas de agentes</h1>
         <p className="mt-1 text-sm text-slate-500">
           Aprobá o rechazá las reseñas que escriben los visitantes. Sólo las aprobadas se ven en la web pública.

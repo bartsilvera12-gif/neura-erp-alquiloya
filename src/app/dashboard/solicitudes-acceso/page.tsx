@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   listErpSolicitudesAcceso,
   type SolicitudAccesoRow,
@@ -20,6 +21,12 @@ export default async function SolicitudesAccesoPage() {
   return (
     <div className="px-6 py-6">
       <header className="mb-6">
+        <Link
+          href="/"
+          className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
+        >
+          ← Volver al dashboard
+        </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
           Solicitudes de acceso
         </h1>

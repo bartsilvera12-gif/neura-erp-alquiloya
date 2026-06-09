@@ -2934,6 +2934,45 @@ const TONE_TEXT: Record<KpiTone, string> = {
   muted: "text-slate-500 bg-slate-100 ring-slate-200",
 };
 
+/**
+ * Card link para "Acciones pendientes" del dashboard. Visualmente coherente
+ * con DensoKpi: icono en cuadradito coloreado + numero grande + hint chico.
+ * Reusa los mapas ACCENT_BG / ACCENT_ICON del KPI.
+ */
+function ActionPendiente({
+  href,
+  accent,
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  href: string;
+  accent: KpiAccent;
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  return (
+    <a
+      href={href}
+      className={`group relative block overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 transition-shadow hover:shadow-md ${ACCENT_BG[accent]}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">{label}</p>
+          <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{value}</p>
+        </div>
+        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${ACCENT_ICON[accent]}`}>
+          {icon}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] font-medium text-slate-500 transition-colors group-hover:text-slate-700">{hint}</p>
+    </a>
+  );
+}
+
 function DensoKpi({
   accent,
   icon,
