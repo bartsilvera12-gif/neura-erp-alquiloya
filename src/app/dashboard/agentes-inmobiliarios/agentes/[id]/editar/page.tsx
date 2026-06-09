@@ -15,15 +15,24 @@ export default async function EditarAgentePage({ params }: Props) {
 
   return (
     <div className="px-6 py-6">
-      <header className="mb-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link
+            href={`/dashboard/agentes-inmobiliarios/agentes/${a.id}`}
+            className="mb-2 inline-flex text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
+          >
+            ← Volver al detalle
+          </Link>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Editar agente</h1>
+          <p className="mt-1 text-sm text-slate-500">{a.nombre ?? "—"}</p>
+        </div>
+        {/* Acceso a Reseñas del agente — el item del sidebar fue removido a pedido del cliente. */}
         <Link
-          href={`/dashboard/agentes-inmobiliarios/agentes/${a.id}`}
-          className="mb-2 inline-flex text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
+          href={`/dashboard/agente-resenas?agente=${encodeURIComponent(a.id)}`}
+          className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
         >
-          ← Volver al detalle
+          Reseñas →
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Editar agente</h1>
-        <p className="mt-1 text-sm text-slate-500">{a.nombre ?? "—"}</p>
       </header>
 
       <AgenteForm

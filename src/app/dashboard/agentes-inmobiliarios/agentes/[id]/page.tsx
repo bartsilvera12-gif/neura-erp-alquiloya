@@ -34,12 +34,22 @@ export default async function AgenteDetailPage({ params }: Props) {
           </h1>
           <p className="mt-1 text-sm text-slate-500">{agente.cargo ?? "Agente inmobiliario"}</p>
         </div>
-        <Link
-          href={`/dashboard/agentes-inmobiliarios/agentes/${agente.id}/editar`}
-          className="inline-flex items-center rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3F8E91]"
-        >
-          Editar
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Acceso a Reseñas del agente — el item del sidebar fue removido a pedido del cliente,
+              ahora se ingresa desde esta pantalla. */}
+          <Link
+            href={`/dashboard/agente-resenas?agente=${encodeURIComponent(agente.id)}`}
+            className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            Reseñas →
+          </Link>
+          <Link
+            href={`/dashboard/agentes-inmobiliarios/agentes/${agente.id}/editar`}
+            className="inline-flex items-center rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3F8E91]"
+          >
+            Editar
+          </Link>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

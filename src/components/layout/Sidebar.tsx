@@ -195,20 +195,27 @@ const MENU_STRUCTURE: MenuItem[] = [
     href: "/dashboard/proyectos",
     icon: FolderKanban,
   },
+  // Propiedades incluye "Pendientes de aprobación" como sub-item.
   {
     key: "propiedades",
     slug: "propiedades",
     label: "Propiedades",
     href: "/dashboard/propiedades",
     icon: Building,
+    children: [
+      { label: "Listado de propiedades", href: "/dashboard/propiedades", exactMatch: true },
+      { label: "Pendientes de aprobación", href: "/dashboard/propiedades-pendientes" },
+    ],
   },
-  {
-    key: "propiedades-pendientes",
-    slug: "propiedades",
-    label: "Pendientes de aprobación",
-    href: "/dashboard/propiedades-pendientes",
-    icon: ListChecks,
-  },
+  // Pendientes de aprobación movido como sub-item de Propiedades (arriba).
+  // Mantenemos el item original comentado por si se reactiva:
+  // {
+  //   key: "propiedades-pendientes",
+  //   slug: "propiedades",
+  //   label: "Pendientes de aprobación",
+  //   href: "/dashboard/propiedades-pendientes",
+  //   icon: ListChecks,
+  // },
   // Oculto a pedido del cliente (ruta /dashboard/testimonios sigue activa):
   // {
   //   key: "testimonios",
@@ -217,20 +224,31 @@ const MENU_STRUCTURE: MenuItem[] = [
   //   href: "/dashboard/testimonios",
   //   icon: Star,
   // },
+  // Agentes inmobiliarios incluye "Solicitudes de acceso" y
+  // "Solicitudes de servicio" como sub-items.
+  // "Reseñas de agentes" se oculta del sidebar a pedido del cliente y se
+  // accede directamente desde el editor del agente. La ruta /dashboard/
+  // agente-resenas sigue activa.
   {
     key: "agentes-inmobiliarios",
     slug: "agentes-inmobiliarios",
     label: "Agentes inmobiliarios",
     href: "/dashboard/agentes-inmobiliarios",
     icon: Users,
+    children: [
+      { label: "Listado de agentes", href: "/dashboard/agentes-inmobiliarios", exactMatch: true },
+      { label: "Solicitudes de acceso", href: "/dashboard/solicitudes-acceso" },
+      { label: "Solicitudes de servicio", href: "/dashboard/solicitudes-servicio" },
+    ],
   },
-  {
-    key: "solicitudes-acceso",
-    slug: "agentes-inmobiliarios",
-    label: "Solicitudes de acceso",
-    href: "/dashboard/solicitudes-acceso",
-    icon: Inbox,
-  },
+  // Solicitudes de acceso movida como sub-item de Agentes (arriba):
+  // {
+  //   key: "solicitudes-acceso",
+  //   slug: "agentes-inmobiliarios",
+  //   label: "Solicitudes de acceso",
+  //   href: "/dashboard/solicitudes-acceso",
+  //   icon: Inbox,
+  // },
   // Oculto a pedido del cliente (ruta /dashboard/agente-blog sigue activa):
   // {
   //   key: "agente-blog",
@@ -239,15 +257,15 @@ const MENU_STRUCTURE: MenuItem[] = [
   //   href: "/dashboard/agente-blog",
   //   icon: ScrollText,
   // },
-  {
-    key: "solicitudes-servicio",
-    slug: "agentes-inmobiliarios",
-    label: "Solicitudes de servicio",
-    href: "/dashboard/solicitudes-servicio",
-    icon: Wrench,
-  },
+  // Solicitudes de servicio movida como sub-item de Agentes (arriba):
+  // {
+  //   key: "solicitudes-servicio",
+  //   slug: "agentes-inmobiliarios",
+  //   label: "Solicitudes de servicio",
+  //   href: "/dashboard/solicitudes-servicio",
+  //   icon: Wrench,
+  // },
   // "Packs de impulsos" se renderiza ahora como sub-item de "Planes" (ver arriba).
-  // El item independiente queda comentado a pedido del cliente:
   // {
   //   key: "impulsos-packs",
   //   slug: "planes",
@@ -255,13 +273,15 @@ const MENU_STRUCTURE: MenuItem[] = [
   //   href: "/dashboard/impulsos-packs",
   //   icon: Rocket,
   // },
-  {
-    key: "agente-resenas",
-    slug: "agentes-inmobiliarios",
-    label: "Reseñas de agentes",
-    href: "/dashboard/agente-resenas",
-    icon: MessageSquareQuote,
-  },
+  // "Reseñas de agentes" oculta del sidebar — el acceso es desde el editor
+  // del agente. Ruta /dashboard/agente-resenas sigue activa.
+  // {
+  //   key: "agente-resenas",
+  //   slug: "agentes-inmobiliarios",
+  //   label: "Reseñas de agentes",
+  //   href: "/dashboard/agente-resenas",
+  //   icon: MessageSquareQuote,
+  // },
   {
     key: "referidos",
     slug: "referidos",
