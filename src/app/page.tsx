@@ -35,7 +35,7 @@ import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session"
 import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
 import GerencialOverview from "@/components/dashboard/GerencialOverview";
 import GerencialActividadReciente from "@/components/dashboard/GerencialActividadReciente";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Inbox as InboxIcon, Wrench as WrenchIcon, MessageSquareQuote, Target as TargetIcon } from "lucide-react";
 import UsuarioSelect from "@/components/dashboard/UsuarioSelect";
 import { etiquetaVisibleTipoServicio } from "@/lib/clientes/tipo-servicio-catalogo";
 import { useMapNombreTipoServicioCatalogo } from "@/lib/clientes/use-map-nombre-tipo-servicio";
@@ -2907,19 +2907,25 @@ export default function DashboardPage() {
 
 // ── Dashboard Propiedades (AlquiloYa) ─────────────────────────────────────────
 type KpiTone = "ok" | "warn" | "info" | "muted";
-type KpiAccent = "teal" | "indigo" | "sky" | "amber";
+type KpiAccent = "teal" | "indigo" | "sky" | "amber" | "violet" | "emerald" | "rose";
 
 const ACCENT_BG: Record<KpiAccent, string> = {
   teal: "bg-gradient-to-br from-[#4FAEB2]/15 to-[#4FAEB2]/0 ring-[#4FAEB2]/30",
   indigo: "bg-gradient-to-br from-indigo-100/70 to-indigo-50/0 ring-indigo-200",
   sky: "bg-gradient-to-br from-sky-100/70 to-sky-50/0 ring-sky-200",
   amber: "bg-gradient-to-br from-amber-100/70 to-amber-50/0 ring-amber-200",
+  violet: "bg-gradient-to-br from-violet-100/70 to-violet-50/0 ring-violet-200",
+  emerald: "bg-gradient-to-br from-emerald-100/70 to-emerald-50/0 ring-emerald-200",
+  rose: "bg-gradient-to-br from-rose-100/70 to-rose-50/0 ring-rose-200",
 };
 const ACCENT_ICON: Record<KpiAccent, string> = {
   teal: "bg-[#4FAEB2]/15 text-[#3F8E91]",
   indigo: "bg-indigo-100 text-indigo-700",
   sky: "bg-sky-100 text-sky-700",
   amber: "bg-amber-100 text-amber-700",
+  violet: "bg-violet-100 text-violet-700",
+  emerald: "bg-emerald-100 text-emerald-700",
+  rose: "bg-rose-100 text-rose-700",
 };
 const TONE_TEXT: Record<KpiTone, string> = {
   ok: "text-emerald-700 bg-emerald-50 ring-emerald-200",
@@ -3191,7 +3197,10 @@ function DashPropiedades() {
         </motion.a>
       ) : null}
 
-      {/* Acciones pendientes */}
+      {/* Acciones pendientes — cards con icono + gradient suave (mismo
+          estilo que los KPIs de arriba, a pedido del cliente). Suma una
+          5ta card "Pendientes de publicación" con el count de
+          data.propiedades.pendientes. */}
       {data.acciones_pendientes ? (
         <motion.div whileHover={{ y: -2 }} className={panelClass}>
           <div className="flex items-center gap-2">
@@ -3204,27 +3213,47 @@ function DashPropiedades() {
           <p className="mt-1 pl-3 text-[11px] text-slate-500">
             Items que esperan tu aprobación o seguimiento.
           </p>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <a href="/dashboard/solicitudes-acceso" className="group rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Solicitudes de acceso</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-amber-900">{data.acciones_pendientes.solicitudes_acceso}</div>
-              <div className="mt-0.5 text-[11px] text-amber-700/80">pendientes →</div>
-            </a>
-            <a href="/dashboard/solicitudes-servicio" className="group rounded-xl border border-blue-200 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">Solicitudes de servicio</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-blue-900">{data.acciones_pendientes.solicitudes_servicio}</div>
-              <div className="mt-0.5 text-[11px] text-blue-700/80">cambio plan / impulsos →</div>
-            </a>
-            <a href="/dashboard/agente-resenas" className="group rounded-xl border border-violet-200 bg-violet-50 p-4 transition-colors hover:bg-violet-100">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-700">Reseñas a moderar</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-violet-900">{data.acciones_pendientes.agente_resenas}</div>
-              <div className="mt-0.5 text-[11px] text-violet-700/80">pendientes →</div>
-            </a>
-            <a href="/dashboard/agentes-inmobiliarios/captaciones" className="group rounded-xl border border-emerald-200 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Captaciones abiertas</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-900">{data.acciones_pendientes.captaciones}</div>
-              <div className="mt-0.5 text-[11px] text-emerald-700/80">en seguimiento →</div>
-            </a>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <ActionPendiente
+              href="/dashboard/propiedades-pendientes"
+              accent="rose"
+              icon={<ListChecks className="h-5 w-5" />}
+              label="Pendientes de publicación"
+              value={data.propiedades.pendientes ?? 0}
+              hint="propiedades →"
+            />
+            <ActionPendiente
+              href="/dashboard/solicitudes-acceso"
+              accent="amber"
+              icon={<InboxIcon className="h-5 w-5" />}
+              label="Solicitudes de acceso"
+              value={data.acciones_pendientes.solicitudes_acceso}
+              hint="pendientes →"
+            />
+            <ActionPendiente
+              href="/dashboard/solicitudes-servicio"
+              accent="sky"
+              icon={<WrenchIcon className="h-5 w-5" />}
+              label="Solicitudes de servicio"
+              value={data.acciones_pendientes.solicitudes_servicio}
+              hint="cambio plan / impulsos →"
+            />
+            <ActionPendiente
+              href="/dashboard/agente-resenas"
+              accent="violet"
+              icon={<MessageSquareQuote className="h-5 w-5" />}
+              label="Reseñas a moderar"
+              value={data.acciones_pendientes.agente_resenas}
+              hint="pendientes →"
+            />
+            <ActionPendiente
+              href="/dashboard/agentes-inmobiliarios/captaciones"
+              accent="emerald"
+              icon={<TargetIcon className="h-5 w-5" />}
+              label="Captaciones abiertas"
+              value={data.acciones_pendientes.captaciones}
+              hint="en seguimiento →"
+            />
           </div>
         </motion.div>
       ) : null}

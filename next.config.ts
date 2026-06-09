@@ -19,6 +19,33 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async headers() {
+    return [
+      // .jsx / .js / .css del sitio legacy: cache largo. Cada archivo lleva ?v=... en index.html,
+      // así que cuando cambia el contenido cambia la URL y se invalida automáticamente.
+      {
+        source: "/alquiloya-legacy/:path*.(jsx|js|css)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400" },
+        ],
+      },
+      // Assets (img/png/jpg/webp/svg/woff2): cache muy largo, son inmutables.
+      {
+        source: "/alquiloya-legacy/:path*.(png|jpg|jpeg|webp|svg|gif|ico|woff|woff2)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=2592000, s-maxage=2592000, immutable" },
+        ],
+      },
+      // Los .html del sitio legacy: cache corto + revalidación, para que cuando hagamos deploy
+      // se vea el contenido nuevo rápido sin esperar TTL.
+      {
+        source: "/alquiloya-legacy/:path*.html",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=300, s-maxage=300, stale-while-revalidate=86400" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
