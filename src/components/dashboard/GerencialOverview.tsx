@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
-import AccesosRapidos from "./AccesosRapidos";
+// AccesosRapidos: el cliente pidio que el dashboard sea solo informacion,
+// sin botones para "Nueva propiedad / Nuevo agente / Nuevo propietario /
+// Solicitudes / Captaciones / Resenias". Mantengo el archivo y el componente
+// definido por si se quiere reactivar mas adelante.
+// import AccesosRapidos from "./AccesosRapidos";
 import AlertasStrip from "./AlertasStrip";
 import PulsoDelDia from "./PulsoDelDia";
 import ActividadReciente from "./ActividadReciente";
@@ -128,18 +132,16 @@ export default function GerencialOverview() {
 
   return (
     <section className="mb-8 space-y-5">
-      {/* Header: saludo + fecha + accesos rápidos */}
-      <header className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-[#4FAEB2]/5 px-5 py-4 shadow-sm">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F8E91]">
-            Centro de control
-          </p>
-          <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
-            {saludo()} ·{" "}
-            <span className="font-normal text-slate-500">{fechaLarga()}</span>
-          </h2>
-        </div>
-        <AccesosRapidos modulos={data.modulos} />
+      {/* Header: saludo + fecha (solo informacion — accesos rapidos removidos
+          a pedido del cliente). */}
+      <header className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-[#4FAEB2]/5 px-5 py-4 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F8E91]">
+          Centro de control
+        </p>
+        <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
+          {saludo()} ·{" "}
+          <span className="font-normal text-slate-500">{fechaLarga()}</span>
+        </h2>
       </header>
 
       {/* Stripe de alertas (solo si hay alertas con count > 0) */}
