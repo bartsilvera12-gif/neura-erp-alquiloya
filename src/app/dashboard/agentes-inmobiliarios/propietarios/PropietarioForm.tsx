@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 export type PropietarioFormData = {
   id?: string;
@@ -37,6 +38,57 @@ export function PropietarioForm({
   const [form, setForm] = useState<PropietarioFormData>(initial);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  async function onResetPassword() {
+    if (!form.id) return;
+    if (!form.email.trim()) {
+      setErr("El propietario necesita un email cargado antes de crear su cuenta.");
+      return;
+    }
+    const ok = await confirmDialog({
+      title: "Generar acceso al portal",
+      message:
+        `Se va a crear (o resetear) la cuenta del portal para "${form.nombre}" con el email ${form.email}.\n\n` +
+        `Vamos a generar una nueva contraseña temporal — pasala vos al cliente por WhatsApp.`,
+      confirmText: "Generar contraseña",
+      cancelText: "Cancelar",
+      tone: "warning",
+    });
+    if (!ok) return;
+    setResetting(true);
+    setErr(null);
+    try {
+      const res = await fetchWithSupabaseSession(
+        `/api/dashboard/alquiloya-propietarios/${form.id}/reset-password`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        email?: string;
+        tempPassword?: string;
+        created?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.success || !data.tempPassword) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      await confirmDialog({
+        title: data.created ? "Cuenta del portal creada" : "Contraseña reseteada",
+        message:
+          `Email: ${data.email}\n` +
+          `Contraseña temporal: ${data.tempPassword}\n\n` +
+          `IMPORTANTE: copiá esta contraseña ahora y enviásela al propietario por WhatsApp. No se vuelve a mostrar.`,
+        confirmText: "Listo, ya la copié",
+        cancelText: "Cerrar",
+        tone: "warning",
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo resetear la contraseña");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   function set<K extends keyof PropietarioFormData>(k: K, v: PropietarioFormData[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -161,7 +213,7 @@ export function PropietarioForm({
         </div>
       </section>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={saving}
@@ -175,6 +227,21 @@ export function PropietarioForm({
         >
           Cancelar
         </Link>
+        {mode === "edit" && form.id ? (
+          <button
+            type="button"
+            onClick={onResetPassword}
+            disabled={resetting}
+            title="Crea la cuenta del portal o resetea su contraseña — útil cuando el propietario no recuerda el acceso."
+            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:opacity-60"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            {resetting ? "Generando…" : "Generar / resetear contraseña"}
+          </button>
+        ) : null}
       </div>
     </form>
   );
