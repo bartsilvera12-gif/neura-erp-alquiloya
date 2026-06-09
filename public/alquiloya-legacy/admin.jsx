@@ -21,6 +21,33 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
     <div className="fade-in" style={{ background: 'var(--bg-2)', minHeight: 'calc(100vh - 76px)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr' }}>
         <aside style={{ background: '#fff', borderRight: '1px solid var(--line)', minHeight: 'calc(100vh - 76px)', padding: '24px 16px' }}>
+          {/* Boton volver al sitio publico (pedido del cliente). */}
+          <button
+            onClick={() => onNav && onNav('home')}
+            title="Volver al sitio"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', padding: '8px 12px', marginBottom: 14,
+              background: 'var(--bg-2)', border: '1px solid var(--line-2)',
+              borderRadius: 10, cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
+              color: 'var(--ink-2)', textAlign: 'left',
+              transition: 'background .12s, color .12s, border-color .12s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--blue-50)';
+              e.currentTarget.style.color = 'var(--blue)';
+              e.currentTarget.style.borderColor = 'var(--blue-100)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--bg-2)';
+              e.currentTarget.style.color = 'var(--ink-2)';
+              e.currentTarget.style.borderColor = 'var(--line-2)';
+            }}
+          >
+            <span style={{ fontSize: 14 }}>←</span>
+            Volver al sitio
+          </button>
           <div style={{ padding: '0 8px 16px', borderBottom: '1px solid var(--line-2)', marginBottom: 12 }}>
             <div className="tag" style={{ color: kind === 'global' ? 'var(--blue)' : 'var(--yellow-600)' }}>
               Panel {kind === 'global' ? 'global' : 'de gestión'}
