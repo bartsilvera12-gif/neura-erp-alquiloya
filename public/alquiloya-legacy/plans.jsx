@@ -239,9 +239,14 @@ function CompareTable() {
     fontWeight: v === 'Sí' ? 700 : 500,
     textAlign: 'center',
   });
+  // P2C: render alterno apilado para mobile (<=760px). CSS en index.html
+  // muestra/oculta cada uno segun viewport — sin tocar el contenido.
   return (
     <div style={{ marginTop: 56 }} className="plans-compare">
       <SectionHead eyebrow="Comparativa" title="Todo lo que incluye cada plan" />
+
+      {/* DESKTOP / TABLET: tabla tradicional 5 columnas con scroll horizontal
+          en el wrapper si fuera necesario. Mismo render que antes. */}
       <div className="card plans-compare-card" style={{ marginTop: 24, padding: 0, overflow: 'hidden' }}>
         <div className="plans-compare-inner">
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', background: 'var(--blue)', color: '#fff', padding: '16px 18px', fontWeight: 700, fontSize: 13 }}>
@@ -263,6 +268,37 @@ function CompareTable() {
           </div>
         ))}
         </div>
+      </div>
+
+      {/* MOBILE: 4 cards apiladas verticalmente, una por plan. Cero scroll
+          horizontal. Cada card lista las 14 caracteristicas con valor a la
+          derecha. CSS en index.html alterna entre esta vista y la tabla. */}
+      <div className="plans-compare-stack" style={{ marginTop: 24 }}>
+        {cols.map((c, planIdx) => (
+          <div key={c.key} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 14 }}>
+            <div style={{ background: 'var(--blue)', color: '#fff', padding: '14px 18px' }}>
+              <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, lineHeight: 1.2 }}>Plan {c.name}</div>
+              <div style={{ fontSize: 11.5, opacity: .85, marginTop: 2 }}>({c.subtitle})</div>
+            </div>
+            <div>
+              {rows.map(([label, ...vals], i) => {
+                const v = vals[planIdx];
+                return (
+                  <div key={label} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '11px 16px', fontSize: 13.5,
+                    borderTop: i === 0 ? 'none' : '1px solid var(--line-2)',
+                    background: i % 2 ? 'var(--bg-2)' : '#fff',
+                    gap: 12,
+                  }}>
+                    <span style={{ color: 'var(--ink-2)', fontWeight: 500, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>{label}</span>
+                    <span style={{ ...cellStyle(v), textAlign: 'right', whiteSpace: 'nowrap' }}>{v}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

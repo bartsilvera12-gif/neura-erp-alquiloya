@@ -470,24 +470,20 @@
       overflow-wrap: anywhere;
       min-width: 0;
     }
-    /* Tabla comparativa: scroll horizontal en lugar de stackearse.
-       Usamos `!important` en min-width porque el catch-all anterior
-       (linea ~342) tiene una regla con !important que anula min-width
-       en cualquier elemento con inline min-width. Aca declaramos via
-       clase y forzamos para ganarle al catch-all. */
+    /* P2C: en mobile reemplazamos la tabla comparativa (que obligaba a swipe
+       lateral) por 4 cards apiladas verticalmente (.plans-compare-stack).
+       Ocultamos la tabla y mostramos el stack. */
     .plans-compare-card {
-      overflow-x: auto !important;
-      -webkit-overflow-scrolling: touch;
+      display: none !important;
     }
-    .plans-compare-inner {
-      min-width: 720px !important;
-      width: 720px !important;
-      max-width: none !important;
+    .plans-compare-stack {
+      display: block !important;
     }
-    /* Anula el catch-all 1fr para los grids internos de la tabla — necesitan
-       mantener sus 5 columnas (1.4fr + 4*1fr) para no perder la estructura. */
-    .plans-compare-inner [style*="grid-template-columns"] {
-      grid-template-columns: 1.4fr repeat(4, 1fr) !important;
+  }
+  /* Desktop / tablet (>760px): mostramos la tabla y ocultamos el stack. */
+  @media (min-width: 761px) {
+    .plans-compare-stack {
+      display: none !important;
     }
   }
 
@@ -512,9 +508,24 @@
       z-index: 39 !important;
     }
 
-    /* Altura: baja especificidad para que .is-open pueda ganarle */
-    header nav.row { max-height: 0 !important; overflow-y: hidden !important; transition: max-height .2s ease, padding .2s ease !important; }
-    header nav.row.is-open { max-height: 70vh !important; overflow-y: auto !important; padding: 12px 16px !important; }
+    /* Altura: baja especificidad para que .is-open pueda ganarle.
+       Cuando el nav esta cerrado, ademas de max-height:0 ANULAMOS padding
+       vertical y border-bottom — sino, el nav fijo (top:96) queda como una
+       franja blanca de ~17px (8px+8px+1px) edge-to-edge debajo del header
+       (P2C: bug reportado por el cliente en mobile). */
+    header nav.row {
+      max-height: 0 !important;
+      overflow-y: hidden !important;
+      padding: 0 16px !important;
+      border-bottom: 0 !important;
+      transition: max-height .2s ease, padding .2s ease, border-bottom-width .2s ease !important;
+    }
+    header nav.row.is-open {
+      max-height: 70vh !important;
+      overflow-y: auto !important;
+      padding: 12px 16px !important;
+      border-bottom: 1px solid var(--line) !important;
+    }
 
     header nav.row button {
       width: 100% !important; text-align: left !important;
@@ -558,7 +569,7 @@
 <script type="text/babel" src="catalog.jsx?v=mobile-1"></script>
 <script type="text/babel" src="detail.jsx?v=consultas-1"></script>
 <script defer type="text/babel" src="temporal.jsx?v=mobile-1"></script>
-<script defer type="text/babel" src="plans.jsx?v=impulsos-wa-1"></script>
+<script defer type="text/babel" src="plans.jsx?v=stacked-mobile-1"></script>
 <script defer type="text/babel" src="publish.jsx?v=confirm-1"></script>
 <script defer type="text/babel" src="posters.jsx?v=mobile-1"></script>
 <script defer type="text/babel" src="admin.jsx?v=impulsos-wa-1"></script>
