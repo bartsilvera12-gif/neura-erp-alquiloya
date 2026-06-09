@@ -153,18 +153,17 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: ScrollText,
   },
   { key: "usuarios", slug: "usuarios", label: "Usuarios", href: "/usuarios", icon: UserCog },
+  // Configuración: item simple sin children a pedido del cliente. La
+  // pantalla /configuracion ya funciona como hub global con tarjetas hacia
+  // cada subseccion (Facturación, Conversaciones, CRM, etc.); cada
+  // subpagina tiene su propio "Volver al centro" via
+  // GlobalConfigSubpageShell.
   {
     key: "configuracion",
     slug: "configuracion",
     label: "Configuración",
     href: "/configuracion",
     icon: Settings,
-    children: [
-      { label: "Facturación", href: "/configuracion/facturacion" },
-      // "Equipos y supervisión" oculto a pedido del cliente. La ruta
-      // /configuracion/omnicanal-equipos sigue activa por si se reactiva.
-      // { label: "Equipos y supervisión", href: "/configuracion/omnicanal-equipos" },
-    ],
   },
   // Planes: pantalla unificada con tabs (Planes de publicacion + Packs de
   // impulsos en /planes) — "Packs de impulsos" se accede desde el tab dentro
