@@ -161,12 +161,14 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Settings,
     children: [
       { label: "Facturación", href: "/configuracion/facturacion" },
-      { label: "Equipos y supervisión", href: "/configuracion/omnicanal-equipos" },
+      // "Equipos y supervisión" oculto a pedido del cliente. La ruta
+      // /configuracion/omnicanal-equipos sigue activa por si se reactiva.
+      // { label: "Equipos y supervisión", href: "/configuracion/omnicanal-equipos" },
     ],
   },
   // Planes: pantalla unificada con tabs (Planes de publicacion + Packs de
-  // impulsos en /planes), mas Solicitudes de servicio como sub-item.
-  // La ruta /dashboard/impulsos-packs sigue activa para bookmarks viejos.
+  // impulsos en /planes) — "Packs de impulsos" se accede desde el tab dentro
+  // de /planes, no necesita item separado en el sidebar.
   {
     key: "planes",
     slug: "planes",
@@ -175,7 +177,6 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: FileText,
     children: [
       { label: "Planes de publicación", href: "/planes", exactMatch: true },
-      { label: "Packs de impulsos", href: "/planes?tab=packs" },
       { label: "Solicitudes de servicio", href: "/dashboard/solicitudes-servicio" },
     ],
   },
