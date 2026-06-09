@@ -7,6 +7,10 @@ function PublishPage() {
   // ocultar la card "Querés ayuda de un agente" y pre-seleccionar el plan.
   const [ctxAgente, setCtxAgente] = React.useState(null); // {id, nombre, plan_publicacion_id, plan_tier}
   const [ctxPropietario, setCtxPropietario] = React.useState(null);
+  // authChecked = ya terminamos de consultar /api/agente/me y /api/propietario/me.
+  // Sin esto, durante el render inicial isLoggedPublisher es false y mostrariamos
+  // el muro de "Ingresar" aunque el usuario SI este logueado — flash desagradable.
+  const [authChecked, setAuthChecked] = React.useState(false);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -14,7 +18,7 @@ function PublishPage() {
         const r = await fetch('/api/agente/me', { cache: 'no-store', credentials: 'include' });
         if (r.ok) {
           const b = await r.json();
-          if (!cancelled && b?.agente) { setCtxAgente(b.agente); return; }
+          if (!cancelled && b?.agente) { setCtxAgente(b.agente); setAuthChecked(true); return; }
         }
       } catch { /* ignore */ }
       try {
@@ -24,6 +28,7 @@ function PublishPage() {
           if (!cancelled && b2?.propietario) setCtxPropietario(b2.propietario);
         }
       } catch { /* ignore */ }
+      if (!cancelled) setAuthChecked(true);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -135,6 +140,70 @@ function PublishPage() {
       setSubmitState({ loading: false, error: (e && e.message) || 'No se pudo enviar.', success: null });
     }
   }
+
+  // ── Muro de auth ──────────────────────────────────────────────────────────
+  // A pedido del cliente: para publicar hace falta una cuenta activa de agente
+  // o propietario. El backend ya rechaza el POST anonimo con 401/403, pero
+  // ademas escondemos el wizard del frontend para que ni siquiera lo intente.
+  if (!authChecked) {
+    return (
+      <div className="fade-in container" style={{ padding: '32px' }}>
+        <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>
+          Cargando…
+        </div>
+      </div>
+    );
+  }
+  if (!isLoggedPublisher) {
+    return (
+      <div className="fade-in container" style={{ padding: '32px' }}>
+        <div
+          className="card"
+          style={{
+            maxWidth: 560,
+            margin: '48px auto',
+            padding: 36,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              margin: '0 auto 16px',
+              background: 'rgba(0,88,165,0.08)',
+              color: 'var(--blue)',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            <I.shield s={28}/>
+          </div>
+          <div className="tag" style={{ justifyContent: 'center' }}>Publicar inmueble</div>
+          <h2 style={{ marginTop: 8, fontSize: 26 }}>Necesitás una cuenta activa</h2>
+          <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            Para publicar una propiedad en AlquiloYa tenés que iniciar sesión con
+            una cuenta de agente o propietario con plan activo. Así nos aseguramos
+            de que cada publicación tenga un responsable verificado.
+          </p>
+          <div className="row gap-12" style={{ justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
+            <a className="btn btn-primary" href="/portal-agentes/login">
+              <I.user s={16}/> Ingresar
+            </a>
+            <a className="btn btn-outline" href="/portal-agentes">
+              Solicitar acceso
+            </a>
+          </div>
+          <p style={{ marginTop: 20, fontSize: 12, color: 'var(--ink-4)' }}>
+            ¿No tenés cuenta todavía? Pedí el acceso y nuestro equipo te contacta
+            para activarte.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-in container" style={{ padding: '32px' }}>
       <div className="row between">
