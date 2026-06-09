@@ -2,6 +2,49 @@
 
 function Header({ route, onNav, onPublish }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // Sesion: si la cookie de Supabase es valida, /api/agente/me o
+  // /api/propietario/me devuelven los datos del usuario logueado. Antes el
+  // header mostraba "Ingresar" siempre, aunque el usuario tuviera la sesion
+  // activa — la sesion SI persistia (cookie HttpOnly), solo no se reflejaba
+  // en la UI.
+  const [session, setSession] = React.useState(null); // {kind:'agente'|'propietario', nombre, email}
+  const [sessionChecked, setSessionChecked] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/agente/me', { cache: 'no-store', credentials: 'include' });
+        if (r.ok) {
+          const b = await r.json();
+          if (!cancelled && b?.agente) {
+            setSession({ kind: 'agente', nombre: b.agente.nombre || b.usuario?.email || 'Mi cuenta', email: b.agente.email || b.usuario?.email || '' });
+            setSessionChecked(true);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+      try {
+        const r2 = await fetch('/api/propietario/me', { cache: 'no-store', credentials: 'include' });
+        if (r2.ok) {
+          const b2 = await r2.json();
+          if (!cancelled && b2?.propietario) {
+            setSession({ kind: 'propietario', nombre: b2.propietario.nombre || b2.usuario?.email || 'Mi cuenta', email: b2.propietario.email || b2.usuario?.email || '' });
+          }
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setSessionChecked(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  async function onSignOut() {
+    try {
+      await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
+    } catch { /* ignore */ }
+    // Reload total: limpia state local + cualquier cache del navegador del
+    // documento actual. Aterrizamos en home asi el usuario ve que cambio.
+    window.location.href = '/';
+  }
   const items = [
     { id: 'home', label: 'Inicio' },
     { id: 'catalog', label: 'Alquileres' },
@@ -83,33 +126,136 @@ function Header({ route, onNav, onPublish }) {
           />
         </div>
 
-        {/* Ingresar button */}
+        {/* Auth chip: muestra "Ingresar" si no hay sesion, o el avatar +
+            dropdown del usuario logueado. Mientras `sessionChecked` es false
+            mostramos un placeholder invisible para reservar el espacio y
+            evitar el flash "Ingresar → user-chip". */}
         <div style={{ flexShrink: 0, position: 'relative', zIndex: 2 }}>
-          <button
-            onClick={() => {
-              // Siempre derivamos al portal público de agentes; el panel
-              // #admin-agent ya no se abre directo desde acá.
-              window.location.href = '/portal-agentes';
-            }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '10px 22px',
-              borderRadius: 999,
-              border: 'none',
-              background: 'var(--blue)',
-              color: '#fff',
-              fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(0,88,165,.25)',
-              transition: 'background .15s, transform .1s, box-shadow .15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue-700)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,88,165,.35)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,88,165,.25)'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(.97)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = ''; }}
-          >
-            <I.user s={16}/> Ingresar
-          </button>
+          {!sessionChecked ? (
+            <div style={{ width: 140, height: 40 }} aria-hidden="true" />
+          ) : session ? (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setUserMenuOpen(o => !o)}
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 10,
+                  padding: '6px 12px 6px 6px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: '#fff',
+                  fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+                  color: 'var(--ink)',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(11,22,34,.05)',
+                  transition: 'background .15s, border-color .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+              >
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: 'var(--blue)', color: '#fff',
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  {(session.nombre || '?').trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase()}
+                </span>
+                <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session.nombre}
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--ink-3)' }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {userMenuOpen ? (
+                <>
+                  {/* Backdrop para cerrar al click afuera */}
+                  <div
+                    onClick={() => setUserMenuOpen(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 50 }}
+                    aria-hidden="true"
+                  />
+                  <div role="menu" style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 8px)',
+                    minWidth: 220, background: '#fff',
+                    borderRadius: 12, border: '1px solid var(--line)',
+                    boxShadow: '0 12px 30px rgba(11,22,34,.12)',
+                    padding: 6, zIndex: 51,
+                  }}>
+                    <div style={{ padding: '8px 12px 6px', borderBottom: '1px solid var(--line-2)' }}>
+                      <div className="muted xs" style={{ marginBottom: 2 }}>
+                        {session.kind === 'agente' ? 'Agente inmobiliario' : 'Propietario'}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--ink-3)', wordBreak: 'break-all' }}>
+                        {session.email || '—'}
+                      </div>
+                    </div>
+                    <button
+                      role="menuitem"
+                      onClick={() => { setUserMenuOpen(false); onNav('admin-agent'); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        padding: '10px 12px', border: 'none', background: 'transparent',
+                        textAlign: 'left', cursor: 'pointer', borderRadius: 8,
+                        fontFamily: 'inherit', fontSize: 13.5, color: 'var(--ink-2)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-2)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <I.user s={14}/> Mi panel
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { setUserMenuOpen(false); onSignOut(); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        padding: '10px 12px', border: 'none', background: 'transparent',
+                        textAlign: 'left', cursor: 'pointer', borderRadius: 8,
+                        fontFamily: 'inherit', fontSize: 13.5, color: 'var(--red)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(195,54,54,.06)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                // No hay sesion: derivamos al portal publico de agentes para
+                // login / solicitar acceso.
+                window.location.href = '/portal-agentes';
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 22px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'var(--blue)',
+                color: '#fff',
+                fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0,88,165,.25)',
+                transition: 'background .15s, transform .1s, box-shadow .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue-700)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,88,165,.35)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,88,165,.25)'; }}
+              onMouseDown={e => { e.currentTarget.style.transform = 'scale(.97)'; }}
+              onMouseUp={e => { e.currentTarget.style.transform = ''; }}
+            >
+              <I.user s={16}/> Ingresar
+            </button>
+          )}
         </div>
       </div>
     </header>
