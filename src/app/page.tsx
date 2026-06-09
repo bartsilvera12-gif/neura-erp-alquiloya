@@ -33,6 +33,7 @@ import {
 } from "@/lib/fechas/calendario";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import GerencialOverview from "@/components/dashboard/GerencialOverview";
+import GerencialActividadReciente from "@/components/dashboard/GerencialActividadReciente";
 import { ListChecks } from "lucide-react";
 import UsuarioSelect from "@/components/dashboard/UsuarioSelect";
 import { etiquetaVisibleTipoServicio } from "@/lib/clientes/tipo-servicio-catalogo";
@@ -2856,6 +2857,10 @@ export default function DashboardPage() {
       {tab === "propiedades" && <DashPropiedades />}
 
       {tab === "captaciones" && <DashCaptaciones />}
+
+      {/* Actividad reciente al FINAL del dashboard (pedido del cliente).
+          Comparte cache 60s con GerencialOverview, sin doble fetch. */}
+      <GerencialActividadReciente />
 
     </div>
   );

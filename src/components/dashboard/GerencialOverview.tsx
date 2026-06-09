@@ -9,7 +9,8 @@ import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
 // import AccesosRapidos from "./AccesosRapidos";
 import AlertasStrip from "./AlertasStrip";
 import PulsoDelDia from "./PulsoDelDia";
-import ActividadReciente from "./ActividadReciente";
+// ActividadReciente: a pedido del cliente se renderiza al FINAL del
+// dashboard (en page.tsx via <GerencialActividadReciente />), no aca.
 
 export type ModulosDisponibles = {
   propiedades: boolean;
@@ -123,10 +124,9 @@ export default function GerencialOverview() {
   // Si hubo error: degradamos en silencio (el dashboard original sigue funcionando).
   if (err || !data) return null;
 
-  const tieneAlgo =
-    data.alertas.length > 0 ||
-    data.kpis.length > 0 ||
-    data.actividad.length > 0;
+  // Actividad se renderiza al final del dashboard via componente separado,
+  // por eso ya no entra en este check.
+  const tieneAlgo = data.alertas.length > 0 || data.kpis.length > 0;
 
   if (!tieneAlgo) return null;
 
@@ -150,8 +150,8 @@ export default function GerencialOverview() {
       {/* KPIs pulso del día */}
       {data.kpis.length > 0 ? <PulsoDelDia kpis={data.kpis} /> : null}
 
-      {/* Actividad reciente */}
-      {data.actividad.length > 0 ? <ActividadReciente items={data.actividad} /> : null}
+      {/* Actividad reciente movida al final del dashboard
+          (ver <GerencialActividadReciente /> en page.tsx). */}
     </section>
   );
 }
