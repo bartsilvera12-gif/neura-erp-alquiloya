@@ -98,23 +98,21 @@ function HelpPage({ onNav }) {
           const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
             whatsapp: '595985489178',
             whatsappLabel: '0985 489 178',
-            emailAyuda: 'ayuda@alquiloya.com.py',
+            email: 'Info@alquiloya.com.py',
           };
-          const emailHelp = C.emailAyuda || C.email || 'ayuda@alquiloya.com.py';
+          // A pedido del cliente: el email del centro de ayuda usa el MISMO
+          // valor que el del footer (C.email). Si CONTACTO_ALQUILOYA no
+          // expone .email, caemos a Info@alquiloya.com.py (mismo default
+          // que el footer en shared.jsx) para que nunca diverjan.
+          const emailHelp = C.email || 'Info@alquiloya.com.py';
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
               <ContactCard
                 icon="whats" color="#25D366"
                 title="WhatsApp"
                 desc="Respondemos en menos de 10 minutos en horario hábil"
                 cta={'Escribir a ' + C.whatsappLabel}
                 href={'https://wa.me/' + C.whatsapp}
-              />
-              <ContactCard
-                icon="chat" color="var(--blue)"
-                title="Chat con VIVIO"
-                desc="Asistente IA disponible 24/7. Te resuelve dudas frecuentes al instante"
-                cta="Abrir chat"
               />
               <ContactCard
                 icon="doc" color="#6e3ad1"
@@ -178,9 +176,9 @@ function HelpPage({ onNav }) {
                 const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
                   whatsapp: '595985489178',
                   whatsappLabel: '0985 489 178',
-                  emailAyuda: 'ayuda@alquiloya.com.py',
+                  email: 'Info@alquiloya.com.py',
                 };
-                const emailH = C.emailAyuda || C.email || 'ayuda@alquiloya.com.py';
+                const emailH = C.email || 'Info@alquiloya.com.py';
                 return (
                   <>
                     <div className="col gap-6" style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-2)' }}>
@@ -219,13 +217,12 @@ function HelpPage({ onNav }) {
           {(() => {
             const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
               whatsapp: '595985489178',
-              emailAyuda: 'ayuda@alquiloya.com.py',
+              email: 'Info@alquiloya.com.py',
             };
-            const emailH = C.emailAyuda || C.email || 'ayuda@alquiloya.com.py';
+            const emailH = C.email || 'Info@alquiloya.com.py';
             return (
               <div className="row gap-12" style={{ justifyContent: 'center', marginTop: 22 }}>
                 <a className="btn btn-wa btn-lg" href={'https://wa.me/' + C.whatsapp} target="_blank" rel="noopener noreferrer"><I.whats s={16}/> Escribir por WhatsApp</a>
-                <button className="btn btn-blue btn-lg"><I.chat s={16}/> Hablar con VIVIO</button>
                 <a className="btn btn-outline btn-lg" href={'mailto:' + emailH}>Enviar email</a>
               </div>
             );
