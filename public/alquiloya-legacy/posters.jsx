@@ -3,14 +3,96 @@
 
 function PostersPage({ route, onNav }) {
   const [modalId, setModalId] = React.useState(null);
-  const sel = modalId ? PROPERTIES.find(p => p.id === modalId) : null;
-  const list = PROPERTIES;
+  const [query, setQuery] = React.useState('');
+
+  // Sesion: igual que AdminAgentPage. Resolvemos si es propietario o agente
+  // para (a) pasarle el `role` correcto al sidebar (sin Captaciones/Blog en
+  // propietario) y (b) traer SUS inmuebles, no la data mock global.
+  const [meKind, setMeKind] = React.useState(null); // 'propietario' | 'agente' | null
+  const [meInfo, setMeInfo] = React.useState({ nombre: '', email: '' });
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/propietario/me', { cache: 'no-store', credentials: 'include' });
+        if (r.ok) {
+          const b = await r.json();
+          if (!cancelled && b?.propietario) {
+            setMeKind('propietario');
+            setMeInfo({ nombre: b.propietario.nombre || '', email: b.propietario.email || b.usuario?.email || '' });
+            return;
+          }
+        }
+        const r2 = await fetch('/api/agente/me', { cache: 'no-store', credentials: 'include' });
+        if (r2.ok) {
+          const b2 = await r2.json();
+          if (!cancelled && b2?.agente) {
+            setMeKind('agente');
+            setMeInfo({ nombre: b2.agente.nombre || '', email: b2.agente.email || b2.usuario?.email || '' });
+          }
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const isPropietario = meKind === 'propietario';
+
+  // Inmuebles REALES del usuario logueado (propietario primero, luego agente).
+  // `null` = todavia cargando; `[]` = sesion ok pero sin inmuebles.
+  const [myProps, setMyProps] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let body = null;
+      try {
+        const r = await fetch('/api/propietario/propiedades', { cache: 'no-store', credentials: 'include' });
+        if (r.ok) {
+          const b = await r.json();
+          if (b?.success && Array.isArray(b.propiedades)) body = b;
+        }
+      } catch { /* try next */ }
+      if (!body) {
+        try {
+          const r2 = await fetch('/api/agente/propiedades', { cache: 'no-store', credentials: 'include' });
+          if (r2.ok) {
+            const b2 = await r2.json();
+            if (b2?.success && Array.isArray(b2.propiedades)) body = b2;
+          }
+        } catch { /* sin sesion */ }
+      }
+      if (cancelled) return;
+      if (!body || !Array.isArray(body.propiedades)) { setMyProps([]); return; }
+      const mapped = body.propiedades.map(p => ({
+        id: p.id,
+        codigo: p.codigo || p.id,
+        title: p.titulo || 'Sin título',
+        cover: p.cover_url || (typeof photo === 'function' ? photo(0) : ''),
+        address: [p.barrio, p.ciudad].filter(Boolean).join(', ') || '—',
+        tipo: p.tipo || '',
+        verified: !!p.verificada,
+      }));
+      setMyProps(mapped);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const loading = myProps === null;
+  const list = Array.isArray(myProps) ? myProps : [];
+  const filtered = query.trim()
+    ? list.filter(p =>
+        (p.title || '').toLowerCase().includes(query.toLowerCase()) ||
+        (p.codigo || '').toLowerCase().includes(query.toLowerCase()))
+    : list;
+  const sel = modalId ? list.find(p => p.codigo === modalId || p.id === modalId) : null;
 
   return (
     <AdminLayout
       kind="agent"
+      role={isPropietario ? 'propietario' : 'agente'}
       route={route || 'admin-agent-qr'}
       onNav={onNav}
+      displayName={meInfo.nombre || 'Mi cuenta'}
+      displayEmail={meInfo.email}
       title="Carteles QR"
       subtitle="Cada propiedad genera su QR único automáticamente. Descargá o imprimí el cartel listo para la fachada."
       actions={
@@ -18,10 +100,12 @@ function PostersPage({ route, onNav }) {
       }
     >
       <div className="card-soft" style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <MiniStat label="Inmuebles con QR" value={PROPERTIES.length} icon="qr" color="var(--blue)"/>
-        <MiniStat label="Carteles descargados" value="42" icon="download" color="var(--green)"/>
-        <MiniStat label="Escaneos esta semana" value="318" icon="eye" color="var(--yellow-600)"/>
-        <MiniStat label="Más escaneado" value="AY-01243" icon="trend" color="#6e3ad1"/>
+        <MiniStat label="Inmuebles con QR" value={loading ? '—' : list.length} icon="qr" color="var(--blue)"/>
+        {/* Descargas / escaneos: no hay tracking real todavia → mostramos "—"
+            en vez de numeros inventados (antes eran mock fijos: 42/318/AY-01243). */}
+        <MiniStat label="Carteles descargados" value="—" icon="download" color="var(--green)"/>
+        <MiniStat label="Escaneos esta semana" value="—" icon="eye" color="var(--yellow-600)"/>
+        <MiniStat label="Más escaneado" value="—" icon="trend" color="#6e3ad1"/>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
@@ -30,19 +114,28 @@ function PostersPage({ route, onNav }) {
             <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 14 }}>Mis inmuebles publicados</div>
             <div className="muted" style={{ marginTop: 2, fontSize: 11 }}>Cada uno con su QR generado automáticamente</div>
           </div>
-          <input className="input" placeholder="Buscar por ID o título..." style={{ width: 240, padding: '6px 10px', fontSize: 12.5 }}/>
+          <input className="input" placeholder="Buscar por ID o título..." value={query} onChange={e => setQuery(e.target.value)} style={{ width: 240, padding: '6px 10px', fontSize: 12.5 }}/>
         </div>
+
+        {loading ? (
+          <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Cargando tus inmuebles…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+            {list.length === 0
+              ? 'Todavía no tenés inmuebles publicados. Cuando publiques uno, su cartel QR aparece acá automáticamente.'
+              : 'No hay inmuebles que coincidan con la búsqueda.'}
+          </div>
+        ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--bg-2)', textAlign: 'left' }}>
               <th style={{ padding: '8px 14px', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Inmueble</th>
               <th style={{ padding: '8px 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '.04em', textTransform: 'uppercase' }}>QR</th>
-              <th style={{ padding: '8px 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Escaneos</th>
               <th style={{ padding: '8px 14px' }}></th>
             </tr>
           </thead>
           <tbody>
-            {list.slice(0, 10).map((p) => (
+            {filtered.map((p) => (
               <tr key={p.id} style={{ borderTop: '1px solid var(--line-2)', transition: 'background .12s' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
@@ -52,25 +145,21 @@ function PostersPage({ route, onNav }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{p.title}</div>
                       <div style={{ marginTop: 2, fontSize: 11, color: 'var(--ink-3)' }}>
-                        <span className="mono" style={{ fontWeight: 600, fontSize: 10.5 }}>{p.id}</span> · {p.address}
+                        <span className="mono" style={{ fontWeight: 600, fontSize: 10.5 }}>{p.codigo}</span> · {p.address}
                       </div>
                     </div>
                   </div>
                 </td>
                 <td style={{ padding: '10px 10px' }}>
                   <div style={{ padding: 3, background: '#fff', border: '1px solid var(--line)', borderRadius: 5, display: 'inline-block' }}>
-                    <QRMock size={28} id={p.id}/>
+                    <QRMock size={28} id={p.codigo}/>
                   </div>
-                </td>
-                <td style={{ padding: '10px 10px' }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{42 + (p.id.charCodeAt(5) * 13) % 380}</div>
-                  <div className="muted" style={{ fontSize: 10.5 }}>últimos 7 días</div>
                 </td>
                 <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                   <div className="row gap-4" style={{ justifyContent: 'flex-end' }}>
                     <button title="Descargar" style={{ padding: '5px', width: 26, height: 26, borderRadius: 7, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><I.download s={11}/></button>
                     <button title="Imprimir" style={{ padding: '5px', width: 26, height: 26, borderRadius: 7, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><I.print s={11}/></button>
-                    <button onClick={() => setModalId(p.id)} style={{ padding: '5px 10px', height: 26, borderRadius: 7, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => setModalId(p.codigo)} style={{ padding: '5px 10px', height: 26, borderRadius: 7, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       Ver <I.chev s={10}/>
                     </button>
                   </div>
@@ -79,15 +168,12 @@ function PostersPage({ route, onNav }) {
             ))}
           </tbody>
         </table>
-        <div className="row between" style={{ padding: '10px 18px', borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--ink-3)' }}>
-          <div>Mostrando 10 de {PROPERTIES.length} inmuebles</div>
-          <div className="row gap-4">
-            <button style={{ padding: '4px 9px', borderRadius: 6, background: '#fff', border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12 }}>‹</button>
-            <span style={{ padding: '4px 10px', borderRadius: 6, background: 'var(--ink)', color: '#fff', fontSize: 12, fontWeight: 600 }}>1</span>
-            <button style={{ padding: '4px 9px', borderRadius: 6, background: '#fff', border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12 }}>2</button>
-            <button style={{ padding: '4px 9px', borderRadius: 6, background: '#fff', border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12 }}>›</button>
+        )}
+        {!loading && filtered.length > 0 ? (
+          <div className="row" style={{ padding: '10px 18px', borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--ink-3)' }}>
+            <div>Mostrando {filtered.length} inmueble{filtered.length !== 1 ? 's' : ''}</div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       {sel && <PosterModal p={sel} onClose={() => setModalId(null)} />}
@@ -117,7 +203,7 @@ function PosterModal({ p, onClose }) {
             <div className="tag">Cartel QR del inmueble</div>
             <div className="row gap-10" style={{ marginTop: 4, alignItems: 'baseline' }}>
               <h3 style={{ fontSize: 18 }}>{p.title}</h3>
-              <span className="mono muted xs">{p.id}</span>
+              <span className="mono muted xs">{p.codigo || p.id}</span>
             </div>
           </div>
           <button onClick={onClose} style={{
@@ -127,12 +213,12 @@ function PosterModal({ p, onClose }) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 28, padding: 28, background: 'var(--bg-2)' }}>
-          <FullPoster id={p.id} address={p.address}/>
+          <FullPoster id={p.codigo || p.id} address={p.address}/>
           <div className="col gap-16">
             <div>
               <div className="muted xs" style={{ letterSpacing: '.08em', fontWeight: 700 }}>DATOS DEL CARTEL</div>
               <div className="col gap-6" style={{ marginTop: 10, fontSize: 14 }}>
-                <Row label="ID del inmueble" value={<span className="mono">{p.id}</span>}/>
+                <Row label="ID del inmueble" value={<span className="mono">{p.codigo || p.id}</span>}/>
                 <Row label="Dirección" value={p.address}/>
                 <Row label="Tipo" value={TIPOS.find(t => t.id === p.tipo)?.label || '—'}/>
                 <Row label="Estado" value={p.verified ? 'Verificado' : 'Publicado'}/>
