@@ -120,42 +120,63 @@ export async function POST(request: Request) {
       );
     }
 
-    // Resolver agente_id desde usuarios.agente_id (misma logica que /api/agente/me).
+    // Resolver perfil de publicador: puede ser agente (publica para terceros)
+    // o propietario directo (se publica a si mismo). Antes solo aceptabamos
+    // agente_id y rechazabamos con 403 a los propietarios — eso bloqueaba el
+    // flujo "publicar gratis" de los dueños directos.
     const { data: uExt } = await supabase
       .from("usuarios")
-      .select("agente_id")
+      .select("agente_id, propietario_id")
       .eq("id", usuarioErp.id)
       .limit(1)
       .maybeSingle();
     const agenteId = (uExt as { agente_id?: string | null } | null)?.agente_id ?? null;
-    if (!agenteId) {
+    const usuarioPropietarioId = (uExt as { propietario_id?: string | null } | null)?.propietario_id ?? null;
+
+    if (!agenteId && !usuarioPropietarioId) {
       return NextResponse.json(
-        { error: "Tu cuenta no tiene perfil de agente. Pedi alta al admin." },
+        { error: "Tu cuenta no tiene perfil de agente ni propietario. Pedi alta al admin." },
         { status: 403 }
       );
     }
 
-    // Validar que el agente este activo y, si tiene plan_vencimiento_at, que
-    // no este vencido. Si el campo es NULL lo tratamos como "sin vencimiento".
-    const { data: agRow } = await supabase
-      .from("agentes")
-      .select("id, activo, plan_vencimiento_at")
-      .eq("id", agenteId)
-      .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
-      .limit(1)
-      .maybeSingle();
-    if (!agRow || (agRow as { activo?: boolean }).activo !== true) {
-      return NextResponse.json(
-        { error: "Tu cuenta de agente esta inactiva. Contactanos para reactivarla." },
-        { status: 403 }
-      );
-    }
-    const venc = (agRow as { plan_vencimiento_at?: string | null }).plan_vencimiento_at ?? null;
-    if (venc && new Date(venc).getTime() < Date.now()) {
-      return NextResponse.json(
-        { error: "Tu plan esta vencido. Renovalo para volver a publicar." },
-        { status: 402 }
-      );
+    // Path agente: validar que el agente este activo y plan no vencido.
+    if (agenteId) {
+      const { data: agRow } = await supabase
+        .from("agentes")
+        .select("id, activo, plan_vencimiento_at")
+        .eq("id", agenteId)
+        .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+        .limit(1)
+        .maybeSingle();
+      if (!agRow || (agRow as { activo?: boolean }).activo !== true) {
+        return NextResponse.json(
+          { error: "Tu cuenta de agente esta inactiva. Contactanos para reactivarla." },
+          { status: 403 }
+        );
+      }
+      const venc = (agRow as { plan_vencimiento_at?: string | null }).plan_vencimiento_at ?? null;
+      if (venc && new Date(venc).getTime() < Date.now()) {
+        return NextResponse.json(
+          { error: "Tu plan esta vencido. Renovalo para volver a publicar." },
+          { status: 402 }
+        );
+      }
+    } else {
+      // Path propietario: validar que el propietario este activo.
+      const { data: prRow } = await supabase
+        .from("propietarios")
+        .select("id, activo")
+        .eq("id", usuarioPropietarioId!)
+        .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+        .limit(1)
+        .maybeSingle();
+      if (!prRow || (prRow as { activo?: boolean }).activo !== true) {
+        return NextResponse.json(
+          { error: "Tu cuenta de propietario esta inactiva. Contactanos para reactivarla." },
+          { status: 403 }
+        );
+      }
     }
 
     const body = (await request.json().catch(() => ({}))) as Body;
@@ -197,9 +218,13 @@ export async function POST(request: Request) {
     try {
       await client.query("BEGIN");
 
-      // 1. Upsert propietario por (empresa_id, lower(email)) o (empresa_id, telefono)
-      let propietarioId: string | null = null;
-      if (propEmail) {
+      // 1. Resolver propietario_id.
+      //   - Si el usuario es propietario directo (usuarioPropietarioId set),
+      //     usamos esa fila — la propiedad es PARA ese propietario.
+      //   - Si es agente publicando para un tercero, buscamos por email/telefono
+      //     del body y, si no existe, creamos abajo.
+      let propietarioId: string | null = usuarioPropietarioId;
+      if (!propietarioId && propEmail) {
         const r = await client.query<{ id: string }>(
           `SELECT id FROM "alquiloya"."propietarios"
             WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1`,
