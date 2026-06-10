@@ -206,6 +206,16 @@ export async function getPublicPropiedad(id: string) {
               'bio', a.bio
             )
           END AS agente,
+          -- Contacto efectivo para el boton de WhatsApp en la ficha publica:
+          -- si hay agente usamos su whatsapp/telefono; si es publicacion de
+          -- propietario directo, usamos el telefono del propietario. Asi el
+          -- boton "Consultar por WhatsApp" siempre lleva al numero correcto.
+          json_build_object(
+            'tipo', CASE WHEN a.id IS NOT NULL THEN 'agente' ELSE 'propietario' END,
+            'nombre', COALESCE(a.nombre, pr.nombre),
+            'telefono', COALESCE(a.telefono, pr.telefono),
+            'whatsapp', COALESCE(a.whatsapp, a.telefono, pr.telefono)
+          ) AS contacto,
           COALESCE((
             SELECT json_agg(
               json_build_object(
@@ -243,6 +253,9 @@ export async function getPublicPropiedad(id: string) {
           ON a.id = p.agente_id
          AND a.empresa_id = p.empresa_id
          AND a.activo = true
+        LEFT JOIN ${t("propietarios")} pr
+          ON pr.id = p.propietario_id
+         AND pr.empresa_id = p.empresa_id
         WHERE p.empresa_id = $1::uuid
           AND p.id = $2::uuid
           AND p.activo = true

@@ -122,8 +122,12 @@ function PublishPage() {
     const precio = Number(String(form.precio).replace(/[^\d.]/g, ''));
     if (!Number.isFinite(precio) || precio <= 0) return 'Precio obligatorio.';
     if (!(form.propietario_nombre || '').trim()) return 'Tu nombre es obligatorio.';
-    if (!(form.propietario_email || '').trim() && !(form.propietario_telefono || '').trim()) {
-      return 'Dejá email o teléfono para que te contactemos.';
+    // Telefono OBLIGATORIO: el boton "Consultar por WhatsApp" de la ficha
+    // publica lleva directo a este numero. Sin telefono, el interesado no
+    // puede contactar al propietario/agente. Validamos un minimo de digitos.
+    const telDigits = (form.propietario_telefono || '').replace(/\D/g, '');
+    if (telDigits.length < 7) {
+      return 'El teléfono / WhatsApp es obligatorio (es el contacto que verán los interesados).';
     }
     return null;
   }
@@ -1254,11 +1258,11 @@ function StepPreview({ form, setF }) {
             <input type="email" className="input" value={form.propietario_email} onChange={(e) => setF({ propietario_email: e.target.value })} placeholder="usuario@dominio.com"/>
           </div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <label>Teléfono / WhatsApp</label>
+            <label>Teléfono / WhatsApp *</label>
             <input className="input" value={form.propietario_telefono} onChange={(e) => setF({ propietario_telefono: e.target.value })} placeholder="+595 ..."/>
           </div>
         </FormGrid>
-        <div className="muted xs" style={{ marginTop: 8 }}>Dejá al menos email o teléfono para que el equipo de AlquiloYa pueda contactarte.</div>
+        <div className="muted xs" style={{ marginTop: 8 }}>El teléfono / WhatsApp es obligatorio: es el contacto al que llega el botón “Consultar por WhatsApp” de tu publicación.</div>
       </div>
 
       <div style={{ marginTop: 16, padding: 18, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 13.5, color: '#8a5e00' }}>

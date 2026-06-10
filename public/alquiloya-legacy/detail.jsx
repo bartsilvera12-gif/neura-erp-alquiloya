@@ -447,7 +447,17 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
   }
   function onClickWhatsApp() {
     registerConsulta('whatsapp');
-    const phone = (agent?.whatsapp || agent?.telefono || '').replace(/\D/g, '');
+    // Prioridad: whatsapp/telefono del agente → contacto efectivo del backend
+    // (agente o propietario directo). Asi el boton siempre lleva al numero real
+    // del responsable de la publicacion.
+    const raw = agent?.whatsapp || agent?.telefono
+      || property?.contacto?.whatsapp || property?.contacto?.telefono || '';
+    let phone = String(raw).replace(/\D/g, '');
+    // Normalizamos a formato internacional Paraguay si vino local (09xx...).
+    if (phone && !phone.startsWith('595')) {
+      if (phone.startsWith('0')) phone = '595' + phone.slice(1);
+      else if (phone.length <= 10) phone = '595' + phone;
+    }
     const msg = encodeURIComponent('Hola! Me interesa la propiedad "' + (property?.title || '') + '" en ' + (property?.address || property?.ciudad || ''));
     const url = phone ? ('https://wa.me/' + phone + '?text=' + msg) : ('https://wa.me/?text=' + msg);
     window.open(url, '_blank', 'noopener');

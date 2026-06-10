@@ -185,6 +185,9 @@
       photos: photosFromRow(row, fallback, cover),
       cover,
       agent,
+      // Contacto efectivo para el boton de WhatsApp (lo expone el endpoint de
+      // detalle): agente o, si es publicacion directa, el propietario.
+      contacto: row.contacto || null,
       desc: row.descripcion || row.desc || fallback?.desc || '',
       features,
       lat: typeof row.lat === 'number' ? row.lat : (row.lat != null ? Number(row.lat) || null : null),
