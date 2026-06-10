@@ -50,6 +50,16 @@ function n(v: unknown): number | null {
   const x = Number(v);
   return Number.isFinite(x) && x >= 0 ? x : null;
 }
+// Coordenadas: NO pueden usar n() porque Paraguay esta en lat/lng NEGATIVAS
+// (lat ~-25, lng ~-57). n() exige x >= 0 y nuleaba ambas, por eso las
+// propiedades se guardaban sin ubicacion y el mapa de la ficha quedaba vacio.
+function coord(v: unknown, kind: "lat" | "lng"): number | null {
+  if (v == null || v === "") return null;
+  const x = Number(v);
+  if (!Number.isFinite(x)) return null;
+  const limit = kind === "lat" ? 90 : 180;
+  return Math.abs(x) <= limit ? x : null;
+}
 function i(v: unknown): number | null {
   const x = n(v);
   return x == null ? null : Math.trunc(x);
@@ -412,8 +422,8 @@ export async function POST(request: Request) {
           i(body.cocheras),
           n(body.superficie_m2),
           n(body.terreno_m2),
-          n(body.lat),
-          n(body.lng),
+          coord(body.lat, "lat"),
+          coord(body.lng, "lng"),
         ]
       );
       const propId = ins.rows[0].id;
