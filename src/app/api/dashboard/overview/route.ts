@@ -223,12 +223,18 @@ export async function GET(request: Request) {
     ]);
 
     // ── Construir ALERTAS ───────────────────────────────────────────────────
+    // A pedido del cliente: los items "accionables" (propiedades pendientes,
+    // solicitudes, reseñas, consultas) se muestran SIEMPRE — aunque el count
+    // sea 0 — mientras el módulo exista. Asi la franja "Atención requerida"
+    // queda permanente hasta que todo esté en 0 y de feedback claro de
+    // "no hay nada pendiente". Los items de infraestructura (vencimientos,
+    // pagos, stock) siguen apareciendo solo cuando hay algo concreto.
     const alertas: Alerta[] = [];
-    if (cSolAcceso > 0) alertas.push({ key: "solicitudes_acceso", label: "Solicitudes de acceso", count: cSolAcceso, severity: "warning", href: "/dashboard/solicitudes-acceso" });
-    if (cSolServ > 0) alertas.push({ key: "solicitudes_servicio", label: "Servicios pendientes", count: cSolServ, severity: "warning", href: "/dashboard/solicitudes-servicio" });
-    if (cResenas > 0) alertas.push({ key: "resenas_pendientes", label: "Reseñas a moderar", count: cResenas, severity: "info", href: "/dashboard/agente-resenas" });
-    if (cPropPend > 0) alertas.push({ key: "propiedades_pendientes", label: "Pendientes de aprobación", count: cPropPend, severity: "warning", href: "/dashboard/propiedades-pendientes" });
-    if (cConsultasPend > 0) alertas.push({ key: "consultas_sin_responder", label: "Consultas sin responder", count: cConsultasPend, severity: "warning", href: "/dashboard/propiedades" });
+    if (hasPropiedades) alertas.push({ key: "propiedades_pendientes", label: "Pendientes de aprobación", count: cPropPend as number, severity: (cPropPend as number) > 0 ? "warning" : "info", href: "/dashboard/propiedades-pendientes" });
+    if (hasSolAcceso) alertas.push({ key: "solicitudes_acceso", label: "Solicitudes de acceso", count: cSolAcceso as number, severity: (cSolAcceso as number) > 0 ? "warning" : "info", href: "/dashboard/solicitudes-acceso" });
+    if (hasSolServ) alertas.push({ key: "solicitudes_servicio", label: "Servicios pendientes", count: cSolServ as number, severity: (cSolServ as number) > 0 ? "warning" : "info", href: "/dashboard/solicitudes-servicio" });
+    if (hasResenas) alertas.push({ key: "resenas_pendientes", label: "Reseñas a moderar", count: cResenas as number, severity: "info", href: "/dashboard/agente-resenas" });
+    if (hasConsultasProp) alertas.push({ key: "consultas_sin_responder", label: "Consultas sin responder", count: cConsultasPend as number, severity: (cConsultasPend as number) > 0 ? "warning" : "info", href: "/dashboard/propiedades" });
     const vencidos = (cVencidosProp as number) + (cVencidosAg as number);
     const porVencer7 = (cVenc7Prop as number) + (cVenc7Ag as number);
     if (vencidos > 0) alertas.push({ key: "planes_vencidos", label: "Planes vencidos", count: vencidos, severity: "danger", href: "/dashboard/agentes-inmobiliarios" });
