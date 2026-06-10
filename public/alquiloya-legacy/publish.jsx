@@ -203,7 +203,7 @@ function PublishPage() {
               <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
                 Estás logueado, pero tu usuario no tiene perfil de agente ni de propietario
                 vinculado. Para publicar tenés que entrar con una cuenta de agente o
-                propietario, o pedirle al admin del ERP que vincule tu usuario a un perfil de publicador.
+                propietario activa.
               </p>
               <div className="row gap-12" style={{ justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
                 <a className="btn btn-primary" href="/portal-agentes/login">
