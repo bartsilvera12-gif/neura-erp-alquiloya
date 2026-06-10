@@ -311,6 +311,10 @@ function AdminAgentPage({ route, onNav }) {
   // Fase 9B: "Mis propiedades" desde API real. Probamos primero propietario (si la
   // sesion es propietaria devuelve sus inmuebles), si no agente.
   const [myPropiedades, setMyPropiedades] = React.useState(null);
+  // propsLoading: mientras es true mostramos skeleton, NO la data mock. Antes,
+  // durante la carga, propsForRender caia a PROPERTIES (seed) y el usuario veia
+  // un flash de propiedades ajenas/inventadas antes de que llegaran las suyas.
+  const [propsLoading, setPropsLoading] = React.useState(true);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -334,7 +338,9 @@ function AdminAgentPage({ route, onNav }) {
       }
       if (cancelled) return;
       if (!body || !body.success || !Array.isArray(body.propiedades)) {
-        // Sin sesion real: no marcar como cargado, dejar null → fallback preview.
+        // Sin sesion real: dejamos myPropiedades en null → fallback preview
+        // (solo demo). Marcamos loading=false para no quedar en skeleton.
+        setPropsLoading(false);
         return;
       }
       // Normalizar al shape consumido por las cards legacy (p.title/p.cover/p.price).
@@ -367,11 +373,16 @@ function AdminAgentPage({ route, onNav }) {
       }));
       // Marcamos como cargado AUNQUE este vacio. Empty array = "tengo sesion pero 0 propiedades".
       setMyPropiedades(mapped);
+      setPropsLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
-  // propsForRender: si terminó de cargar (array, incluso vacio) → usar real. Sino preview con PROPERTIES.
-  const propsForRender = Array.isArray(myPropiedades) ? myPropiedades : PROPERTIES;
+  // propsForRender:
+  //  - cargando        → [] (renderizamos skeleton, NUNCA el mock)
+  //  - cargado (array) → datos reales (aunque sea vacio)
+  //  - sin sesion/demo → PROPERTIES (preview)
+  const loadedProps = Array.isArray(myPropiedades);
+  const propsForRender = loadedProps ? myPropiedades : (propsLoading ? [] : PROPERTIES);
   // KPIs derivados de datos reales del ERP. Si no hay propiedades reales, mostramos guiones.
   const hasRealProps = Array.isArray(myPropiedades);
   const totalProps = hasRealProps ? myPropiedades.length : 0;
@@ -539,7 +550,7 @@ function AdminAgentPage({ route, onNav }) {
           <div className="row between" style={{ marginBottom: 12, alignItems: 'flex-end' }}>
             <div>
               <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16 }}>Mis propiedades</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>{propsForRender.length} publicada{propsForRender.length !== 1 ? 's' : ''} · {destacadasCount} destacada{destacadasCount !== 1 ? 's' : ''}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>{propsLoading ? 'Cargando…' : `${propsForRender.length} publicada${propsForRender.length !== 1 ? 's' : ''} · ${destacadasCount} destacada${destacadasCount !== 1 ? 's' : ''}`}</div>
             </div>
             <div style={{ display: 'inline-flex', gap: 4 }}>
               {[
@@ -560,7 +571,18 @@ function AdminAgentPage({ route, onNav }) {
 
           {/* Lista de propiedades — cards individuales, no tabla */}
           <div className="col gap-8">
-            {propsForRender.slice(0, 6).map((p, i) => {
+            {propsLoading ? (
+              // Skeleton mientras cargan los datos reales — evita el flash de mock.
+              [0,1,2].map(i => (
+                <div key={'sk'+i} className="card" style={{ padding: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 84, height: 64, borderRadius: 8, background: 'linear-gradient(90deg,#eef2f7,#f6f8fb,#eef2f7)', backgroundSize: '200% 100%', animation: 'fadeIn .4s', flexShrink: 0 }}/>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: 12, width: '55%', borderRadius: 6, background: '#eef2f7', marginBottom: 8 }}/>
+                    <div style={{ height: 10, width: '35%', borderRadius: 6, background: '#f0f3f7' }}/>
+                  </div>
+                </div>
+              ))
+            ) : propsForRender.slice(0, 6).map((p, i) => {
               // Si es real: pausada = estado 'pausada' o activo=false. Mock: índice 2 para demo.
               const isPaused = p._real
                 ? (p.estado === 'pausada' || p.activo === false)
