@@ -14,10 +14,16 @@ const DEFAULT_ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 const overviewTableExistsCache = new Map<string, boolean>();
 
 // Cache de la respuesta completa por tenant (la data es la misma para todos los
-// usuarios del mismo empresa_id). TTL 30s.
-type CachedOverview = { data: unknown; expiresAt: number; refreshing: boolean };
+// usuarios del mismo empresa_id). Stale-while-revalidate:
+//  - Dentro de FRESH_MS: devuelve cache instantaneo.
+//  - Entre FRESH_MS y STALE_MS: devuelve cache instantaneo Y refresca en background.
+//  - Despues de STALE_MS: regenera bloqueando (el siguiente usuario espera).
+// Esto elimina el "tarda mucho" despues del cold start: el primer usuario paga
+// el costo, los demas siempre ven data inmediata.
+type CachedOverview = { data: unknown; computedAt: number; refreshing: boolean };
 const overviewResponseCache = new Map<string, CachedOverview>();
-const OVERVIEW_FRESH_MS = 30_000;
+const OVERVIEW_FRESH_MS = 2 * 60_000;   // 2 min sin tocar Postgres
+const OVERVIEW_STALE_MS = 30 * 60_000;  // 30 min sirviendo stale + refresh background
 
 type Severity = "danger" | "warning" | "info";
 
@@ -77,23 +83,68 @@ export async function GET(request: Request) {
     const empresaId =
       process.env.NEURA_CLIENT_EMPRESA_ID?.trim() || DEFAULT_ALQUILOYA_EMPRESA_ID;
 
-    // ── Cache compartido por tenant ──────────────────────────────────────────
-    // La respuesta es la misma para todos los usuarios del mismo empresa_id, asi
-    // que un solo cache module-level sirve a todos. TTL 30s.
-    // Despues del TTL, el siguiente request regenera (1 hit costoso, luego 30s
-    // gratis para todos).
+    // ── Cache compartido por tenant (stale-while-revalidate) ────────────────
+    // La respuesta es la misma para todos los usuarios del mismo empresa_id,
+    // asi que un solo cache module-level sirve a todos. SWR:
+    //   - fresh (<2 min): cache instantaneo
+    //   - stale (<30 min): cache instantaneo + refresh en background
+    //   - expirado: regenera bloqueando
     const cacheKey = `${schema}:${empresaId}`;
     const now = Date.now();
     const cached = overviewResponseCache.get(cacheKey);
-    if (cached && now < cached.expiresAt) {
-      return NextResponse.json({ success: true, data: cached.data, cached: "fresh" });
-    }
 
     const sq = (t: string) => `"${schema}"."${t}"`;
 
+    // Funcion que recomputa el payload y lo guarda en cache. Se usa tanto en
+    // el path bloqueante (cache vacio o expirado) como en background (stale).
+    async function recompute(): Promise<unknown> {
+      const data = await computePayload();
+      overviewResponseCache.set(cacheKey, {
+        data,
+        computedAt: Date.now(),
+        refreshing: false,
+      });
+      return data;
+    }
+
+    // SWR: si hay cache fresco, responde ya; si esta stale, responde con el
+    // viejo y dispara refresh sin esperar.
+    if (cached) {
+      const age = now - cached.computedAt;
+      if (age < OVERVIEW_FRESH_MS) {
+        return NextResponse.json({ success: true, data: cached.data, cached: "fresh" });
+      }
+      if (age < OVERVIEW_STALE_MS) {
+        if (!cached.refreshing) {
+          cached.refreshing = true;
+          recompute().catch((e) => {
+            cached.refreshing = false;
+            console.error(
+              "[api/dashboard/overview swr-refresh]",
+              e instanceof Error ? e.message : e
+            );
+          });
+        }
+        return NextResponse.json({ success: true, data: cached.data, cached: "stale" });
+      }
+    }
+
+    // No hay cache (o esta demasiado viejo) — bloqueamos y computamos.
+    const payload = await computePayload();
+    overviewResponseCache.set(cacheKey, {
+      data: payload,
+      computedAt: Date.now(),
+      refreshing: false,
+    });
+    return NextResponse.json({ success: true, data: payload });
+
     // ──────────────────────────────────────────────────────────────────────────
+    // Heavy lifting — se evita cuando hay cache fresh/stale gracias a los
+    // returns de arriba. Definido despues para poder usar closures sobre pool,
+    // schema, empresaId, sq.
+    // ──────────────────────────────────────────────────────────────────────────
+    async function computePayload() {
     // Helpers tolerantes — nunca tiran, devuelven 0 / [] / false si falla.
-    // ──────────────────────────────────────────────────────────────────────────
     async function tableExists(name: string): Promise<boolean> {
       const cacheKey = `${schema}.${name}`;
       const cached = overviewTableExistsCache.get(cacheKey);
@@ -285,15 +336,8 @@ export async function GET(request: Request) {
       kpis,
       actividad: actividadFinal,
     };
-
-    // Guardamos en el cache para la proxima request.
-    overviewResponseCache.set(cacheKey, {
-      data: payload,
-      expiresAt: Date.now() + OVERVIEW_FRESH_MS,
-      refreshing: false,
-    });
-
-    return NextResponse.json({ success: true, data: payload });
+    return payload;
+    } // fin computePayload
   } catch (err) {
     console.error("[api/dashboard/overview]", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Error al cargar overview" }, { status: 500 });
