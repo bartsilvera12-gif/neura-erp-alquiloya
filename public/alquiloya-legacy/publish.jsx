@@ -90,6 +90,21 @@ function PublishPage() {
   });
   const setF = React.useCallback((patch) => setForm(f => Object.assign({}, f, typeof patch === 'function' ? patch(f) : patch)), []);
 
+  // Pre-llenar "Tus datos de contacto" con el perfil del publicador logueado
+  // (propietario o agente). Solo rellena campos que el usuario todavia no
+  // toco — si ya escribio algo, lo respetamos. Se dispara cuando termina de
+  // resolverse la sesion (ctxAgente / ctxPropietario).
+  React.useEffect(() => {
+    const perfil = ctxPropietario || ctxAgente;
+    if (!perfil) return;
+    setForm(f => ({
+      ...f,
+      propietario_nombre: f.propietario_nombre || perfil.nombre || '',
+      propietario_email: f.propietario_email || perfil.email || '',
+      propietario_telefono: f.propietario_telefono || perfil.telefono || perfil.whatsapp || '',
+    }));
+  }, [ctxAgente, ctxPropietario]);
+
   // Asesoría agente — opcional, no parte del wizard. Disponible vía card lateral.
   const [pickedAgentId, setPickedAgentId] = React.useState(null);
   const [asesoriaPropietario, setAsesoriaPropietario] = React.useState({
