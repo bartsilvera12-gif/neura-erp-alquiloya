@@ -1480,6 +1480,7 @@ function CaptarPropietarioModal({ onClose, onSaved }) {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          propietario_id: form.propietario_id || null,
           propietario_nombre: form.propietario_nombre.trim(),
           propietario_email: form.propietario_email.trim() || null,
           propietario_telefono: form.propietario_telefono.trim() || null,
@@ -1527,6 +1528,76 @@ function CaptarPropietarioModal({ onClose, onSaved }) {
         )}
 
         <div style={{ marginTop: 16, fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Propietario</div>
+
+        {/* Selector de propietario existente — antes que los campos manuales. */}
+        <div style={{ marginTop: 10, position: 'relative' }}>
+          <label style={lbl}>Buscar propietario existente</label>
+          {form.propietario_id ? (
+            <div className="row between" style={{ alignItems: 'center', padding: '10px 12px', borderRadius: 8, background: 'var(--blue-50)', border: '1px solid var(--blue-100)' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{form.propietario_nombre}</div>
+                <div className="muted xs" style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[form.propietario_email, form.propietario_telefono].filter(Boolean).join(' · ') || 'Sin contacto'}
+                </div>
+              </div>
+              <button type="button" onClick={clearExisting} style={{ background: 'transparent', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', marginLeft: 10, flexShrink: 0 }}>
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                style={inp}
+                placeholder="Escribí nombre, email o teléfono"
+                value={search}
+                onFocus={() => setSearchOpen(true)}
+                onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
+              />
+              {searchOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 5,
+                  background: '#fff', border: '1px solid var(--line)', borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(11,22,34,.10)', maxHeight: 260, overflowY: 'auto',
+                }}>
+                  {searchLoading ? (
+                    <div className="muted xs" style={{ padding: '12px 14px' }}>Buscando…</div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="muted xs" style={{ padding: '12px 14px' }}>
+                      No hay coincidencias. Cargá los datos abajo para crear uno nuevo.
+                    </div>
+                  ) : (
+                    searchResults.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => pickExisting(p)}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '10px 14px', background: 'transparent', border: 'none',
+                          borderBottom: '1px solid var(--line-2)', cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-2)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>{p.nombre || 'Sin nombre'}</div>
+                        <div className="muted xs" style={{ marginTop: 2 }}>
+                          {[p.email, p.telefono, p.ciudad].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                  <div style={{ padding: '8px 14px', borderTop: '1px solid var(--line-2)', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="muted xs">¿No está en la lista?</span>
+                    <button type="button" onClick={() => setSearchOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                      Cargá uno nuevo abajo →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         <div style={{ marginTop: 10 }}>
           <label style={lbl}>Nombre *</label>
           <input style={inp} value={form.propietario_nombre} onChange={e => set('propietario_nombre', e.target.value)} placeholder="Ej. María González" />
