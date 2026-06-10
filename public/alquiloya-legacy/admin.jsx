@@ -750,7 +750,7 @@ function AdminAgentPage({ route, onNav }) {
       </div>
       )}
 
-      {view === 'captures' && <CapturesSection/>}
+      {view === 'captures' && <CapturesSection onNav={onNav}/>}
 
       {view === 'blog' && <BlogSection/>}
 
@@ -1063,21 +1063,38 @@ function QueriesSection() {
   );
 }
 
-function CapturesSection() {
+function CapturesSection({ onNav }) {
   const [showAll, setShowAll] = React.useState(false);
-  // Captaciones reales del agente logueado (Fase 12A). Si no hay sesión o falla, fallback al mock.
+  // Captaciones reales del agente logueado (Fase 12A). Distinguimos 3 estados:
+  // - null      => cargando
+  // - []        => respuesta OK pero sin captaciones (agente nuevo) -> empty state
+  // - [c, c..]  => captaciones reales
+  // - 'mock'    => el endpoint falló O no hay sesión: caemos al mock SOLO en ese caso
   const [realCapt, setRealCapt] = React.useState(null);
   const [realErr, setRealErr] = React.useState(null);
   React.useEffect(() => {
     let cancelled = false;
     fetch('/api/agente/captaciones', { cache: 'no-store', credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(b => { if (cancelled) return; if (b && b.success && Array.isArray(b.captaciones)) setRealCapt(b.captaciones); })
-      .catch(e => { if (!cancelled) setRealErr((e && e.message) || 'error'); });
+      .then(r => {
+        if (cancelled) return null;
+        if (r.status === 401 || r.status === 403) { setRealCapt('mock'); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(b => {
+        if (cancelled) return;
+        if (!b) { if (realCapt === null) setRealCapt([]); return; }
+        if (b.success && Array.isArray(b.captaciones)) setRealCapt(b.captaciones);
+        else setRealCapt([]);
+      })
+      .catch(e => { if (!cancelled) { setRealErr((e && e.message) || 'error'); setRealCapt('mock'); } });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const isLoading = realCapt === null;
+  const useMock = realCapt === 'mock';
+  const realList = Array.isArray(realCapt) ? realCapt : [];
   // Si hay captaciones reales (sesion activa), las usamos. Sino mock de demo.
-  const realCaptMapped = (Array.isArray(realCapt) ? realCapt : []).map((r, i) => ({
+  const realCaptMapped = realList.map((r, i) => ({
     propertyId: r.propiedad_titulo ? (r.propiedad_titulo.length > 28 ? r.propiedad_titulo.slice(0, 28) + '…' : r.propiedad_titulo) : `CAPT-${i + 1}`,
     agentId: 'AG-REAL',
     date: (r.created_at || '').slice(0, 10).split('-').reverse().join('/'),
@@ -1094,10 +1111,14 @@ function CapturesSection() {
     _telefono: r.propietario_telefono,
   }));
   const hasRealCapt = realCaptMapped.length > 0;
-  const allCaptures = hasRealCapt ? realCaptMapped : CAPTURES.filter(c => c.agentId === 'AG-001');
+  // Solo caemos al mock si el fetch fallo (useMock). Si la respuesta vino vacia
+  // (agente nuevo sin captaciones), mostramos empty state — NO mock.
+  const allCaptures = hasRealCapt
+    ? realCaptMapped
+    : (useMock ? CAPTURES.filter(c => c.agentId === 'AG-001') : []);
   // Generate extra historical captures for the "historial completo" view
   const extras = React.useMemo(() => {
-    if (!showAll || hasRealCapt) return [];
+    if (!showAll || hasRealCapt || !useMock) return [];
     const owners = ['María L.', 'José P.', 'Andrés R.', 'Carolina V.', 'Tomás M.', 'Beatriz N.', 'Ricardo S.', 'Diana F.'];
     const dates = ['10/01/2026', '22/01/2026', '08/02/2026', '19/02/2026', '04/03/2026', '20/12/2025', '15/11/2025', '02/10/2025'];
     return owners.map((o, i) => ({
@@ -1110,7 +1131,7 @@ function CapturesSection() {
       commission: 120000 + (i * 9000),
       paid: true,
     }));
-  }, [showAll]);
+  }, [showAll, useMock]);
   const captures = showAll ? [...allCaptures, ...extras] : allCaptures;
   const gestionando = captures.filter(c => c.status === 'gestionando');
   const cerradas = captures.filter(c => c.status === 'cerrada');
@@ -1148,11 +1169,63 @@ function CapturesSection() {
           <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, marginTop: 4 }}>Propiedades que capté</div>
           <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Comisión {me.commissionRate}% solo si se concreta</div>
         </div>
-        <button onClick={() => setShowAll(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          {showAll ? 'Ver solo activas ←' : 'Historial completo →'}
-        </button>
+        {(hasRealCapt || useMock) && (
+          <button onClick={() => setShowAll(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {showAll ? 'Ver solo activas ←' : 'Historial completo →'}
+          </button>
+        )}
       </div>
 
+      {isLoading && (
+        <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          Cargando captaciones…
+        </div>
+      )}
+
+      {!isLoading && !hasRealCapt && !useMock && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '28px 24px 22px', textAlign: 'center', borderBottom: '1px solid var(--line-2)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--blue-50)', color: 'var(--blue)', display: 'grid', placeItems: 'center', margin: '0 auto 12px' }}>
+              <I.shield s={26}/>
+            </div>
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18 }}>Todavía no tenés captaciones</div>
+            <p className="muted" style={{ fontSize: 13.5, marginTop: 6, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
+              Acá vas a ver las propiedades que captes de propietarios. Cobrás {me.commissionRate}% del primer alquiler solo si la operación se concreta.
+            </p>
+          </div>
+
+          <div style={{ padding: '22px 24px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 14 }}>
+              Cómo captar una propiedad
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+              {[
+                { n: 1, t: 'Encontrá un propietario', d: 'Por contacto directo, referidos, o respondiendo solicitudes que llegan al ERP.' },
+                { n: 2, t: 'Cargá la propiedad', d: 'Desde "Cargar propiedad" subís fotos, datos y la asignás al propietario.' },
+                { n: 3, t: 'Gestioná las visitas', d: 'Recibís consultas por WhatsApp y coordinás con el propietario.' },
+                { n: 4, t: 'Cobrás la comisión', d: 'Cuando se concreta el alquiler/venta, marcás cerrada y se calcula tu comisión.' },
+              ].map(s => (
+                <div key={s.n} style={{ padding: 14, border: '1px solid var(--line-2)', borderRadius: 10, background: 'var(--bg-1)' }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>{s.n}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>{s.t}</div>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4, lineHeight: 1.45 }}>{s.d}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 22 }}>
+              <button onClick={() => onNav && onNav('publish')} style={{
+                background: 'var(--yellow)', color: 'var(--ink)', border: 'none',
+                padding: '10px 22px', borderRadius: 10, fontWeight: 700, fontSize: 13.5,
+                cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+                <I.plus s={14}/> Cargar primera propiedad captada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(hasRealCapt || useMock) && (<>
       {/* Tabla "Solicitudes recibidas" — oculta porque ahora la lista principal abajo usa los mismos datos reales */}
       {false && realCapt && realCapt.length > 0 && (
         <div className="card" style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
@@ -1298,6 +1371,7 @@ function CapturesSection() {
           );
         })}
       </div>
+      </>)}
     </div>
   );
 }
