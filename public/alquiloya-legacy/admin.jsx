@@ -424,17 +424,14 @@ function AdminAgentPage({ route, onNav }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
-        window.alert('¡Listo! Recibimos tu pedido. Te contactamos para coordinar el pago.');
-        setBuyOpen(false);
-        return;
+        return { ok: true };
       } catch (e) {
-        window.alert('No pudimos registrar la compra: ' + (e.message || 'error'));
-        return;
+        return { ok: false, error: e.message || 'error' };
       }
     }
     // Fallback (mock para preview).
     setImpulsesPaid(v => v + pack.qty);
-    setBuyOpen(false);
+    return { ok: true, mock: true };
   };
 
   // Reset scroll when changing section
@@ -1294,26 +1291,53 @@ function ImpulseBanner({ free, paid, freeMax, onBuy }) {
 }
 
 function BuyImpulsesModal({ onClose, onBuy }) {
+  const [busy, setBusy] = React.useState(false);
+  const [feedback, setFeedback] = React.useState(null); // { kind, text } | null
+  const handlePick = async (pack) => {
+    if (busy) return;
+    setBusy(true); setFeedback(null);
+    try {
+      const r = await onBuy(pack);
+      if (r && r.ok) {
+        setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu pedido por ' + pack.qty + ' impulso' + (pack.qty > 1 ? 's' : '') + '. Te contactamos por WhatsApp para coordinar el pago y activarlos en tu cuenta.' });
+      } else {
+        setFeedback({ kind: 'error', text: 'No pudimos registrar la compra. ' + ((r && r.error) || '') });
+      }
+    } catch (e) {
+      setFeedback({ kind: 'error', text: 'No pudimos registrar la compra. ' + (e.message || '') });
+    } finally { setBusy(false); }
+  };
   return (
-    <div onClick={onClose} style={{
+    <div onClick={busy ? undefined : onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 100,
       display: 'grid', placeItems: 'center', padding: 20
     }}>
       <div onClick={(e) => e.stopPropagation()} className="card" style={{
         padding: 28, maxWidth: 560, width: '100%', background: '#fff', position: 'relative'
       }}>
-        <button onClick={onClose} style={{
+        <button onClick={onClose} disabled={busy} style={{
           position: 'absolute', top: 14, right: 14, background: 'var(--bg-2)', border: 'none',
-          width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'grid', placeItems: 'center'
+          width: 32, height: 32, borderRadius: 8, cursor: busy ? 'default' : 'pointer', display: 'grid', placeItems: 'center', opacity: busy ? 0.5 : 1
         }}><I.x s={14}/></button>
+        {feedback && feedback.kind === 'success' ? (
+          <div style={{ textAlign: 'center', padding: '14px 4px 4px' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#dcfce7', color: '#15803d', display: 'grid', placeItems: 'center', margin: '0 auto 14px', fontSize: 28, fontWeight: 800 }}>✓</div>
+            <h3 style={{ fontSize: 20, margin: '0 0 8px' }}>Pedido recibido</h3>
+            <p className="muted" style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>{feedback.text}</p>
+            <button onClick={onClose} className="btn btn-primary" style={{ marginTop: 18, padding: '10px 22px' }}>Entendido</button>
+          </div>
+        ) : (<>
         <div className="tag" style={{ color: 'var(--yellow-600)' }}>Impulsos</div>
         <h3 style={{ fontSize: 22, marginTop: 6 }}>Comprar impulsos extra</h3>
         <p className="muted" style={{ fontSize: 13.5, marginTop: 6 }}>
           Cada impulso destaca 1 propiedad por 7 días. No tienen vencimiento.
         </p>
+        {feedback && feedback.kind === 'error' && (
+          <div style={{ marginTop: 14, padding: '10px 12px', background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13 }}>{feedback.text}</div>
+        )}
         <div className="col gap-10" style={{ marginTop: 18 }}>
           {IMPULSE_PACKS.map(pack => (
-            <button key={pack.id} onClick={() => onBuy(pack)} className="card" style={{
+            <button key={pack.id} onClick={() => handlePick(pack)} disabled={busy} className="card" style={{
               padding: 14, cursor: 'pointer', textAlign: 'left',
               border: pack.popular ? '2px solid var(--yellow)' : (pack.best ? '2px solid var(--blue)' : '1px solid var(--line)'),
               background: '#fff', position: 'relative'
@@ -1346,6 +1370,7 @@ function BuyImpulsesModal({ onClose, onBuy }) {
         <div className="muted xs" style={{ marginTop: 16, textAlign: 'center' }}>
           El pago se coordina por WhatsApp. Una vez confirmado, el equipo activa los impulsos en tu cuenta.
         </div>
+        </>)}
       </div>
     </div>
   );

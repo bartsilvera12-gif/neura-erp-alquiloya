@@ -20,8 +20,7 @@ const overviewTableExistsCache = new Map<string, boolean>();
 //  - Despues de STALE_MS: regenera bloqueando (el siguiente usuario espera).
 // Esto elimina el "tarda mucho" despues del cold start: el primer usuario paga
 // el costo, los demas siempre ven data inmediata.
-type CachedOverview = { data: unknown; computedAt: number; refreshing: boolean };
-const overviewResponseCache = new Map<string, CachedOverview>();
+import { overviewResponseCache, overviewCacheKey } from "@/lib/cache/dashboard-overview-cache";
 const OVERVIEW_FRESH_MS = 2 * 60_000;   // 2 min sin tocar Postgres
 const OVERVIEW_STALE_MS = 30 * 60_000;  // 30 min sirviendo stale + refresh background
 
@@ -89,7 +88,7 @@ export async function GET(request: Request) {
     //   - fresh (<2 min): cache instantaneo
     //   - stale (<30 min): cache instantaneo + refresh en background
     //   - expirado: regenera bloqueando
-    const cacheKey = `${schema}:${empresaId}`;
+    const cacheKey = overviewCacheKey(schema, empresaId);
     const now = Date.now();
     const cached = overviewResponseCache.get(cacheKey);
 

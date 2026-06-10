@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
+import { getClientSchema } from "@/lib/env/instance-mode";
+import { bustOverviewCache } from "@/lib/cache/dashboard-overview-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,6 +66,10 @@ export async function POST(
       if (!r.rows || r.rows.length === 0) {
         return NextResponse.json({ error: "no encontrada" }, { status: 404 });
       }
+      bustOverviewCache(
+        getClientSchema(),
+        process.env.NEURA_CLIENT_EMPRESA_ID?.trim() || ALQUILOYA_EMPRESA_ID
+      );
       return NextResponse.json({ success: true, id: r.rows[0].id, estado: "aprobada" });
     }
 
@@ -103,6 +109,10 @@ export async function POST(
     if (!r.rows || r.rows.length === 0) {
       return NextResponse.json({ error: "no encontrada" }, { status: 404 });
     }
+    bustOverviewCache(
+      getClientSchema(),
+      process.env.NEURA_CLIENT_EMPRESA_ID?.trim() || ALQUILOYA_EMPRESA_ID
+    );
     return NextResponse.json({ success: true, id: r.rows[0].id, estado: "rechazada" });
   } catch (err) {
     console.error("[api/dashboard/alquiloya-propiedades/[id]/moderacion]", err);
