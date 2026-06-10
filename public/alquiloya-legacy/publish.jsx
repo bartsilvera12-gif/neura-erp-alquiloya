@@ -864,22 +864,55 @@ function StepPhotos({ form, setF, isAgent }) {
     setF(f => ({ fotos: [...(f.fotos || []), { url, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
     setUrlNew('');
   }
-  function addFotoFiles(fileList) {
-    const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
-    if (files.length === 0) return;
-    files.forEach(file => {
-      if (file.size > 4 * 1024 * 1024) {
-        window.alert('"' + file.name + '" supera los 4MB. Comprimila o subila como URL.');
-        return;
-      }
+  // Comprime una imagen a max 1600px de lado mayor y la convierte a JPEG ~0.82.
+  // Mantiene calidad visual aceptable pero baja el peso ~10x (5MB → 300-500KB).
+  function compressImage(file, maxSide, quality) {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target && e.target.result;
-        if (typeof dataUrl !== 'string') return;
-        setF(f => ({ fotos: [...(f.fotos || []), { url: dataUrl, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
+        if (typeof dataUrl !== 'string') { reject(new Error('No se pudo leer el archivo')); return; }
+        const img = new Image();
+        img.onload = () => {
+          const w0 = img.naturalWidth || img.width;
+          const h0 = img.naturalHeight || img.height;
+          if (!w0 || !h0) { resolve(dataUrl); return; }
+          const scale = Math.min(1, maxSide / Math.max(w0, h0));
+          const w = Math.round(w0 * scale);
+          const h = Math.round(h0 * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(dataUrl); return; }
+          // Pintamos fondo blanco para PNGs con transparencia (al pasar a JPG queda negro).
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+          catch (err) { reject(err); }
+        };
+        img.onerror = () => resolve(dataUrl); // fallback: si no carga, mando el original
+        img.src = dataUrl;
       };
+      reader.onerror = () => reject(new Error('Error al leer'));
       reader.readAsDataURL(file);
     });
+  }
+  async function addFotoFiles(fileList) {
+    const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    for (const file of files) {
+      if (file.size > 12 * 1024 * 1024) {
+        window.alert('"' + file.name + '" supera los 12MB. Reducila antes de subir.');
+        continue;
+      }
+      try {
+        const dataUrl = await compressImage(file, 1600, 0.82);
+        setF(f => ({ fotos: [...(f.fotos || []), { url: dataUrl, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
+      } catch (err) {
+        window.alert('No se pudo procesar "' + file.name + '": ' + (err && err.message ? err.message : 'error'));
+      }
+    }
   }
   function removeFoto(idx) {
     setF(f => ({ fotos: (f.fotos || []).filter((_, i) => i !== idx) }));

@@ -29,16 +29,30 @@ const MAX_FOTOS = 20;
 const MAX_CARAC = 30;
 
 // Extrae la URL real cuando el campo viene como HTML embed (postimg, imgbb, etc.)
-function sanitizeImageUrl(v: unknown, max = 1024): string | null {
-  const raw = s(v, max);
-  if (!raw) return null;
-  if (!/[<>]/.test(raw)) return raw;
-  const img = raw.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
-  if (img?.[1]) return img[1].trim().slice(0, max);
-  const href = raw.match(/<a[^>]+href\s*=\s*["']([^"']+)["']/i);
-  if (href?.[1]) return href[1].trim().slice(0, max);
-  const url = raw.match(/https?:\/\/[^\s"'<>]+/i);
-  return url ? url[0].slice(0, max) : raw;
+// IMPORTANTE: los data: URLs (subida desde dispositivo) pueden pesar cientos de KB.
+// Si los truncamos a 1024 chars la imagen queda rota. Damos un cap muy alto para esos
+// (10 MB de base64 ≈ 7 MB de imagen, que ya es absurdamente grande) y mantenemos
+// el cap chico para URLs http/https normales.
+const DATA_URL_MAX = 10 * 1024 * 1024;
+function sanitizeImageUrl(v: unknown, max = 2048): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  // 1) data URL de imagen: pasa tal cual, sin truncar (con cap defensivo de 10MB).
+  if (/^data:image\//i.test(trimmed)) {
+    return trimmed.slice(0, DATA_URL_MAX);
+  }
+  // 2) HTML embed (postimg, imgbb): extraer la URL real.
+  if (/[<>]/.test(trimmed)) {
+    const img = trimmed.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+    if (img?.[1]) return img[1].trim().slice(0, max);
+    const href = trimmed.match(/<a[^>]+href\s*=\s*["']([^"']+)["']/i);
+    if (href?.[1]) return href[1].trim().slice(0, max);
+    const url = trimmed.match(/https?:\/\/[^\s"'<>]+/i);
+    return url ? url[0].slice(0, max) : trimmed.slice(0, max);
+  }
+  // 3) URL simple: respetar el cap normal.
+  return trimmed.slice(0, max);
 }
 function s(v: unknown, max = 1024): string | null {
   if (typeof v !== "string") return null;
