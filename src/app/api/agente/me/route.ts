@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
+import { extractPlanLimits } from "@/lib/alquiloya/plan-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,12 +50,51 @@ export async function GET(request: Request) {
       if (agenteId) {
         const { data: ag } = await supabase
           .from("agentes")
-          .select("id, nombre, email, telefono, whatsapp, foto_url, cargo, bio, orden, activo")
+          .select("id, nombre, email, telefono, whatsapp, foto_url, cargo, bio, orden, activo, plan_publicacion_id, plan_vencimiento_at")
           .eq("id", agenteId)
           .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
           .limit(1)
           .maybeSingle();
-        if (ag) agente = ag as Record<string, unknown>;
+        if (ag) {
+          agente = ag as Record<string, unknown>;
+          // Plan info + cuota: lee el plan asignado y cuenta propiedades activas
+          // del agente para que el panel publico sepa si puede publicar o no.
+          const planId = (ag as { plan_publicacion_id?: string | null }).plan_publicacion_id ?? null;
+          let plan: Record<string, unknown> | null = null;
+          let propiedadesActivas: number | null = null;
+          let limiteActivas: number | null = null;
+          let limiteFotos: number | null = null;
+          if (planId) {
+            const { data: pl } = await supabase
+              .from("planes_publicacion")
+              .select("id, tier, nombre, billing, bullets, activo")
+              .eq("id", planId)
+              .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+              .limit(1)
+              .maybeSingle();
+            if (pl) {
+              plan = pl as Record<string, unknown>;
+              const limits = extractPlanLimits((pl as { bullets?: unknown }).bullets);
+              limiteActivas = limits.propiedadesActivas;
+              limiteFotos = limits.fotosPorInmueble;
+            }
+          }
+          const { count } = await supabase
+            .from("propiedades")
+            .select("id", { count: "exact", head: true })
+            .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+            .eq("agente_id", agenteId)
+            .eq("activo", true)
+            .eq("visible_web", true);
+          propiedadesActivas = typeof count === "number" ? count : 0;
+          (agente as Record<string, unknown>).plan = plan;
+          (agente as Record<string, unknown>).propiedades_activas = propiedadesActivas;
+          (agente as Record<string, unknown>).plan_limite_activas = limiteActivas;
+          (agente as Record<string, unknown>).plan_limite_fotos = limiteFotos;
+          (agente as Record<string, unknown>).puede_publicar =
+            !!plan &&
+            (limiteActivas == null || (propiedadesActivas ?? 0) < limiteActivas);
+        }
       }
     }
 

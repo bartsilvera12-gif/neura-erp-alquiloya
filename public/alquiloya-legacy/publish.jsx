@@ -267,12 +267,52 @@ function PublishPage() {
     );
   }
 
+  // Gating de plan SOLO para agentes: sin plan -> no puede publicar.
+  // Con plan pero alcanzo la cuota -> tampoco puede.
+  if (ctxAgente && (!ctxAgente.plan_publicacion_id || ctxAgente.puede_publicar === false)) {
+    const sinPlan = !ctxAgente.plan_publicacion_id;
+    const limite = ctxAgente.plan_limite_activas;
+    const usadas = ctxAgente.propiedades_activas;
+    return (
+      <div className="fade-in container" style={{ padding: '32px' }}>
+        <div className="card" style={{ maxWidth: 600, margin: '48px auto', padding: 36, textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px', background: 'rgba(248,178,18,0.12)', color: 'var(--yellow-600)', display: 'grid', placeItems: 'center' }}>
+            <I.bolt s={28}/>
+          </div>
+          <div className="tag" style={{ justifyContent: 'center' }}>Publicar inmueble</div>
+          {sinPlan ? (<>
+            <h2 style={{ marginTop: 8, fontSize: 26 }}>Necesitás un plan activo</h2>
+            <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              Para publicar como agente tenés que elegir un plan. Cada plan define cuántas propiedades podés tener activas al mismo tiempo y cuántas fotos por inmueble.
+            </p>
+          </>) : (<>
+            <h2 style={{ marginTop: 8, fontSize: 26 }}>Llegaste al límite de tu plan</h2>
+            <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              Tu plan permite hasta <strong>{limite}</strong> propiedades activas y ya tenés <strong>{usadas}</strong>. Pausá una propiedad o cambiá a un plan superior para seguir publicando.
+            </p>
+          </>)}
+          <div className="row gap-12" style={{ justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
+            <a className="btn btn-primary" href="#plans"><I.star s={16}/> {sinPlan ? 'Ver planes' : 'Cambiar de plan'}</a>
+            {!sinPlan && (
+              <a className="btn btn-outline" href="#admin-agent-properties">Ver mis propiedades</a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-in container" style={{ padding: '32px' }}>
       <div className="row between">
         <div>
           <div className="tag">Publicar inmueble</div>
           <h2 style={{ marginTop: 6, fontSize: 30 }}>Cargá tu propiedad en 5 pasos</h2>
+          {ctxAgente && ctxAgente.plan_limite_activas != null && (
+            <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+              Plan {(ctxAgente.plan && ctxAgente.plan.nombre) || ''} · {ctxAgente.propiedades_activas}/{ctxAgente.plan_limite_activas} propiedades activas
+            </div>
+          )}
         </div>
         <button className="btn btn-outline">Guardar borrador</button>
       </div>

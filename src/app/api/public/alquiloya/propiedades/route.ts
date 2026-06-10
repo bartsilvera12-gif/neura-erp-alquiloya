@@ -5,6 +5,7 @@ import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
+import { extractPlanLimits } from "@/lib/alquiloya/plan-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -178,11 +179,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Path agente: validar que el agente este activo y plan no vencido.
+    // Path agente: validar que el agente este activo, con plan asignado y
+    // sin haber agotado la cuota de propiedades activas.
     if (agenteId) {
       const { data: agRow } = await supabase
         .from("agentes")
-        .select("id, activo, plan_vencimiento_at")
+        .select("id, activo, plan_publicacion_id, plan_vencimiento_at")
         .eq("id", agenteId)
         .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
         .limit(1)
@@ -193,12 +195,50 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
+      const planId = (agRow as { plan_publicacion_id?: string | null }).plan_publicacion_id ?? null;
+      if (!planId) {
+        return NextResponse.json(
+          { error: "Necesitas un plan activo para publicar. Elegi un plan desde tu panel.", code: "sin_plan" },
+          { status: 402 }
+        );
+      }
       const venc = (agRow as { plan_vencimiento_at?: string | null }).plan_vencimiento_at ?? null;
       if (venc && new Date(venc).getTime() < Date.now()) {
         return NextResponse.json(
-          { error: "Tu plan esta vencido. Renovalo para volver a publicar." },
+          { error: "Tu plan esta vencido. Renovalo para volver a publicar.", code: "plan_vencido" },
           { status: 402 }
         );
+      }
+      // Cuota: leemos el bullet "N propiedades activas" del plan y contamos
+      // las propiedades visibles del agente. Si alcanzo el limite, bloquea.
+      const { data: planRow } = await supabase
+        .from("planes_publicacion")
+        .select("bullets")
+        .eq("id", planId)
+        .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+        .limit(1)
+        .maybeSingle();
+      const limits = extractPlanLimits((planRow as { bullets?: unknown } | null)?.bullets);
+      if (limits.propiedadesActivas != null) {
+        const { count: activeCount } = await supabase
+          .from("propiedades")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
+          .eq("agente_id", agenteId)
+          .eq("activo", true)
+          .eq("visible_web", true);
+        const used = typeof activeCount === "number" ? activeCount : 0;
+        if (used >= limits.propiedadesActivas) {
+          return NextResponse.json(
+            {
+              error: `Llegaste al limite de tu plan (${used}/${limits.propiedadesActivas} propiedades activas). Pausa una propiedad o pasa a un plan superior.`,
+              code: "limite_alcanzado",
+              activas: used,
+              limite: limits.propiedadesActivas,
+            },
+            { status: 402 }
+          );
+        }
       }
     } else {
       // Path propietario: validar que el propietario este activo.
