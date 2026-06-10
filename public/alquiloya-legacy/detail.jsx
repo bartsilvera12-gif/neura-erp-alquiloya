@@ -42,8 +42,40 @@ function DetailPage({ p, onProperty, onNav }) {
   );
 }
 
+// Helpers de acciones compartidas por la ficha (Compartir / Guardar / Imprimir).
+function _savedKey() { return 'alquiloya_guardados'; }
+function _getSaved() {
+  try { return JSON.parse(localStorage.getItem(_savedKey()) || '[]'); } catch { return []; }
+}
+function _isSaved(id) { return id ? _getSaved().includes(String(id)) : false; }
+function _toggleSaved(id) {
+  if (!id) return false;
+  const cur = _getSaved();
+  const sid = String(id);
+  const next = cur.includes(sid) ? cur.filter(x => x !== sid) : [...cur, sid];
+  try { localStorage.setItem(_savedKey(), JSON.stringify(next)); } catch {}
+  return next.includes(sid);
+}
+async function _sharePropiedad(property) {
+  const url = window.location.href;
+  const title = (property && property.title) || 'Propiedad en AlquiloYa';
+  const text = title + (property && property.address ? ' — ' + property.address : '');
+  // Web Share API (mobile y navegadores modernos). Fallback: copiar al portapapeles.
+  if (navigator.share) {
+    try { await navigator.share({ title, text, url }); return; } catch { /* cancelado */ return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    window.alert('Enlace copiado al portapapeles. ¡Compartilo donde quieras!');
+  } catch {
+    window.prompt('Copiá el enlace de la propiedad:', url);
+  }
+}
+
 function Gallery({ photos = [], active, setActive, property }) {
   const [openFull, setOpenFull] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  React.useEffect(() => { setSaved(_isSaved(property && (property.apiId || property.id))); }, [property]);
   const real = (Array.isArray(photos) ? photos : []).filter(Boolean);
   const totalExtra = Math.max(0, real.length - 5);
   return (
@@ -68,9 +100,16 @@ function Gallery({ photos = [], active, setActive, property }) {
       </div>
       <div className="row between" style={{ marginTop: 12 }}>
         <div className="row gap-8">
-          <button className="btn btn-outline btn-sm"><I.share s={14}/> Compartir</button>
-          <button className="btn btn-outline btn-sm"><I.heart s={14}/> Guardar</button>
-          <button className="btn btn-outline btn-sm"><I.print s={14}/> Imprimir ficha</button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => _sharePropiedad(property)}><I.share s={14}/> Compartir</button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setSaved(_toggleSaved(property && (property.apiId || property.id)))}
+            style={saved ? { borderColor: 'var(--blue)', color: 'var(--blue)', background: 'var(--blue-50)' } : undefined}
+          >
+            <I.heart s={14}/> {saved ? 'Guardado' : 'Guardar'}
+          </button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => window.print()}><I.print s={14}/> Imprimir ficha</button>
         </div>
         <button onClick={() => setOpenFull(true)} className="btn btn-outline btn-sm">Ver galería completa <I.arrow s={14}/></button>
       </div>
