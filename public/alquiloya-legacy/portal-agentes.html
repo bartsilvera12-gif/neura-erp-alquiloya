@@ -211,11 +211,6 @@
         <div class="field">
           <label for="sol-telefono">Teléfono / WhatsApp *</label>
           <input id="sol-telefono" type="tel" maxlength="40" required placeholder="+595 9XX XXX XXX" />
-          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:#5b6573;cursor:pointer">
-            <input id="sol-tiene-wa" type="checkbox" checked style="width:16px;height:16px;accent-color:#0058A5" />
-            Este número tiene WhatsApp activo
-          </label>
-          <div style="font-size:12px;color:#8893a1;margin-top:4px">Te enviaremos el acceso por WhatsApp. Si no tenés WhatsApp, destildá la casilla y te lo mandamos al email.</div>
         </div>
         <div class="field" id="field-empresa" style="display:none">
           <label for="sol-empresa">Inmobiliaria / Razón social</label>
@@ -291,18 +286,14 @@
         var nombre = document.getElementById('sol-nombre').value.trim();
         var email = document.getElementById('sol-email').value.trim();
         var telefono = document.getElementById('sol-telefono').value.trim();
-        var tieneWa = document.getElementById('sol-tiene-wa').checked;
         var empresa = document.getElementById('sol-empresa').value.trim();
         var ciudad = document.getElementById('sol-ciudad').value.trim();
         var mensaje = document.getElementById('sol-mensaje').value.trim();
         var subTipo = tipo === 'agente' ? document.getElementById('sol-subtipo').value : null;
 
         if (!nombre) { feedback.className = 'feedback error'; feedback.textContent = 'Ingresá tu nombre.'; return; }
-        // Telefono OBLIGATORIO: por ahi te mandamos el acceso. Si no tiene
-        // WhatsApp activo, exigimos email para poder enviarlo por correo.
         var telDigits = telefono.replace(/\D/g, '');
-        if (telDigits.length < 7) { feedback.className = 'feedback error'; feedback.textContent = 'El teléfono es obligatorio (te enviamos el acceso ahí).'; return; }
-        if (!tieneWa && !email) { feedback.className = 'feedback error'; feedback.textContent = 'Como tu número no tiene WhatsApp, necesitamos un email para enviarte el acceso.'; return; }
+        if (telDigits.length < 7) { feedback.className = 'feedback error'; feedback.textContent = 'El teléfono es obligatorio.'; return; }
 
         submitBtn.disabled = true;
         submitBtn.textContent = 'Enviando…';
@@ -310,7 +301,7 @@
           var res = await fetch('/api/public/alquiloya/solicitudes-acceso', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tipo: tipo, sub_tipo: subTipo, nombre: nombre, email: email || null, telefono: telefono || null, tiene_whatsapp: tieneWa, empresa: empresa || null, ciudad: ciudad || null, mensaje: mensaje || null })
+            body: JSON.stringify({ tipo: tipo, sub_tipo: subTipo, nombre: nombre, email: email || null, telefono: telefono || null, empresa: empresa || null, ciudad: ciudad || null, mensaje: mensaje || null })
           });
           var data = await res.json().catch(function () { return {}; });
           if (!res.ok || !data || data.success === false) {
