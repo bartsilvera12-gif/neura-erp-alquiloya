@@ -1188,7 +1188,7 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
-      setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu solicitud. Te contactamos en breve.' });
+      setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.' });
       setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
     } catch (err) {
       setFeedback({ kind: 'error', text: 'No pudimos registrar tu solicitud. ' + (err.message || '') });

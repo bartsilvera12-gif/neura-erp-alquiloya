@@ -78,7 +78,7 @@ export default function SolicitudesAccesoClient({
   // Modal de credenciales creadas: muestra email + contraseña + botones para
   // enviarlas por WhatsApp (o email si no tiene WhatsApp).
   const [creds, setCreds] = useState<
-    | { email: string; tempPassword: string; nombre: string; telefono: string | null }
+    | { email: string; tempPassword: string; nombre: string; telefono: string | null; emailSent: boolean }
     | null
   >(null);
 
@@ -162,13 +162,21 @@ export default function SolicitudesAccesoClient({
         resultado_id?: string | null;
         error?: string;
         portal_credentials?: { email: string; tempPassword: string } | null;
+        email_sent?: boolean;
+        email_error?: string | null;
       };
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
       if (action === "aprobar" && data.portal_credentials) {
         const { email, tempPassword } = data.portal_credentials;
         // Modal propio con botones "Enviar por WhatsApp / Email". Reemplaza al
         // confirmDialog generico para poder mandar el acceso al solicitante.
-        setCreds({ email, tempPassword, nombre: row.nombre, telefono: row.telefono ?? null });
+        setCreds({
+          email,
+          tempPassword,
+          nombre: row.nombre,
+          telefono: row.telefono ?? null,
+          emailSent: !!data.email_sent,
+        });
       }
       setRows((prev) =>
         prev.map((r) =>
@@ -492,7 +500,7 @@ function waNum(raw: string | null): string | null {
 function CredencialesModal({
   creds, onClose,
 }: {
-  creds: { email: string; tempPassword: string; nombre: string; telefono: string | null };
+  creds: { email: string; tempPassword: string; nombre: string; telefono: string | null; emailSent: boolean };
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -524,6 +532,16 @@ function CredencialesModal({
         <p className="mt-1 text-center text-sm text-slate-500">
           Enviale el acceso a <strong>{creds.nombre}</strong>. La contraseña no se vuelve a mostrar.
         </p>
+
+        {creds.emailSent ? (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            ✉ Le enviamos un correo a <strong>{creds.email}</strong> con un link para que se establezca su contraseña. Igual te dejamos los datos abajo por si querés mandarlos manualmente.
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            ⚠ No pudimos enviar el correo automático (SMTP no configurado en Supabase). Compartile los datos por WhatsApp o email manualmente.
+          </div>
+        )}
 
         <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
           <div className="flex justify-between gap-2"><span className="text-slate-500">Email</span><span className="font-medium text-slate-800 break-all">{creds.email}</span></div>

@@ -317,7 +317,7 @@
             throw new Error((data && (data.error || (data.data && data.data.error))) || ('HTTP ' + res.status));
           }
           feedback.className = 'feedback success';
-          feedback.textContent = '¡Listo! Recibimos tu solicitud. Te vamos a contactar en breve.';
+          feedback.textContent = '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.';
           form.reset();
         } catch (err) {
           feedback.className = 'feedback error';

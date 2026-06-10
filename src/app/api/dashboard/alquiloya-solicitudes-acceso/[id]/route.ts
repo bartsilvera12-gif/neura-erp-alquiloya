@@ -249,6 +249,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
       // Crear auth.users + alquiloya.usuarios (con propietario_id/agente_id) si hay email.
       // Si no hay email no podemos crear cuenta -> queda solo el registro y se completa manual.
       let portalCredentials: { email: string; tempPassword: string } | null = null;
+      let emailSent = false; // true si pudimos disparar el correo automatico via Supabase Auth
+      let emailError: string | null = null;
       let usuarioErpId: string | null = null;
       if (sol.email) {
         try {
@@ -319,6 +321,35 @@ export async function PATCH(request: Request, ctx: Ctx) {
           }
 
           portalCredentials = { email: sol.email, tempPassword };
+
+          // Disparar correo automatico al usuario con un link para establecer/resetear
+          // su contraseña. Si Supabase tiene SMTP configurado (default o custom), envia
+          // el email. Si no, queda registrado el link en data.properties.action_link
+          // y el admin puede compartir la tempPassword manualmente.
+          try {
+            const portalUrl =
+              sol.tipo === "referido_partner"
+                ? "/portal-referidos/login"
+                : "/portal-agentes/login";
+            const origin = new URL(request.url).origin;
+            const { error: linkErr } = await supabase.auth.admin.generateLink({
+              type: "recovery",
+              email: sol.email,
+              options: { redirectTo: `${origin}${portalUrl}` },
+            });
+            if (linkErr) {
+              emailError = linkErr.message;
+              console.warn(
+                "[solicitudes-acceso] generateLink falló (¿SMTP configurado?):",
+                linkErr.message
+              );
+            } else {
+              emailSent = true;
+            }
+          } catch (e) {
+            emailError = e instanceof Error ? e.message : "Error generando link";
+            console.warn("[solicitudes-acceso] no se pudo enviar email:", emailError);
+          }
         } catch (e) {
           // Best-effort: si falla, no abortamos la aprobacion. Se puede crear manualmente despues.
           console.warn("[solicitudes-acceso] no se pudo crear auth user:", e instanceof Error ? e.message : e);
@@ -342,6 +373,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
         resultado_id: resultadoId,
         tipo: sol.tipo,
         portal_credentials: portalCredentials, // {email, tempPassword} | null
+        email_sent: emailSent,
+        email_error: emailError,
         usuario_erp_id: usuarioErpId,
       });
     } catch (e) {
