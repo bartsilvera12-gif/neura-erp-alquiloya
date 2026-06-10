@@ -713,7 +713,7 @@ function StepLocation({ form, setF }) {
     <div>
       <div className="tag">Paso 2</div>
       <h3 style={{ fontSize: 22, marginTop: 6 }}>¿Dónde se encuentra tu inmueble?</h3>
-      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>La ubicación exacta solo se compartirá cuando coordines una visita.</p>
+      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>Tu dirección escrita queda privada. El punto en el mapa sí se muestra al público para que vean la zona.</p>
       <div style={{ marginTop: 24 }}>
         <FormGrid>
           <div className="field"><label>Ciudad *</label><input className="input" value={form.ciudad} onChange={(e) => setF({ ciudad: e.target.value })} placeholder="Ej. Asunción"/></div>
@@ -724,8 +724,8 @@ function StepLocation({ form, setF }) {
           <input className="input" value={form.direccion} onChange={(e) => setF({ direccion: e.target.value })} placeholder="Ej. Mariscal López casi Capitán Brizuela"/>
         </div>
         <div className="field" style={{ marginTop: 18 }}>
-          <label>Punto en el mapa</label>
-          <div className="muted xs" style={{ marginBottom: 6 }}>Clic en el mapa para fijar la ubicación exacta. Podés arrastrar el pin.</div>
+          <label>Punto en el mapa (visible al público)</label>
+          <div className="muted xs" style={{ marginBottom: 6 }}>Clic en el mapa para fijar la ubicación exacta. Podés arrastrar el pin. Este punto se muestra en la publicación.</div>
           <LeafletPickerWidget
             lat={form.lat}
             lng={form.lng}
