@@ -30,6 +30,10 @@ const TIPOS_OK = new Set([
   "salon_comercial", "alquiler_temporal",
 ]);
 const OPERACIONES_OK = new Set(["alquiler", "venta"]);
+// Estados que el dueno puede setear desde el panel. "aprobada"/"rechazada"
+// quedan reservados al admin global. "alquilada"/"reservada" sacan la propiedad
+// del listado publico (visible_web=false) pero NO la borran.
+const ESTADOS_USUARIO_OK = new Set(["pausada", "activa", "alquilada", "reservada"]);
 
 function s(v: unknown, max = 1024): string | null | undefined {
   if (v === undefined) return undefined;
@@ -178,6 +182,24 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     const pubDias = i(body.publicacion_dias);
     if (pubDias !== undefined) push("publicacion_dias", pubDias);
 
+    // Cambios de estado y visibilidad desde el panel del dueno.
+    if (body.estado !== undefined) {
+      const est = s(body.estado, 30);
+      if (!est || !ESTADOS_USUARIO_OK.has(est)) {
+        return NextResponse.json({ error: "Estado invalido" }, { status: 400 });
+      }
+      push("estado", est);
+      // Reglas de visibilidad asociadas: activa => visible y activo. Las demas
+      // (pausada/alquilada/reservada) salen del listado publico pero siguen
+      // existiendo para que el dueno las vea y pueda reactivar.
+      if (est === "activa") {
+        push("visible_web", true);
+        push("activo", true);
+      } else {
+        push("visible_web", false);
+      }
+    }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -252,6 +274,71 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     }
   } catch (err) {
     console.error("[api/public/alquiloya/propiedades/[id] PATCH]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error" },
+      { status: 500 }
+    );
+  }
+}
+
+// ── DELETE — soft-delete del dueno ──────────────────────────────────────────
+// No borramos la fila: marcamos activo=false + visible_web=false. Asi queda
+// auditable y reversible desde el admin global si el usuario se arrepiente.
+export async function DELETE(request: Request, ctx: RouteCtx) {
+  try {
+    const { id } = await ctx.params;
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: "id invalido" }, { status: 400 });
+    }
+    const authUser = await getAuthUserForApiRoute(request);
+    if (!authUser?.id) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const supabase = createServiceRoleClient();
+    const usuarioErp = await resolveUsuarioErpFromAuthUser(supabase, authUser);
+    if (!usuarioErp || usuarioErp.empresa_id !== ALQUILOYA_EMPRESA_ID) {
+      return NextResponse.json({ error: "Usuario no autorizado" }, { status: 403 });
+    }
+    const { data: uExt } = await supabase
+      .from("usuarios")
+      .select("agente_id, propietario_id")
+      .eq("id", usuarioErp.id)
+      .limit(1)
+      .maybeSingle();
+    const userAgenteId = (uExt as { agente_id?: string | null } | null)?.agente_id ?? null;
+    const userPropietarioId = (uExt as { propietario_id?: string | null } | null)?.propietario_id ?? null;
+    if (!userAgenteId && !userPropietarioId) {
+      return NextResponse.json({ error: "Sin perfil de publicador" }, { status: 403 });
+    }
+
+    const pool = getChatPostgresPool();
+    if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+
+    const own = await pool.query<{ propietario_id: string | null; agente_id: string | null }>(
+      `SELECT propietario_id::text AS propietario_id, agente_id::text AS agente_id
+         FROM "alquiloya"."propiedades"
+        WHERE empresa_id=$1::uuid AND id=$2::uuid LIMIT 1`,
+      [ALQUILOYA_EMPRESA_ID, id]
+    );
+    if (own.rows.length === 0) {
+      return NextResponse.json({ error: "no encontrada" }, { status: 404 });
+    }
+    const owns =
+      (userPropietarioId && own.rows[0].propietario_id === userPropietarioId) ||
+      (userAgenteId && own.rows[0].agente_id === userAgenteId);
+    if (!owns) {
+      return NextResponse.json({ error: "No podes borrar esta propiedad" }, { status: 403 });
+    }
+
+    await pool.query(
+      `UPDATE "alquiloya"."propiedades"
+          SET activo = false, visible_web = false, updated_at = now()
+        WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+      [ALQUILOYA_EMPRESA_ID, id]
+    );
+    return NextResponse.json({ success: true, id, message: "Propiedad eliminada." });
+  } catch (err) {
+    console.error("[api/public/alquiloya/propiedades/[id] DELETE]", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Error" },
       { status: 500 }

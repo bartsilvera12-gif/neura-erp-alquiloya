@@ -116,9 +116,9 @@ function PublishPage() {
           cache: 'no-store', credentials: 'include',
         });
         const body = await r.json().catch(() => ({}));
-        if (!r.ok || !body?.success || !body?.data) throw new Error(body?.error || ('HTTP ' + r.status));
+        if (!r.ok || !body?.success || !body?.data?.propiedad) throw new Error(body?.error || ('HTTP ' + r.status));
         if (cancelled) return;
-        const p = body.data;
+        const p = body.data.propiedad;
         setForm(f => ({
           ...f,
           titulo: p.titulo || '',

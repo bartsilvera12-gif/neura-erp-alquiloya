@@ -671,13 +671,21 @@ function AdminAgentPage({ route, onNav }) {
                 </div>
               ))
             ) : propsForRender.slice(0, 6).map((p, i) => {
-              // Si es real: pausada = estado 'pausada' o activo=false. Mock: índice 2 para demo.
+              // Estado normalizado para badges + selector. Mock: índice 2 = pausada.
+              const estadoLc = String(p.estado || '').toLowerCase();
+              const isAlquilada = p._real && estadoLc === 'alquilada';
+              const isReservada = p._real && estadoLc === 'reservada';
               const isPaused = p._real
-                ? (p.estado === 'pausada' || p.activo === false)
+                ? (estadoLc === 'pausada' || p.activo === false)
                 : (i === 2);
               const isBoosted = !!boostedIds[p.id] || !!p.destacada;
               const status = isPaused ? 'paused' : 'active';
               if (propFilter !== 'all' && propFilter !== status) return null;
+              const currentEstadoOption = isAlquilada
+                ? 'alquilada'
+                : isReservada
+                  ? 'reservada'
+                  : isPaused ? 'pausada' : 'activa';
               // Banner plan gratis: aviso si quedan <=7 dias o ya vencio.
               const showPlanGratisWarning = p._real && p.plan_es_gratis && !p.plan_gratis_expirado
                 && typeof p.plan_gratis_dias_restantes === 'number'
@@ -742,11 +750,15 @@ function AdminAgentPage({ route, onNav }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="row gap-8" style={{ alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{p.title}</span>
-                      {isPaused
-                        ? <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--bg-3)', color: 'var(--ink-3)', fontSize: 9.5, fontWeight: 600 }}>Pausada</span>
-                        : isBoosted
-                          ? <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--yellow)', color: 'var(--ink)', fontSize: 9.5, fontWeight: 700 }}>Destacada</span>
-                          : <span style={{ padding: '1px 7px', borderRadius: 999, background: '#eaf6f0', color: 'var(--green)', fontSize: 9.5, fontWeight: 600 }}>Activa</span>}
+                      {isAlquilada
+                        ? <span style={{ padding: '1px 7px', borderRadius: 999, background: '#e8eef9', color: 'var(--blue)', fontSize: 9.5, fontWeight: 600 }}>Alquilada</span>
+                        : isReservada
+                          ? <span style={{ padding: '1px 7px', borderRadius: 999, background: '#fff4e0', color: 'var(--yellow-600)', fontSize: 9.5, fontWeight: 600 }}>Reservada</span>
+                          : isPaused
+                            ? <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--bg-3)', color: 'var(--ink-3)', fontSize: 9.5, fontWeight: 600 }}>Pausada</span>
+                            : isBoosted
+                              ? <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--yellow)', color: 'var(--ink)', fontSize: 9.5, fontWeight: 700 }}>Destacada</span>
+                              : <span style={{ padding: '1px 7px', borderRadius: 999, background: '#eaf6f0', color: 'var(--green)', fontSize: 9.5, fontWeight: 600 }}>Activa</span>}
                       {verifiedIds[p.id] && <span style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--blue-50)', color: 'var(--blue)', fontSize: 9.5, fontWeight: 600 }}>✓ Verificada</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
@@ -782,6 +794,45 @@ function AdminAgentPage({ route, onNav }) {
                     <button onClick={() => onNav && onNav('admin-agent-qr')} title="Ver cartel QR" style={{ padding: 0, width: 28, height: 28, borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                       <I.qr s={13}/>
                     </button>
+                    {/* Cambiar estado: PATCH /propiedades/:id { estado }. */}
+                    {p._real && (
+                      <select
+                        value={currentEstadoOption}
+                        onChange={async (e) => {
+                          const nuevo = e.target.value;
+                          if (nuevo === currentEstadoOption) return;
+                          try {
+                            const r = await fetch('/api/public/alquiloya/propiedades/' + encodeURIComponent(p.apiId || p.id), {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              credentials: 'include',
+                              body: JSON.stringify({ estado: nuevo }),
+                            });
+                            const b = await r.json().catch(() => ({}));
+                            if (!r.ok || !b?.success) throw new Error(b?.error || ('HTTP ' + r.status));
+                            if (window.ayToast) window.ayToast('Estado actualizado.', { variant: 'success', duration: 3500 });
+                            setMyPropiedades(prev => Array.isArray(prev)
+                              ? prev.map(x => x.id === p.id
+                                  ? Object.assign({}, x, { estado: nuevo, activo: nuevo === 'activa', visible_web: nuevo === 'activa' })
+                                  : x)
+                              : prev);
+                          } catch (err) {
+                            if (window.ayToast) window.ayToast('No se pudo cambiar el estado.', { variant: 'error' });
+                          }
+                        }}
+                        title="Cambiar estado"
+                        style={{
+                          height: 28, borderRadius: 8, padding: '0 8px',
+                          border: '1px solid var(--line)', background: '#fff',
+                          color: 'var(--ink-2)', fontSize: 12, fontWeight: 600,
+                          fontFamily: 'inherit', cursor: 'pointer',
+                        }}>
+                        <option value="activa">Activa</option>
+                        <option value="pausada">Pausada</option>
+                        <option value="alquilada">Alquilada</option>
+                        <option value="reservada">Reservada</option>
+                      </select>
+                    )}
                     <button onClick={() => {
                       // Guardamos el id de la propiedad a editar en un global
                       // que PublishPage lee al montar para prefillear el form
@@ -791,6 +842,27 @@ function AdminAgentPage({ route, onNav }) {
                     }} title="Editar" style={{ padding: '0 14px', height: 28, borderRadius: 8, background: 'var(--ink)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
                       Editar
                     </button>
+                    {/* Borrar (soft-delete). Solo propiedades reales. */}
+                    {p._real && (
+                      <button onClick={async () => {
+                        if (!confirm('¿Eliminar esta propiedad? Dejará de mostrarse en el sitio. Podés pedirle al equipo que la restaure si fue un error.')) return;
+                        try {
+                          const r = await fetch('/api/public/alquiloya/propiedades/' + encodeURIComponent(p.apiId || p.id), {
+                            method: 'DELETE',
+                            credentials: 'include',
+                          });
+                          const b = await r.json().catch(() => ({}));
+                          if (!r.ok || !b?.success) throw new Error(b?.error || ('HTTP ' + r.status));
+                          if (window.ayToast) window.ayToast('Propiedad eliminada.', { variant: 'success', duration: 3500 });
+                          setMyPropiedades(prev => Array.isArray(prev) ? prev.filter(x => x.id !== p.id) : prev);
+                        } catch (err) {
+                          if (window.ayToast) window.ayToast('No se pudo eliminar la propiedad.', { variant: 'error' });
+                        }
+                      }} title="Eliminar"
+                        style={{ padding: 0, width: 28, height: 28, borderRadius: 8, background: 'transparent', color: '#d93838', border: '1px solid #f1c4c4', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
+                        ×
+                      </button>
+                    )}
                   </div>
                 </div>
                 </React.Fragment>
