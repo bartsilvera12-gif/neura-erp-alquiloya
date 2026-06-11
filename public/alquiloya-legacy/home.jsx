@@ -121,7 +121,10 @@ function HeroSearch({ onSubmit, verifiedCount }) {
     const list = CIUDADES[depto] || [];
     return list.length > 0 ? list : ALL_CITIES;
   }, [depto, ALL_CITIES]);
-  const PRICE_MIN = 500000, PRICE_MAX = 20000000;
+  // PRICE_MIN=0: si el usuario no toca el slider, queremos que la busqueda
+  // devuelva TODO. Antes era 500.000 y propiedades de alquiler temporal o
+  // bajo precio quedaban afuera por default (el usuario veia "0 resultados").
+  const PRICE_MIN = 0, PRICE_MAX = 20000000;
   const AREA_MIN = 20, AREA_MAX = 500;
   const [priceMin, setPriceMin] = React.useState(PRICE_MIN);
   const [priceMax, setPriceMax] = React.useState(PRICE_MAX);

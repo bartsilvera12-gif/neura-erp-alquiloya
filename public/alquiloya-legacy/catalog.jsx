@@ -5,12 +5,48 @@ const normLoc = (s) => (s == null ? '' : String(s).trim().toLowerCase().normaliz
 const eqLoc = (a, b) => normLoc(a) === normLoc(b);
 const isAll = (v) => !v || v === 'Todos' || v === 'Todos los barrios' || v === 'Todas las ciudades' || v === 'Todo el país';
 
+// Lista completa de tipos para el selector del catalogo. Los ids coinciden
+// con los valores que guarda el backend (TIPOS_OK en la API). Se incluyen
+// todos los que figuran en el wizard de publicar mas las variantes "salon
+// comercial" / "alquiler temporal" / "casa independiente" que la API tambien
+// acepta. Asi cualquier propiedad cargada matchea contra UNA opcion del select.
+const CATALOG_TIPOS = [
+  { id: 'departamento',      label: 'Departamento' },
+  { id: 'casa',              label: 'Casa' },
+  { id: 'casa_independiente',label: 'Casa independiente' },
+  { id: 'duplex',            label: 'Dúplex' },
+  { id: 'duplex_ph',         label: 'Dúplex PH' },
+  { id: 'local_comercial',   label: 'Local comercial' },
+  { id: 'salon_comercial',   label: 'Salón comercial' },
+  { id: 'oficina',           label: 'Oficina' },
+  { id: 'terreno',           label: 'Terreno' },
+  { id: 'deposito',          label: 'Depósito' },
+  { id: 'alquiler_temporal', label: 'Alquiler temporal' },
+];
+
+// Mapeo de las 4 categorias "broad" que usan los chips del home a la lista
+// de tipos reales del backend. Si el usuario apreta "Departamento" en el
+// hero del home, en el catalogo queremos matchear depto + duplex + dpto-ph.
+const BROAD_TO_TIPOS = {
+  depto:    ['departamento', 'duplex', 'duplex_ph'],
+  casa:     ['casa', 'casa_independiente'],
+  salon:    ['salon_comercial', 'local_comercial', 'oficina', 'deposito'],
+  temporal: ['alquiler_temporal'],
+};
+function matchTipo(propTipo, selected) {
+  if (!selected || selected === 'all') return true;
+  const broad = BROAD_TO_TIPOS[selected];
+  if (broad) return broad.includes(propTipo);
+  return propTipo === selected;
+}
+
 function CatalogPage({ onProperty }) {
   const { properties } = useAlquiloYaPublicData();
   const pending = (typeof window !== 'undefined' && window.__pendingSearch) || null;
   const [tipo, setTipo] = React.useState(pending?.tipo || 'all');
   const [sort, setSort] = React.useState('recent');
   const [view, setView] = React.useState('grid');
+  const [q, setQ] = React.useState(pending?.q || '');
   const [filters, setFilters] = React.useState({
     depto: pending?.depto || 'Todos',
     ciudad: pending?.ciudad || 'Todos',
@@ -21,20 +57,29 @@ function CatalogPage({ onProperty }) {
     amoblado: false, mascotas: false, verified: false, temporal: false,
   });
   React.useEffect(() => { if (window.__pendingSearch) delete window.__pendingSearch; }, []);
-  const filtered = properties.filter(p =>
-    (tipo === 'all' || p.tipo === tipo) &&
-    (isAll(filters.ciudad) || eqLoc(p.ciudad, filters.ciudad)) &&
-    (isAll(filters.barrio) || eqLoc(p.barrio, filters.barrio)) &&
-    p.price >= filters.min && p.price <= filters.max &&
-    (!filters.areaMin || p.m2 >= filters.areaMin) &&
-    (!filters.areaMax || p.m2 <= filters.areaMax) &&
-    (filters.beds === 0 || p.beds >= filters.beds) &&
-    (filters.baths === 0 || p.baths >= filters.baths) &&
-    (!filters.amoblado || p.amoblado) &&
-    (!filters.mascotas || p.mascotas) &&
-    (!filters.verified || p.verified) &&
-    (!filters.temporal || p.tipo === 'temporal')
-  );
+  // Match texto libre del input "Buscar por título, ID o ubicación..." contra
+  // titulo, codigo, ciudad, barrio, direccion. Normalizamos para tolerar
+  // mayusculas y acentos. Si q esta vacio, todas las propiedades pasan.
+  const qNorm = normLoc(q);
+  const filtered = properties.filter(p => {
+    if (qNorm) {
+      const hay = [p.title, p.titulo, p.codigo, p.ciudad, p.barrio, p.address, p.direccion]
+        .filter(Boolean).map(normLoc).join(' ');
+      if (!hay.includes(qNorm)) return false;
+    }
+    return matchTipo(p.tipo, tipo) &&
+      (isAll(filters.ciudad) || eqLoc(p.ciudad, filters.ciudad)) &&
+      (isAll(filters.barrio) || eqLoc(p.barrio, filters.barrio)) &&
+      p.price >= filters.min && p.price <= filters.max &&
+      (!filters.areaMin || p.m2 >= filters.areaMin) &&
+      (!filters.areaMax || p.m2 <= filters.areaMax) &&
+      (filters.beds === 0 || p.beds >= filters.beds) &&
+      (filters.baths === 0 || p.baths >= filters.baths) &&
+      (!filters.amoblado || p.amoblado) &&
+      (!filters.mascotas || p.mascotas) &&
+      (!filters.verified || p.verified) &&
+      (!filters.temporal || p.tipo === 'temporal');
+  });
   const sorted = [...filtered].sort((a, b) => {
     if (sort === 'priceAsc') return a.price - b.price;
     if (sort === 'priceDesc') return b.price - a.price;
@@ -43,7 +88,7 @@ function CatalogPage({ onProperty }) {
   });
   return (
     <div className="fade-in">
-      <CatalogHeader count={sorted.length} tipo={tipo} setTipo={setTipo} filters={filters} />
+      <CatalogHeader count={sorted.length} tipo={tipo} setTipo={setTipo} filters={filters} q={q} setQ={setQ} />
       <div className="container" style={{ padding: '24px 32px 32px', display: 'grid', gridTemplateColumns: '290px 1fr', gap: 28 }}>
         <FilterPanel filters={filters} setFilters={setFilters} />
         <div>
@@ -73,7 +118,7 @@ function CatalogPage({ onProperty }) {
   );
 }
 
-function CatalogHeader({ count, tipo, setTipo, filters }) {
+function CatalogHeader({ count, tipo, setTipo, filters, q, setQ }) {
   const locParts = [];
   if (filters && !isAll(filters.ciudad)) locParts.push(filters.ciudad);
   if (filters && !isAll(filters.depto))  locParts.push(filters.depto);
@@ -95,14 +140,31 @@ function CatalogHeader({ count, tipo, setTipo, filters }) {
           </div>
           <div className="card" style={{ padding: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
             <I.search s={16}/>
-            <input className="input" placeholder="Buscar por título, ID o ubicación..." style={{ border: 'none', padding: 8, width: 340 }} />
+            <input
+              className="input"
+              placeholder="Buscar por título, ID o ubicación..."
+              value={q || ''}
+              onChange={(e) => setQ && setQ(e.target.value)}
+              style={{ border: 'none', padding: 8, width: 340 }}
+            />
           </div>
         </div>
-        <div className="row gap-8" style={{ marginTop: 20 }}>
-          <CatTab label="Todos" active={tipo === 'all'} onClick={() => setTipo('all')} />
-          {TIPOS.map(t => (
-            <CatTab key={t.id} icon={t.icon} label={t.label} active={tipo === t.id} onClick={() => setTipo(t.id)} />
-          ))}
+        {/* Selector unico de tipo de inmueble. Reemplaza los chips viejos (4
+            opciones con ids legacy 'depto/casa/salon/temporal' que no
+            matcheaban contra los tipos reales del backend) por un dropdown
+            con TODOS los tipos que la API acepta. matchTipo() conserva la
+            compat con los chips del home (broad → lista). */}
+        <div className="row gap-12" style={{ marginTop: 20, alignItems: 'center', paddingBottom: 16 }}>
+          <span style={{ fontSize: 14, color: 'var(--ink-3)', fontWeight: 600 }}>Tipo de inmueble:</span>
+          <PrettySelect
+            value={tipo}
+            onChange={setTipo}
+            style={{ width: 260 }}
+            options={[
+              { value: 'all', label: 'Todos' },
+              ...CATALOG_TIPOS.map(t => ({ value: t.id, label: t.label })),
+            ]}
+          />
         </div>
       </div>
     </div>

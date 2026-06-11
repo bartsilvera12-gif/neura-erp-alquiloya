@@ -26,6 +26,9 @@ function PublishPage() {
   // hasSession: hay sesion Supabase aunque el usuario no sea agente/propietario.
   // Util para diferenciar "no logueado" de "logueado pero sin perfil de publicador".
   const [hasSession, setHasSession] = React.useState(false);
+  // Modal "Solicitar acceso" inline: antes el boton mandaba a /portal-agentes
+  // (recargaba la pagina). Pedido del cliente: abrirlo directo desde aca.
+  const [accessOpen, setAccessOpen] = React.useState(false);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -368,9 +371,9 @@ function PublishPage() {
                 <a className="btn btn-primary" href="/portal-agentes/login">
                   <I.user s={16}/> Ingresar
                 </a>
-                <a className="btn btn-outline" href="/portal-agentes">
+                <button type="button" className="btn btn-outline" onClick={() => setAccessOpen(true)}>
                   Solicitar acceso
-                </a>
+                </button>
               </div>
               <p style={{ marginTop: 20, fontSize: 12, color: 'var(--ink-4)' }}>
                 ¿No tenés cuenta todavía? Pedí el acceso y nuestro equipo te contacta
@@ -379,6 +382,9 @@ function PublishPage() {
             </>
           )}
         </div>
+        {accessOpen && window.RequestAccessModal && (
+          <window.RequestAccessModal onClose={() => setAccessOpen(false)} />
+        )}
       </div>
     );
   }
@@ -466,7 +472,7 @@ function PublishPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 28, marginTop: 28, alignItems: 'flex-start' }}>
         <div className="card" style={{ padding: 32 }}>
-          {step === 0 && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario}/>}
+          {step === 0 && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario} editingId={editingId}/>}
           {step === 1 && <StepBasics form={form} setF={setF}/>}
           {step === 2 && <StepLocation form={form} setF={setF}/>}
           {step === 3 && <StepPhotos form={form} setF={setF} isAgent={!!ctxAgente}/>}
@@ -1383,8 +1389,13 @@ function extractPlanLimitsFromBullets(bullets) {
   return { fotosPorInmueble, propiedadesActivas };
 }
 
-function StepPlan({ form, setF, ctxAgente, ctxPropietario }) {
+function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
   const [apiPlans, setApiPlans] = React.useState(null);
+  const [agentPickerOpen, setAgentPickerOpen] = React.useState(false);
+  // Solo propietarios logueados (no agentes, ni editando una propiedad existente)
+  // ven el atajo "que un agente publique por mi". Esto crea una captacion en
+  // el panel del agente elegido, sin que el propietario tenga que seguir el wizard.
+  const canRequestAgent = !!ctxPropietario && !ctxAgente && !editingId;
   React.useEffect(() => {
     let cancelled = false;
     fetch('/api/public/alquiloya/planes-publicacion', { cache: 'no-store' })
@@ -1433,6 +1444,35 @@ function StepPlan({ form, setF, ctxAgente, ctxPropietario }) {
       <div className="tag">Paso 1</div>
       <h3 style={{ fontSize: 22, marginTop: 6 }}>Elegí un plan para tu publicación</h3>
       <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>Podés cambiar de plan más adelante.</p>
+
+      {canRequestAgent && (
+        <div className="card" style={{
+          marginTop: 16, padding: '14px 16px',
+          background: '#f1f7ff', border: '1px solid var(--blue-100)',
+          borderLeft: '4px solid var(--blue)',
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--blue)', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <I.user s={18}/>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>¿Preferís que un agente publique por vos?</div>
+            <div className="muted xs" style={{ marginTop: 2 }}>
+              Elegí un agente activo de AlquiloYa y le llega tu solicitud a su panel de captaciones. Te contacta por WhatsApp, carga la propiedad y la administra. Sin costo para vos.
+            </div>
+          </div>
+          <button type="button" onClick={() => setAgentPickerOpen(true)} className="btn btn-blue" style={{ flexShrink: 0 }}>
+            Elegir agente
+          </button>
+        </div>
+      )}
+
+      {agentPickerOpen && (
+        <AgentPickerModal
+          ctxPropietario={ctxPropietario}
+          onClose={() => setAgentPickerOpen(false)}
+        />
+      )}
       <div className="col gap-12" style={{ marginTop: 20 }}>
         {list.map(p => {
           const picked = form.plan_id === p.tier;
@@ -2118,4 +2158,177 @@ function ConfirmPublishModal({ form, loading, isAgent, onCancel, onConfirm }) {
   );
 }
 
-Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal });
+// ─────────────────────────────────────────────────────────────────────────────
+// AgentPickerModal — solo lo usa el flujo "que un agente publique por mi" del
+// propietario logueado en el wizard. Lista agentes activos de AlquiloYa, deja
+// elegir uno, opcionalmente escribir un mensaje, y crea una captacion via
+// POST /api/public/alquiloya/captaciones. La captacion aparece en el panel
+// del agente elegido (Captaciones).
+// ─────────────────────────────────────────────────────────────────────────────
+function AgentPickerModal({ ctxPropietario, onClose }) {
+  const [agentes, setAgentes] = React.useState(null); // null = loading
+  const [error, setError] = React.useState(null);
+  const [pickedId, setPickedId] = React.useState(null);
+  const [mensaje, setMensaje] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/public/alquiloya/agentes', { cache: 'no-store' });
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok || !b?.success) throw new Error(b?.error || ('HTTP ' + r.status));
+        const arr = Array.isArray(b?.data?.agentes) ? b.data.agentes.filter(a => a.activo !== false) : [];
+        if (!cancelled) setAgentes(arr);
+      } catch (e) {
+        if (!cancelled) { setError(e?.message || 'Error'); setAgentes([]); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const enviar = async () => {
+    if (!pickedId || submitting) return;
+    const nombre = (ctxPropietario?.nombre || '').trim();
+    const email = (ctxPropietario?.email || '').trim();
+    const telefono = (ctxPropietario?.telefono || ctxPropietario?.whatsapp || '').trim();
+    if (!nombre || (!email && !telefono)) {
+      if (window.ayToast) window.ayToast('Faltan tus datos de contacto en el perfil.', { variant: 'error' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const r = await fetch('/api/public/alquiloya/captaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          agente_id: pickedId,
+          propietario_nombre: nombre,
+          propietario_email: email || null,
+          propietario_telefono: telefono || null,
+          mensaje: mensaje || null,
+          origen: 'panel_propietario_publish',
+        }),
+      });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok || !b?.success) throw new Error(b?.error || ('HTTP ' + r.status));
+      if (window.ayToast) window.ayToast('Le llegó tu solicitud. El agente te va a contactar pronto.', {
+        title: '¡Listo!', variant: 'success', duration: 7000,
+      });
+      onClose && onClose();
+      // Lo mandamos al panel del propietario para que vea el flujo cerrado.
+      try { window.location.hash = '#admin-agent'; } catch {}
+    } catch (e) {
+      if (window.ayToast) window.ayToast(e?.message || 'No se pudo enviar la solicitud.', { variant: 'error', title: 'Error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 220,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto'
+    }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{
+        maxWidth: 720, width: '100%', background: '#fff', position: 'relative',
+        maxHeight: 'calc(100dvh - 40px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0,
+        margin: 'auto 0'
+      }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14, background: 'var(--bg-2)', border: 'none',
+          width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'grid', placeItems: 'center', zIndex: 2
+        }}><I.x s={14}/></button>
+
+        <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid var(--line-2)' }}>
+          <div className="tag">Solicitar agente</div>
+          <h3 style={{ fontSize: 22, marginTop: 6 }}>Elegí un agente para que publique por vos</h3>
+          <p className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+            Le va a llegar la solicitud a su panel de captaciones. Te contacta por WhatsApp para coordinar fotos, datos y publicación.
+          </p>
+        </div>
+
+        <div style={{ padding: '16px 28px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {agentes === null && (
+            <div className="muted" style={{ textAlign: 'center', padding: '30px 0' }}>Cargando agentes…</div>
+          )}
+          {agentes && agentes.length === 0 && (
+            <div className="muted" style={{ textAlign: 'center', padding: '30px 0' }}>
+              {error ? ('No pudimos cargar los agentes: ' + error) : 'No hay agentes disponibles por ahora.'}
+            </div>
+          )}
+          {agentes && agentes.length > 0 && (
+            <div className="col gap-8">
+              {agentes.map(a => {
+                const picked = pickedId === a.id;
+                return (
+                  <button key={a.id} type="button" onClick={() => setPickedId(a.id)} className="card" style={{
+                    padding: 12, textAlign: 'left',
+                    border: '2px solid ' + (picked ? 'var(--blue)' : 'var(--line)'),
+                    background: picked ? 'var(--blue-50)' : '#fff',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      border: '2px solid ' + (picked ? 'var(--blue)' : 'var(--line)'),
+                      background: picked ? 'var(--blue)' : '#fff',
+                      display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0,
+                    }}>{picked && <I.check s={10}/>}</span>
+                    {a.foto_url ? (
+                      <Photo src={a.foto_url} style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0 }}/>
+                    ) : (
+                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--bg-3)', color: 'var(--ink-4)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                        <I.user s={18}/>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{a.nombre || 'Agente'}</div>
+                      <div className="muted xs" style={{ marginTop: 2 }}>
+                        {a.cargo || 'Agente AlquiloYa'}{a.propiedades_count != null ? ` · ${a.propiedades_count} publicaciones` : ''}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="field" style={{ marginTop: 16 }}>
+            <label>Mensaje para el agente (opcional)</label>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder="Contale brevemente qué propiedad querés publicar (tipo, ubicación, precio orientativo)."
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value.slice(0, 1000))}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+        </div>
+
+        <div style={{
+          padding: '14px 28px', borderTop: '1px solid var(--line-2)', background: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0,
+        }}>
+          <span className="muted xs">Tus datos del perfil se envían como contacto.</span>
+          <div className="row gap-10">
+            <button className="btn btn-outline" onClick={onClose} disabled={submitting}>Cancelar</button>
+            <button
+              className="btn btn-blue"
+              onClick={enviar}
+              disabled={!pickedId || submitting}
+              style={{ opacity: (!pickedId || submitting) ? .5 : 1, cursor: (!pickedId || submitting) ? 'not-allowed' : 'pointer' }}
+            >
+              {submitting ? 'Enviando…' : <>Enviar solicitud <I.check s={14}/></>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal, AgentPickerModal });

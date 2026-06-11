@@ -1,5 +1,18 @@
 // Administradores — Global y Propietario/Agente
 
+// Navega a "publish" limpiando el hash de la URL. Sin esto, el hash queda en
+// #admin-agent-properties y al recargar el usuario vuelve al panel en vez de
+// quedar en /publish — pedido del cliente: al salir o refrescar desde el
+// wizard de publicar debe quedar en https://alquiloya.com.py/.
+function goPublishCleanUrl(onNav) {
+  try {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch {}
+  if (onNav) onNav('publish');
+}
+
 function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displayName, displayEmail, planInfo, planLoading, children }) {
   const items = kind === 'global' ? [
     { id: 'admin-global', label: 'Dashboard', icon: 'grid' },
@@ -16,8 +29,9 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
     // resolverse el rol (additivo, menos molesto que mostrarlos y sacarlos).
     ...(role === 'agente' ? [{ id: 'admin-agent-captures', label: 'Captaciones', icon: 'shield' }] : []),
     ...(role === 'agente' ? [{ id: 'admin-agent-blog', label: 'Mi blog', icon: 'doc' }] : []),
-    { id: 'admin-agent-qr', label: 'Carteles QR', icon: 'qr' },
-    { id: 'admin-agent-profile', label: 'Mi perfil', icon: 'user' },
+    // Carteles QR y Mi perfil solo para agentes (los propietarios no los usan).
+    ...(role === 'agente' ? [{ id: 'admin-agent-qr', label: 'Carteles QR', icon: 'qr' }] : []),
+    ...(role === 'agente' ? [{ id: 'admin-agent-profile', label: 'Mi perfil', icon: 'user' }] : []),
   ];
 
   return (
@@ -131,7 +145,7 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
                 {actions || (
                   <>
                     {/* Contador "4 nuevas" (consultas) ocultado en limpieza UI legacy. */}
-                    {kind !== 'global' && <button onClick={() => onNav && onNav('publish')} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
+                    {kind !== 'global' && <button onClick={() => goPublishCleanUrl(onNav)} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
                   </>
                 )}
               </div>
@@ -141,7 +155,7 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
           {!title && (
             <div className="row gap-8" style={{ justifyContent: 'flex-end', marginBottom: 14 }}>
               {/* Contador "4 nuevas" (consultas) ocultado en limpieza UI legacy. */}
-              {kind !== 'global' && <button onClick={() => onNav && onNav('publish')} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
+              {kind !== 'global' && <button onClick={() => goPublishCleanUrl(onNav)} style={{ padding: '6px 14px', height: 32, borderRadius: 8, background: 'var(--yellow)', border: 'none', color: 'var(--ink)', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><I.plus s={12}/> Cargar propiedad</button>}
             </div>
           )}
           {children}
@@ -838,7 +852,7 @@ function AdminAgentPage({ route, onNav }) {
                       // que PublishPage lee al montar para prefillear el form
                       // y cambiar el submit a PATCH.
                       try { window.__AY_EDIT_PROP_ID = p.apiId || p.id || null; } catch {}
-                      if (onNav) onNav('publish');
+                      goPublishCleanUrl(onNav);
                     }} title="Editar" style={{ padding: '0 14px', height: 28, borderRadius: 8, background: 'var(--ink)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
                       Editar
                     </button>
