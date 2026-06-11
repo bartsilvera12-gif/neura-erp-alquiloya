@@ -26,7 +26,15 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
         <aside style={{ background: '#fff', borderRight: '1px solid var(--line)', minHeight: 'calc(100vh - 76px)', padding: '24px 16px' }}>
           {/* Boton volver al sitio publico (pedido del cliente). */}
           <button
-            onClick={() => onNav && onNav('home')}
+            onClick={() => {
+              // Limpiar el hash (#admin-agent, #admin-agent-qr, etc.) antes
+              // de navegar. Sin esto, recargar la pagina vuelve a leer el
+              // hash y manda al usuario otra vez al panel.
+              if (typeof window !== 'undefined' && window.location.hash) {
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              }
+              if (onNav) onNav('home');
+            }}
             title="Volver al sitio"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
