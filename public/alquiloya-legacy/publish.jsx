@@ -1025,16 +1025,42 @@ function LeafletPickerWidget({ lat, lng, onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng]);
 
-  function onPasteLink() {
+  const [linkBusy, setLinkBusy] = React.useState(false);
+  async function onPasteLink() {
     setLinkErr(null);
-    const parsed = parseGoogleMapsLink(linkInput);
-    if (!parsed) {
+    const raw = (linkInput || '').trim();
+    if (!raw) return;
+    // 1) Parser local rapido: funciona para links largos con @LAT,LNG / !3d!4d / ?q=...
+    const local = parseGoogleMapsLink(raw);
+    if (local) {
+      const [la, ln] = local;
+      onChange(Number(la.toFixed(6)), Number(ln.toFixed(6)));
+      setLinkInput('');
+      return;
+    }
+    // 2) Link corto (maps.app.goo.gl / goo.gl/maps): el navegador no puede
+    // seguir el redirect por CORS. Lo resolvemos via /api/public/alquiloya/
+    // resolve-gmaps que sigue el redirect server-side.
+    const isShort = /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(raw)
+      || /google\.com/i.test(raw);
+    if (!isShort) {
       setLinkErr('No pudimos extraer la ubicación de ese link. Probá copiar de nuevo desde Google Maps (botón "Compartir → Copiar enlace").');
       return;
     }
-    const [la, ln] = parsed;
-    onChange(Number(la.toFixed(6)), Number(ln.toFixed(6)));
-    setLinkInput('');
+    setLinkBusy(true);
+    try {
+      const r = await fetch('/api/public/alquiloya/resolve-gmaps?url=' + encodeURIComponent(raw), { cache: 'no-store' });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok || !b || !b.ok || typeof b.lat !== 'number' || typeof b.lng !== 'number') {
+        throw new Error((b && b.error) || 'No pudimos resolver el link');
+      }
+      onChange(Number(Number(b.lat).toFixed(6)), Number(Number(b.lng).toFixed(6)));
+      setLinkInput('');
+    } catch (e) {
+      setLinkErr('No pudimos extraer la ubicación de ese link. Abrí el link en Google Maps, después "Compartir → Copiar enlace" y pegá el link largo (no el corto).');
+    } finally {
+      setLinkBusy(false);
+    }
   }
   return (
     <div>
@@ -1052,11 +1078,11 @@ function LeafletPickerWidget({ lat, lng, onChange }) {
         <button
           type="button"
           onClick={onPasteLink}
-          disabled={!linkInput.trim()}
+          disabled={!linkInput.trim() || linkBusy}
           className="btn btn-blue"
-          style={{ flexShrink: 0, opacity: linkInput.trim() ? 1 : 0.5 }}
+          style={{ flexShrink: 0, opacity: linkInput.trim() && !linkBusy ? 1 : 0.5 }}
         >
-          Usar link
+          {linkBusy ? 'Resolviendo…' : 'Usar link'}
         </button>
       </div>
       {linkErr ? (
