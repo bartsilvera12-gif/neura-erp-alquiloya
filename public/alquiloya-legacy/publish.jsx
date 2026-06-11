@@ -916,7 +916,7 @@ function StepPhotos({ form, setF, isAgent }) {
     const url = (urlNew || '').trim();
     if (!url) return;
     if (planCap != null && fotosLen >= planCap) {
-      window.alert(`Tu plan permite hasta ${planCap} fotos por inmueble. Borrá alguna o cambiá a un plan superior.`);
+      window.alert(`Ya cargaste las ${planCap} fotos que permite tu plan. Borrá alguna para sumar otra, o pasá a un plan superior.`);
       return;
     }
     setF(f => ({ fotos: [...(f.fotos || []), { url, alt: f.titulo || '', es_portada: (f.fotos || []).length === 0 }] }));
@@ -963,7 +963,12 @@ function StepPhotos({ form, setF, isAgent }) {
     const currentLen = (form.fotos || []).length;
     const remaining = planCap != null ? Math.max(0, planCap - currentLen) : files.length;
     if (planCap != null && files.length > remaining) {
-      window.alert(`Tu plan permite hasta ${planCap} fotos por inmueble. Te quedan ${remaining}. Las primeras ${remaining} se agregaron.`);
+      if (remaining === 0) {
+        window.alert(`Ya cargaste las ${planCap} fotos que permite tu plan. Borrá alguna para sumar otra, o pasá a un plan superior.`);
+      } else {
+        const rest = files.length - remaining;
+        window.alert(`Tu plan permite hasta ${planCap} fotos por inmueble. Sumamos ${remaining} y dejamos ${rest} sin agregar.`);
+      }
     }
     const toAdd = planCap != null ? files.slice(0, remaining) : files;
     for (const file of toAdd) {
