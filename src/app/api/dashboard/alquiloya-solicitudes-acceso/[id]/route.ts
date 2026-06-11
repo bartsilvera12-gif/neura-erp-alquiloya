@@ -130,14 +130,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
       const emailLc = sol.email.toLowerCase();
       const { rows: dup } = await queryWithRetry<{ source: string }>(
         pool,
-        `SELECT 'usuarios' AS source FROM ${t("usuarios")}
-           WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1
+        `(SELECT 'usuarios' AS source FROM ${t("usuarios")}
+            WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1)
          UNION ALL
-         SELECT 'agentes' FROM ${t("agentes")}
-           WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1
+         (SELECT 'agentes' FROM ${t("agentes")}
+            WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1)
          UNION ALL
-         SELECT 'propietarios' FROM ${t("propietarios")}
-           WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1`,
+         (SELECT 'propietarios' FROM ${t("propietarios")}
+            WHERE empresa_id=$1::uuid AND lower(email)=$2 LIMIT 1)`,
         [ALQUILOYA_EMPRESA_ID, emailLc]
       );
       if (dup.length > 0) {

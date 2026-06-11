@@ -56,14 +56,14 @@ export async function POST(request: Request) {
     // 1) Email único: ni en propietarios, ni en agentes, ni en usuarios.
     const { rows: emailHits } = await queryWithRetry<{ source: string }>(
       pool,
-      `SELECT 'propietarios' AS source FROM ${t("propietarios")}
-         WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1
+      `(SELECT 'propietarios' AS source FROM ${t("propietarios")}
+          WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1)
        UNION ALL
-       SELECT 'agentes' FROM ${t("agentes")}
-         WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1
+       (SELECT 'agentes' FROM ${t("agentes")}
+          WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1)
        UNION ALL
-       SELECT 'usuarios' FROM ${t("usuarios")}
-         WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1`,
+       (SELECT 'usuarios' FROM ${t("usuarios")}
+          WHERE empresa_id=$1::uuid AND lower(email)=lower($2) LIMIT 1)`,
       [ALQUILOYA_EMPRESA_ID, email]
     );
     if (emailHits.length > 0) {
@@ -76,11 +76,11 @@ export async function POST(request: Request) {
     // 2) Teléfono único en propietarios + agentes (comparación por dígitos).
     const { rows: phoneHits } = await queryWithRetry<{ source: string }>(
       pool,
-      `SELECT 'propietarios' AS source FROM ${t("propietarios")}
-         WHERE empresa_id=$1::uuid AND regexp_replace(coalesce(telefono,''), '[^0-9+]', '', 'g') = $2 LIMIT 1
+      `(SELECT 'propietarios' AS source FROM ${t("propietarios")}
+          WHERE empresa_id=$1::uuid AND regexp_replace(coalesce(telefono,''), '[^0-9+]', '', 'g') = $2 LIMIT 1)
        UNION ALL
-       SELECT 'agentes' FROM ${t("agentes")}
-         WHERE empresa_id=$1::uuid AND regexp_replace(coalesce(telefono,''), '[^0-9+]', '', 'g') = $2 LIMIT 1`,
+       (SELECT 'agentes' FROM ${t("agentes")}
+          WHERE empresa_id=$1::uuid AND regexp_replace(coalesce(telefono,''), '[^0-9+]', '', 'g') = $2 LIMIT 1)`,
       [ALQUILOYA_EMPRESA_ID, telefonoNorm]
     );
     if (phoneHits.length > 0) {
