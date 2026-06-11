@@ -666,8 +666,18 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
   const catastralOk = !!form.catastralFile;
   const nisOk = form.nis.trim().length >= 4 && form.nisFile;
   const ciOk = form.ciNumber.trim().length >= 5 && form.ciFront && form.ciBack;
-  const ownerOk = form.ownerName.trim().length >= 3 && form.phone.trim().length >= 8;
+  const ownerOk = form.ownerName.trim().length >= 2 && form.phone.trim().length >= 7;
   const ready = cccOk && catastralOk && nisOk && ciOk && ownerOk && form.accept;
+  // Lista de campos faltantes para mostrar al usuario por que el boton esta
+  // deshabilitado (el reclamo tipico es "complete todo y no me deja enviar").
+  const missing = [];
+  if (!cccOk) missing.push('CCC (numero + archivo)');
+  if (!catastralOk) missing.push('Cedula catastral / escritura');
+  if (!nisOk) missing.push('NIS de ANDE (numero + archivo)');
+  if (!ciOk) missing.push('CI del propietario (numero + frente + dorso)');
+  if (!ownerOk) missing.push('Nombre y telefono del titular');
+  if (!form.accept) missing.push('Aceptar la declaracion');
+  const [submitting, setSubmitting] = React.useState(false);
 
   return ReactDOM.createPortal(
     <div onClick={onClose} style={{
@@ -786,38 +796,68 @@ function VerificationModal({ propertyId, propertyTitle, onClose }) {
             {/* Footer sticky */}
             <div style={{
               padding: '14px 28px', borderTop: '1px solid var(--line-2)', background: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+              display: 'flex', flexDirection: 'column', gap: 10,
               flexShrink: 0
             }}>
-              <div className="muted xs" style={{ minWidth: 0 }}>
-                Costo único: <strong style={{ color: 'var(--ink-2)' }}>Gs. 45.000</strong> · Vigencia: 12 meses
-              </div>
-              <div className="row gap-10" style={{ flexShrink: 0 }}>
-                <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
-                <button
-                  className="btn btn-blue"
-                  disabled={!ready}
-                  onClick={async () => {
-                    if (!ready) return;
-                    try {
-                      await fetch('/api/public/alquiloya/solicitudes-servicio', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          kind: 'verificacion',
-                          nombre: form.ownerName,
-                          telefono: form.phone,
-                          propiedad_id: propertyId || null,
-                          mensaje: 'CCC: ' + form.ccc + ' / NIS: ' + form.nis + ' / CI: ' + form.ciNumber,
-                        }),
-                      });
-                    } catch (e) { /* feedback igual */ }
-                    setStep(2);
-                  }}
-                  style={{ opacity: ready ? 1 : .5, cursor: ready ? 'pointer' : 'not-allowed' }}
-                >
-                  Enviar solicitud <I.check s={14}/>
-                </button>
+              {missing.length > 0 && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, background: '#fff7e6',
+                  border: '1px solid #f5d585', color: '#8a5a00', fontSize: 12,
+                }}>
+                  <strong>Faltan datos:</strong> {missing.join(', ')}
+                </div>
+              )}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 12, flexWrap: 'wrap',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <span className="muted xs">Costo único</span>
+                  <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 22, color: 'var(--blue)', lineHeight: 1.1 }}>
+                    Gs. 45.000
+                  </div>
+                  <span className="muted xs">Vigencia: 12 meses</span>
+                </div>
+                <div className="row gap-10" style={{ flexShrink: 0 }}>
+                  <button className="btn btn-outline" onClick={onClose} disabled={submitting}>Cancelar</button>
+                  <button
+                    className="btn btn-blue"
+                    disabled={!ready || submitting}
+                    onClick={async () => {
+                      if (!ready || submitting) return;
+                      setSubmitting(true);
+                      try {
+                        const r = await fetch('/api/public/alquiloya/solicitudes-servicio', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            kind: 'verificacion',
+                            nombre: form.ownerName,
+                            telefono: form.phone,
+                            propiedad_id: propertyId || null,
+                            mensaje: 'CCC: ' + form.ccc + ' / NIS: ' + form.nis + ' / CI: ' + form.ciNumber,
+                          }),
+                        });
+                        const b = await r.json().catch(() => ({}));
+                        if (!r.ok || !b?.success) throw new Error(b?.error || ('HTTP ' + r.status));
+                        if (window.ayToast) window.ayToast('Tu solicitud quedó registrada. Te avisamos cuando la revisemos.', {
+                          title: '¡Solicitud enviada!', variant: 'success', duration: 6000,
+                        });
+                        setStep(2);
+                      } catch (err) {
+                        if (window.ayToast) window.ayToast(
+                          (err && err.message) || 'No pudimos enviar la solicitud. Intentá de nuevo o escribinos por WhatsApp.',
+                          { title: 'Error al enviar', variant: 'error', duration: 8000 }
+                        );
+                      } finally {
+                        setSubmitting(false);
+                      }
+                    }}
+                    style={{ opacity: (!ready || submitting) ? .5 : 1, cursor: (!ready || submitting) ? 'not-allowed' : 'pointer' }}
+                  >
+                    {submitting ? 'Enviando…' : <>Enviar solicitud <I.check s={14}/></>}
+                  </button>
+                </div>
               </div>
             </div>
           </>
