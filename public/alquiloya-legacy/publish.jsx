@@ -1589,19 +1589,22 @@ function printBrochure(property, contacto) {
   // Mapa estatico (mejor esfuerzo) centrado en coords o ciudad.
   const cc = (typeof window !== 'undefined' && window.CITY_COORDS && window.normalizeCity)
     ? window.CITY_COORDS[window.normalizeCity(p.ciudad || p.city)] : null;
-  const lat = typeof p.lat === 'number' ? p.lat : (cc ? cc[0] : null);
-  const lng = typeof p.lng === 'number' ? p.lng : (cc ? cc[1] : null);
+  const hasExact = typeof p.lat === 'number' && typeof p.lng === 'number';
+  const lat = hasExact ? p.lat : (cc ? cc[0] : null);
+  const lng = hasExact ? p.lng : (cc ? cc[1] : null);
+  // Coord exacta → zoom alto + marker rojo (ubicacion precisa).
+  // Solo ciudad → zoom medio sin marker (area aproximada).
+  const mapZoom = hasExact ? 17 : 13;
+  const mapMarker = hasExact ? `&markers=${lat},${lng},red-pushpin` : '';
   const mapSrc = (lat != null && lng != null)
-    ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=13&size=560x200&markers=${lat},${lng},lightblue1`
+    ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=${mapZoom}&size=560x200${mapMarker}`
     : null;
   const cName = (contacto && contacto.nombre) || '';
   const cPhone = (contacto && (contacto.telefono || contacto.whatsapp)) || '';
   const footer = [cName, cPhone].filter(Boolean).join(' · ');
   const fmt = (n) => 'Gs. ' + Number(n || 0).toLocaleString('es-PY');
 
-  const w = window.open('', '_blank', 'width=900,height=1100');
-  if (!w) { window.alert('Habilitá las ventanas emergentes para descargar el PDF.'); return; }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title} · AlquiloYa</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title} · AlquiloYa</title>
   <style>
     *{box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{background:#fff;color:#0b1622}
@@ -1660,9 +1663,80 @@ function printBrochure(property, contacto) {
     </div>
     <div class="ft">${footer ? footer + ' · ' : ''}ALQUILOYA.COM.PY</div>
   </div>
-  </body></html>`);
-  w.document.close();
-  w.onload = () => { setTimeout(() => { w.focus(); w.print(); }, 600); };
+  </body></html>`;
+  downloadBrochurePdf(html, title);
+}
+
+// Carga html2pdf.js (html2canvas + jsPDF empaquetados) desde CDN una sola vez
+// y devuelve la promesa de window.html2pdf. Si el CDN falla, retorna null y
+// caemos al print clasico.
+let __ay_html2pdf_promise = null;
+function loadHtml2Pdf() {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  if (__ay_html2pdf_promise) return __ay_html2pdf_promise;
+  __ay_html2pdf_promise = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.async = true;
+    s.onload = () => resolve(window.html2pdf || null);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+  return __ay_html2pdf_promise;
+}
+
+// Renderiza el HTML del brochure en un contenedor oculto, lo convierte a PDF
+// con html2pdf y dispara el download. Si html2pdf no esta disponible (CDN
+// bloqueado / offline) caemos al window.open + print() de antes.
+function downloadBrochurePdf(html, title) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const filename = (String(title || 'brochure').replace(/[^\w\d\-\_\s]/g, '').trim() || 'brochure') + '.pdf';
+  // Toast feedback inmediato (la generacion tarda ~2-3s).
+  if (window.ayToast) window.ayToast('Generando PDF…', { variant: 'info', duration: 3500 });
+  loadHtml2Pdf().then((h2p) => {
+    if (!h2p) {
+      // Fallback: abrir ventana imprimible.
+      const w = window.open('', '_blank', 'width=900,height=1100');
+      if (!w) { window.alert('Habilitá las ventanas emergentes para descargar el PDF.'); return; }
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => { setTimeout(() => { w.focus(); w.print(); }, 600); };
+      return;
+    }
+    const wrap = document.createElement('div');
+    // Off-screen, no afecta layout visible. width fija para A4.
+    wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:210mm;background:#fff;z-index:-1';
+    // Solo extraemos el body interior — html2pdf espera un elemento.
+    const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    wrap.innerHTML = m ? m[1] : html;
+    // El <style> del head viene FUERA del body; lo insertamos como bloque
+    // dentro del contenedor para que html2canvas lo aplique.
+    const sm = html.match(/<style>([\s\S]*?)<\/style>/i);
+    if (sm) {
+      const st = document.createElement('style');
+      st.textContent = sm[1];
+      wrap.insertBefore(st, wrap.firstChild);
+    }
+    document.body.appendChild(wrap);
+    const opt = {
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    };
+    h2p().set(opt).from(wrap).save()
+      .catch((e) => {
+        console.warn('[brochure] html2pdf fallo, fallback a print:', e);
+        const w = window.open('', '_blank', 'width=900,height=1100');
+        if (w) { w.document.write(html); w.document.close(); w.onload = () => { setTimeout(() => { w.focus(); w.print(); }, 600); }; }
+      })
+      .finally(() => {
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      });
+  });
 }
 
 // El brochure ahora se genera con los datos REALES de la propiedad + el

@@ -32,6 +32,8 @@ type PropiedadAgenteRow = {
   banos: number | null;
   cocheras: number | null;
   superficie_m2: number | null;
+  lat: number | null;
+  lng: number | null;
   destacada: boolean | null;
   visible_web: boolean | null;
   activo: boolean | null;
@@ -91,6 +93,7 @@ export async function GET(request: Request) {
           p.precio::float8 AS precio, p.moneda,
           p.dormitorios, p.banos, p.cocheras,
           p.superficie_m2::float8 AS superficie_m2,
+          p.lat::float8 AS lat, p.lng::float8 AS lng,
           p.destacada, p.visible_web, p.activo,
           cover.url AS cover_url,
           COALESCE(fcnt.n, 0)::int AS fotos_count,

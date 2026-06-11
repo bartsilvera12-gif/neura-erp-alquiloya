@@ -44,6 +44,7 @@ export async function GET(request: Request) {
       `SELECT
          p.id, p.codigo, p.titulo, p.tipo, p.operacion, p.estado,
          p.ciudad, p.barrio,
+         p.lat::float8 AS lat, p.lng::float8 AS lng,
          p.precio::float8 AS precio, p.moneda,
          p.dormitorios, p.banos,
          (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada,
