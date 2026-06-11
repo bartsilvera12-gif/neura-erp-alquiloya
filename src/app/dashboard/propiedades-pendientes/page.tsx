@@ -1,9 +1,9 @@
-import Link from "next/link";
 import {
   listErpPropiedadesPendientes,
   type ErpPropiedadPendienteRow,
 } from "@/lib/alquiloya/erp-propiedades";
 import PropiedadesPendientesClient from "./PropiedadesPendientesClient";
+import BackLink from "./BackLink";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,12 +21,7 @@ export default async function PropiedadesPendientesPage() {
   return (
     <div className="px-6 py-6">
       <header className="mb-6">
-        <Link
-          href="/"
-          className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
-        >
-          ← Volver al dashboard
-        </Link>
+        <BackLink />
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
           Propiedades pendientes de aprobación
         </h1>
