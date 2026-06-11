@@ -1462,7 +1462,7 @@ function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
             </div>
           </div>
           <button type="button" onClick={() => setAgentPickerOpen(true)} className="btn btn-blue" style={{ flexShrink: 0 }}>
-            Elegir agente
+            Solicitar agente
           </button>
         </div>
       )}
@@ -2288,6 +2288,10 @@ function AgentPickerModal({ ctxPropietario, onClose }) {
                       <div className="muted xs" style={{ marginTop: 2 }}>
                         {a.cargo || 'Agente AlquiloYa'}{a.propiedades_count != null ? ` · ${a.propiedades_count} publicaciones` : ''}
                       </div>
+                      {/* Calificacion: 5 estrellas pintadas segun rating (0..5) + numero
+                          de resenas aprobadas. Si todavia no tiene resenas mostramos
+                          "Sin reseñas" para no engañar con 0 estrellas. */}
+                      <AgentStars rating={Number(a.rating) || 0} count={Number(a.resenas_count) || 0}/>
                     </div>
                   </button>
                 );
@@ -2331,4 +2335,38 @@ function AgentPickerModal({ ctxPropietario, onClose }) {
   );
 }
 
-Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal, AgentPickerModal });
+// Estrellas compactas usadas en cada card del AgentPickerModal. Dibujamos 5
+// estrellas con SVG superpuestos: la base gris siempre se ve, y encima
+// ponemos otra capa amarilla con `width` proporcional al rating. Esto soporta
+// medios decimales (4.3 → 4 enteras + 30% de la quinta).
+function AgentStars({ rating, count }) {
+  const r = Math.max(0, Math.min(5, Number(rating) || 0));
+  const pct = (r / 5) * 100;
+  const Star = ({ fill }) => (
+    <svg viewBox="0 0 20 20" width="14" height="14" style={{ display: 'block' }}>
+      <path d="M10 1.5l2.6 5.3 5.9.9-4.25 4.15 1 5.85L10 14.95 4.75 17.7l1-5.85L1.5 7.7l5.9-.9z"
+        fill={fill} stroke="none"/>
+    </svg>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+      <div style={{ position: 'relative', display: 'inline-block', height: 14 }}>
+        <div style={{ display: 'flex', gap: 1 }}>
+          {[0,1,2,3,4].map(i => <Star key={'b'+i} fill="#e2e8f0"/>)}
+        </div>
+        <div style={{ position: 'absolute', inset: 0, width: pct + '%', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', gap: 1 }}>
+            {[0,1,2,3,4].map(i => <Star key={'f'+i} fill="#F9B000"/>)}
+          </div>
+        </div>
+      </div>
+      {count > 0
+        ? <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            <strong style={{ color: 'var(--ink-2)' }}>{r.toFixed(1)}</strong> ({count} reseña{count === 1 ? '' : 's'})
+          </span>
+        : <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>Sin reseñas todavía</span>}
+    </div>
+  );
+}
+
+Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal, AgentPickerModal, AgentStars });
