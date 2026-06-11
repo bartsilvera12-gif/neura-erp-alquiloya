@@ -24,6 +24,13 @@ function q(table: string): string {
 // Agentes inmobiliarios (alquiloya.agentes)
 // ---------------------------------------------------------------------------
 
+export type PlanEstado =
+  | "sin_plan"
+  | "gratis"
+  | "activo"
+  | "por_vencer"
+  | "vencido";
+
 export type ErpAgenteInmobiliarioRow = {
   id: string;
   nombre: string | null;
@@ -35,6 +42,12 @@ export type ErpAgenteInmobiliarioRow = {
   activo: boolean | null;
   orden: number | null;
   propiedades_count: number;
+  plan_publicacion_id: string | null;
+  plan_nombre: string | null;
+  plan_tier: string | null;
+  plan_billing: string | null;
+  plan_vencimiento_at: string | null;
+  plan_estado: PlanEstado;
 };
 
 export async function listErpAgentesInmobiliarios(): Promise<ErpAgenteInmobiliarioRow[]> {
@@ -46,8 +59,21 @@ export async function listErpAgentesInmobiliarios(): Promise<ErpAgenteInmobiliar
       SELECT
         a.id, a.nombre, a.email, a.telefono, a.whatsapp,
         a.cargo, a.foto_url, a.activo, a.orden,
-        COALESCE(pc.n, 0)::int AS propiedades_count
+        COALESCE(pc.n, 0)::int AS propiedades_count,
+        a.plan_publicacion_id,
+        pp.nombre AS plan_nombre,
+        pp.tier   AS plan_tier,
+        pp.billing AS plan_billing,
+        a.plan_vencimiento_at::text AS plan_vencimiento_at,
+        CASE
+          WHEN a.plan_publicacion_id IS NULL THEN 'sin_plan'
+          WHEN pp.billing = 'gratis' OR lower(pp.tier) LIKE 'gratuito%' THEN 'gratis'
+          WHEN a.plan_vencimiento_at IS NOT NULL AND a.plan_vencimiento_at < now() THEN 'vencido'
+          WHEN a.plan_vencimiento_at IS NOT NULL AND a.plan_vencimiento_at < now() + interval '7 days' THEN 'por_vencer'
+          ELSE 'activo'
+        END AS plan_estado
       FROM ${q("agentes")} a
+      LEFT JOIN ${q("planes_publicacion")} pp ON pp.id = a.plan_publicacion_id
       LEFT JOIN LATERAL (
         SELECT count(*)::int AS n
         FROM ${q("propiedades")} p
@@ -77,6 +103,11 @@ export type ErpPropietarioRow = {
   activo: boolean;
   usuario_id: string | null;
   plan_publicacion_id: string | null;
+  plan_nombre: string | null;
+  plan_tier: string | null;
+  plan_billing: string | null;
+  plan_vencimiento_at: string | null;
+  plan_estado: PlanEstado;
   created_at: string | null;
 };
 
@@ -251,12 +282,24 @@ export async function getErpPropietario(id: string): Promise<ErpPropietarioDetai
   const { rows } = await queryWithRetry<ErpPropietarioRow & { observaciones: string | null }>(
     pool,
     `
-      SELECT id, nombre, email, telefono, documento, tipo_persona,
-             estado, activo, usuario_id, plan_publicacion_id,
-             observaciones,
-             created_at::text AS created_at
-      FROM ${q("propietarios")}
-      WHERE empresa_id = $1::uuid AND id = $2::uuid
+      SELECT pr.id, pr.nombre, pr.email, pr.telefono, pr.documento, pr.tipo_persona,
+             pr.estado, pr.activo, pr.usuario_id, pr.plan_publicacion_id,
+             pp.nombre AS plan_nombre,
+             pp.tier   AS plan_tier,
+             pp.billing AS plan_billing,
+             pr.plan_vencimiento_at::text AS plan_vencimiento_at,
+             CASE
+               WHEN pr.plan_publicacion_id IS NULL THEN 'sin_plan'
+               WHEN pp.billing = 'gratis' OR lower(pp.tier) LIKE 'gratuito%' THEN 'gratis'
+               WHEN pr.plan_vencimiento_at IS NOT NULL AND pr.plan_vencimiento_at < now() THEN 'vencido'
+               WHEN pr.plan_vencimiento_at IS NOT NULL AND pr.plan_vencimiento_at < now() + interval '7 days' THEN 'por_vencer'
+               ELSE 'activo'
+             END AS plan_estado,
+             pr.observaciones,
+             pr.created_at::text AS created_at
+      FROM ${q("propietarios")} pr
+      LEFT JOIN ${q("planes_publicacion")} pp ON pp.id = pr.plan_publicacion_id
+      WHERE pr.empresa_id = $1::uuid AND pr.id = $2::uuid
       LIMIT 1
     `,
     [ALQUILOYA_EMPRESA_ID, id]
@@ -296,12 +339,24 @@ export async function listErpPropietarios(): Promise<ErpPropietarioRow[]> {
     pool,
     `
       SELECT
-        id, nombre, email, telefono, documento, tipo_persona,
-        estado, activo, usuario_id, plan_publicacion_id,
-        created_at::text AS created_at
-      FROM ${q("propietarios")}
-      WHERE empresa_id = $1::uuid
-      ORDER BY created_at DESC NULLS LAST, lower(nombre) ASC
+        pr.id, pr.nombre, pr.email, pr.telefono, pr.documento, pr.tipo_persona,
+        pr.estado, pr.activo, pr.usuario_id, pr.plan_publicacion_id,
+        pp.nombre AS plan_nombre,
+        pp.tier   AS plan_tier,
+        pp.billing AS plan_billing,
+        pr.plan_vencimiento_at::text AS plan_vencimiento_at,
+        CASE
+          WHEN pr.plan_publicacion_id IS NULL THEN 'sin_plan'
+          WHEN pp.billing = 'gratis' OR lower(pp.tier) LIKE 'gratuito%' THEN 'gratis'
+          WHEN pr.plan_vencimiento_at IS NOT NULL AND pr.plan_vencimiento_at < now() THEN 'vencido'
+          WHEN pr.plan_vencimiento_at IS NOT NULL AND pr.plan_vencimiento_at < now() + interval '7 days' THEN 'por_vencer'
+          ELSE 'activo'
+        END AS plan_estado,
+        pr.created_at::text AS created_at
+      FROM ${q("propietarios")} pr
+      LEFT JOIN ${q("planes_publicacion")} pp ON pp.id = pr.plan_publicacion_id
+      WHERE pr.empresa_id = $1::uuid
+      ORDER BY pr.created_at DESC NULLS LAST, lower(pr.nombre) ASC
     `,
     [ALQUILOYA_EMPRESA_ID]
   );

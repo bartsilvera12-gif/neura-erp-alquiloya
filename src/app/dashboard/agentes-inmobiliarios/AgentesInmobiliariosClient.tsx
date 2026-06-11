@@ -50,6 +50,106 @@ type Tab = "agentes" | "propietarios";
 type Kind = "agente" | "propietario";
 type ActionKind = "desactivar" | "reactivar" | "eliminar";
 
+type PlanEstadoUI = "sin_plan" | "gratis" | "activo" | "por_vencer" | "vencido";
+
+const PLAN_ESTADO_LABEL: Record<PlanEstadoUI, string> = {
+  sin_plan: "Sin plan",
+  gratis: "Gratis",
+  activo: "Activo",
+  por_vencer: "Por vencer",
+  vencido: "Vencido",
+};
+
+const PLAN_ESTADO_CLS: Record<PlanEstadoUI, string> = {
+  sin_plan: "bg-slate-100 text-slate-600 ring-slate-200",
+  gratis: "bg-sky-100 text-sky-700 ring-sky-200",
+  activo: "bg-emerald-100 text-emerald-700 ring-emerald-200",
+  por_vencer: "bg-amber-100 text-amber-700 ring-amber-200",
+  vencido: "bg-rose-100 text-rose-700 ring-rose-200",
+};
+
+function fmtFecha(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("es-PY", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
+function PlanCell({
+  estado,
+  nombre,
+  tier,
+  vencimiento,
+}: {
+  estado: PlanEstadoUI;
+  nombre: string | null;
+  tier: string | null;
+  vencimiento: string | null;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${PLAN_ESTADO_CLS[estado]}`}
+      >
+        {PLAN_ESTADO_LABEL[estado]}
+      </span>
+      {nombre || tier ? (
+        <span className="text-xs font-medium text-slate-700">{nombre ?? tier}</span>
+      ) : null}
+      {estado !== "sin_plan" && estado !== "gratis" && vencimiento ? (
+        <span className="text-[10px] text-slate-500">vence {fmtFecha(vencimiento)}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function PlanFilter({
+  value,
+  counts,
+  onChange,
+}: {
+  value: "todos" | PlanEstadoUI;
+  counts: Record<"todos" | PlanEstadoUI, number>;
+  onChange: (v: "todos" | PlanEstadoUI) => void;
+}) {
+  const opts: Array<{ key: "todos" | PlanEstadoUI; label: string }> = [
+    { key: "todos", label: "Todos" },
+    { key: "activo", label: "Activo" },
+    { key: "por_vencer", label: "Por vencer" },
+    { key: "vencido", label: "Vencido" },
+    { key: "gratis", label: "Gratis" },
+    { key: "sin_plan", label: "Sin plan" },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Plan</span>
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${
+            value === o.key
+              ? "bg-[#4FAEB2] text-white ring-[#4FAEB2]"
+              : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          {o.label}
+          <span
+            className={`rounded-full px-1.5 text-[10px] ${
+              value === o.key ? "bg-white/20" : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {counts[o.key] ?? 0}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Badge({ on, label }: { on: boolean | null; label: string }) {
   const isOn = !!on;
   return (
@@ -349,13 +449,26 @@ function AgentesTab({
   error: string | null;
 }) {
   const [showInactive, setShowInactive] = useState(false);
+  const [planFilter, setPlanFilter] = useState<"todos" | PlanEstadoUI>("todos");
   const { busyId, pending, setPending, err, setErr, run, noun } = useToggleHandler("agente");
 
   const inactiveCount = useMemo(() => rows.filter((r) => !r.activo).length, [rows]);
-  const visibleRows = useMemo(
-    () => (showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo)),
-    [rows, showInactive]
-  );
+  const planCounts = useMemo(() => {
+    const c: Record<"todos" | PlanEstadoUI, number> = {
+      todos: 0, activo: 0, por_vencer: 0, vencido: 0, gratis: 0, sin_plan: 0,
+    };
+    const pool = showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo);
+    for (const r of pool) {
+      c.todos += 1;
+      c[r.plan_estado as PlanEstadoUI] = (c[r.plan_estado as PlanEstadoUI] ?? 0) + 1;
+    }
+    return c;
+  }, [rows, showInactive]);
+  const visibleRows = useMemo(() => {
+    const base = showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo);
+    if (planFilter === "todos") return base;
+    return base.filter((r) => r.plan_estado === planFilter);
+  }, [rows, showInactive, planFilter]);
 
   if (error) {
     return (
@@ -373,7 +486,8 @@ function AgentesTab({
   }
   return (
     <>
-      <div className="mb-3 flex items-center justify-end gap-3 text-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <PlanFilter value={planFilter} counts={planCounts} onChange={setPlanFilter} />
         <label className="inline-flex cursor-pointer items-center gap-2 text-slate-600">
           <input
             type="checkbox"
@@ -403,6 +517,7 @@ function AgentesTab({
               <th className="px-3 py-2.5">Teléfono</th>
               <th className="hidden px-3 py-2.5 lg:table-cell">Email</th>
               <th className="hidden px-3 py-2.5 text-center md:table-cell">Propiedades</th>
+              <th className="px-3 py-2.5">Plan</th>
               <th className="px-3 py-2.5">Activo</th>
               <th className="sticky right-0 bg-slate-50 px-3 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)]">Acciones</th>
             </tr>
@@ -410,10 +525,10 @@ function AgentesTab({
           <tbody className="divide-y divide-slate-100">
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-500">
                   {showInactive
-                    ? "No hay agentes desactivados."
-                    : "No hay agentes activos. Activá \"Ver desactivados\" para verlos."}
+                    ? "No hay agentes desactivados que coincidan."
+                    : "No hay agentes activos que coincidan con el filtro."}
                 </td>
               </tr>
             ) : (
@@ -443,6 +558,14 @@ function AgentesTab({
                     <td className="hidden px-3 py-2 text-slate-700 lg:table-cell">{a.email ?? "—"}</td>
                     <td className="hidden px-3 py-2 text-center text-slate-700 tabular-nums md:table-cell">
                       {a.propiedades_count}
+                    </td>
+                    <td className="px-3 py-2">
+                      <PlanCell
+                        estado={a.plan_estado as PlanEstadoUI}
+                        nombre={a.plan_nombre}
+                        tier={a.plan_tier}
+                        vencimiento={a.plan_vencimiento_at}
+                      />
                     </td>
                     <td className="px-3 py-2">
                       <Badge on={a.activo} label={a.activo ? "Sí" : "No"} />
@@ -484,13 +607,26 @@ function PropietariosTab({
   error: string | null;
 }) {
   const [showInactive, setShowInactive] = useState(false);
+  const [planFilter, setPlanFilter] = useState<"todos" | PlanEstadoUI>("todos");
   const { busyId, pending, setPending, err, setErr, run, noun } = useToggleHandler("propietario");
 
   const inactiveCount = useMemo(() => rows.filter((r) => !r.activo).length, [rows]);
-  const visibleRows = useMemo(
-    () => (showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo)),
-    [rows, showInactive]
-  );
+  const planCounts = useMemo(() => {
+    const c: Record<"todos" | PlanEstadoUI, number> = {
+      todos: 0, activo: 0, por_vencer: 0, vencido: 0, gratis: 0, sin_plan: 0,
+    };
+    const pool = showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo);
+    for (const r of pool) {
+      c.todos += 1;
+      c[r.plan_estado as PlanEstadoUI] = (c[r.plan_estado as PlanEstadoUI] ?? 0) + 1;
+    }
+    return c;
+  }, [rows, showInactive]);
+  const visibleRows = useMemo(() => {
+    const base = showInactive ? rows.filter((r) => !r.activo) : rows.filter((r) => r.activo);
+    if (planFilter === "todos") return base;
+    return base.filter((r) => r.plan_estado === planFilter);
+  }, [rows, showInactive, planFilter]);
 
   if (error) {
     return (
@@ -508,7 +644,8 @@ function PropietariosTab({
   }
   return (
     <>
-      <div className="mb-3 flex items-center justify-end gap-3 text-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <PlanFilter value={planFilter} counts={planCounts} onChange={setPlanFilter} />
         <label className="inline-flex cursor-pointer items-center gap-2 text-slate-600">
           <input
             type="checkbox"
@@ -541,7 +678,7 @@ function PropietariosTab({
               <th className="hidden px-3 py-2.5 xl:table-cell">Estado</th>
               <th className="px-3 py-2.5">Activo</th>
               <th className="hidden px-3 py-2.5 xl:table-cell">Usuario</th>
-              <th className="hidden px-3 py-2.5 xl:table-cell">Plan</th>
+              <th className="px-3 py-2.5">Plan</th>
               <th className="sticky right-0 bg-slate-50 px-3 py-2.5 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)]">Acciones</th>
             </tr>
           </thead>
@@ -571,8 +708,13 @@ function PropietariosTab({
                     <td className="hidden px-3 py-2 text-slate-500 xl:table-cell">
                       {p.usuario_id ? <span className="text-emerald-700">vinculado</span> : "—"}
                     </td>
-                    <td className="hidden px-3 py-2 text-slate-500 xl:table-cell">
-                      {p.plan_publicacion_id ? <span className="text-emerald-700">asignado</span> : "—"}
+                    <td className="px-3 py-2">
+                      <PlanCell
+                        estado={p.plan_estado as PlanEstadoUI}
+                        nombre={p.plan_nombre}
+                        tier={p.plan_tier}
+                        vencimiento={p.plan_vencimiento_at}
+                      />
                     </td>
                     <td className="sticky right-0 bg-white px-3 py-2 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)]">
                       <ActionsCell
