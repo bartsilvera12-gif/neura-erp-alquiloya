@@ -733,16 +733,18 @@ export default function Sidebar() {
       initial={false}
       animate={{ width: collapsed ? 80 : 260 }}
       transition={{ duration: 0.2 }}
-      className="flex h-svh min-h-0 shrink-0 flex-col border-r border-[color:var(--zentra-sidebar-border)] bg-[color:var(--zentra-sidebar)]"
+      className="relative flex h-svh min-h-0 shrink-0 flex-col border-r border-[color:var(--zentra-sidebar-border)] bg-[color:var(--zentra-sidebar)]"
     >
-      {/* Logo oficial ZENTRA (blanco sobre azul marca) */}
+      {/* Logo oficial ZENTRA: cuando esta colapsado usamos el isotipo cuadrado
+          (zentralogo.png) para que no quede espacio vacio; cuando esta
+          expandido el lockup horizontal completo. */}
       <div className="flex h-[7.25rem] shrink-0 items-center justify-between gap-2 border-b border-[color:var(--zentra-sidebar-border)] bg-[color:var(--zentra-sidebar-elevated)]/35 px-3 py-2.5">
         <Link href="/" className={`flex items-center justify-center min-w-0 flex-1 overflow-hidden`}>
           <div
             className={`relative flex items-center justify-center ${collapsed ? "h-11 w-11" : "h-[4.5rem] w-full max-w-[200px]"}`}
           >
             <Image
-              src="/brand/zentra-logo-official.png"
+              src={collapsed ? "/brand/zentralogo.png" : "/brand/zentra-logo-official.png"}
               alt="ZENTRA"
               width={400}
               height={220}
@@ -752,15 +754,31 @@ export default function Sidebar() {
             />
           </div>
         </Link>
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-[color:var(--zentra-sidebar-hover)] hover:text-white"
-          aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
-        >
-          {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-        </button>
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-[color:var(--zentra-sidebar-hover)] hover:text-white"
+            aria-label="Colapsar sidebar"
+          >
+            <PanelLeftClose className="h-5 w-5" />
+          </button>
+        )}
       </div>
+
+      {/* Toggle flotante estilo Coolify: pestaña en el borde derecho del
+          sidebar. Siempre visible (independiente del estado del logo) para
+          que el usuario pueda contraer/expandir sin perder la flecha cuando
+          el isotipo ocupa el header. */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(!collapsed)}
+        aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+        title={collapsed ? "Expandir" : "Colapsar"}
+        className="absolute top-[3.25rem] -right-3 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--zentra-sidebar-border)] bg-[color:var(--zentra-sidebar-elevated)] text-slate-300 shadow-[0_4px_10px_rgba(0,0,0,0.35)] transition-[background-color,color,transform] hover:bg-[color:var(--zentra-sidebar-hover)] hover:text-white"
+      >
+        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 -rotate-90" />}
+      </button>
 
       {!collapsed && (
         <div className="shrink-0 border-b border-[color:var(--zentra-sidebar-border)] px-3 py-3">
