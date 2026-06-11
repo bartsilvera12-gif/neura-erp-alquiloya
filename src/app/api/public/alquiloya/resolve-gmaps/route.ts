@@ -53,6 +53,7 @@ function isAllowedHost(url: string): boolean {
 }
 
 export async function GET(request: Request) {
+  const debug: string[] = [];
   try {
     const { searchParams } = new URL(request.url);
     const raw = (searchParams.get("url") || "").trim();
@@ -62,38 +63,56 @@ export async function GET(request: Request) {
     if (!isAllowedHost(raw)) {
       return NextResponse.json({ ok: false, error: "Solo links de Google Maps" }, { status: 400 });
     }
+    debug.push(`start url=${raw}`);
 
     // 1) Probamos parsear la URL directa (por si ya es la larga con coords).
     const direct = parseCoordsFromUrl(raw);
-    if (direct) return NextResponse.json({ ok: true, lat: direct.lat, lng: direct.lng });
+    if (direct) {
+      debug.push(`parsed-from-input lat=${direct.lat} lng=${direct.lng}`);
+      console.log("[resolve-gmaps]", debug.join(" | "));
+      return NextResponse.json({ ok: true, lat: direct.lat, lng: direct.lng });
+    }
 
     // 2) Seguimos el redirect manualmente para capturar el Location header.
-    //    fetch() con redirect:'manual' no sigue automaticamente. Iteramos hasta
-    //    3 redirects para cubrir cadenas (maps.app.goo.gl -> consent.google.com
-    //    -> google.com/maps/... a veces pasan por consent).
     let currentUrl = raw;
-    for (let i = 0; i < 5; i++) {
-      const res = await fetch(currentUrl, {
-        method: "GET",
-        redirect: "manual",
-        headers: {
-          // UA "browser" — algunos endpoints de Google devuelven HTML distinto
-          // segun el UA. Con un UA tipo Chrome obtenemos la pagina con
-          // coordenadas en meta tags / scripts.
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-          "Accept-Language": "es-PY,es;q=0.9,en;q=0.5",
-        },
-      });
+    for (let i = 0; i < 6; i++) {
+      let res;
+      try {
+        res = await fetch(currentUrl, {
+          method: "GET",
+          redirect: "manual",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+            "Accept-Language": "es-PY,es;q=0.9,en;q=0.5",
+          },
+        });
+      } catch (fetchErr) {
+        debug.push(`fetch-error i=${i} msg=${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`);
+        console.error("[resolve-gmaps]", debug.join(" | "));
+        return NextResponse.json(
+          { ok: false, error: "No pudimos contactar a Google Maps", debug: debug.join(" | ") },
+          { status: 200 }
+        );
+      }
+      debug.push(`hop${i} status=${res.status} url=${currentUrl.slice(0, 80)}`);
 
       // Si redirige: tomamos Location y reintentamos.
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get("location");
-        if (!loc) break;
+        if (!loc) {
+          debug.push(`hop${i} no-location-header`);
+          break;
+        }
         const next = new URL(loc, currentUrl).toString();
+        debug.push(`hop${i} -> ${next.slice(0, 80)}`);
         // Probamos parsear la nueva URL antes de seguir (puede tener las coords).
         const fromNext = parseCoordsFromUrl(next);
-        if (fromNext) return NextResponse.json({ ok: true, lat: fromNext.lat, lng: fromNext.lng });
+        if (fromNext) {
+          debug.push(`parsed-from-location lat=${fromNext.lat} lng=${fromNext.lng}`);
+          console.log("[resolve-gmaps]", debug.join(" | "));
+          return NextResponse.json({ ok: true, lat: fromNext.lat, lng: fromNext.lng });
+        }
         currentUrl = next;
         continue;
       }
@@ -101,24 +120,36 @@ export async function GET(request: Request) {
       // Llegamos al destino: parseamos URL final y body HTML.
       const fromFinalUrl = parseCoordsFromUrl(res.url || currentUrl);
       if (fromFinalUrl) {
+        debug.push(`parsed-from-final-url lat=${fromFinalUrl.lat} lng=${fromFinalUrl.lng}`);
+        console.log("[resolve-gmaps]", debug.join(" | "));
         return NextResponse.json({ ok: true, lat: fromFinalUrl.lat, lng: fromFinalUrl.lng });
       }
       const text = await res.text().catch(() => "");
+      debug.push(`hop${i} body-len=${text.length}`);
       const fromBody = parseCoordsFromUrl(text);
       if (fromBody) {
+        debug.push(`parsed-from-body lat=${fromBody.lat} lng=${fromBody.lng}`);
+        console.log("[resolve-gmaps]", debug.join(" | "));
         return NextResponse.json({ ok: true, lat: fromBody.lat, lng: fromBody.lng });
       }
+      debug.push(`hop${i} no-coords-in-body`);
       break;
     }
 
+    console.warn("[resolve-gmaps] no-match", debug.join(" | "));
     return NextResponse.json(
-      { ok: false, error: "No pudimos extraer la ubicacion del link" },
+      {
+        ok: false,
+        error: "No pudimos extraer la ubicación del link",
+        debug: debug.join(" | "),
+      },
       { status: 200 }
     );
   } catch (err) {
-    console.error("[resolve-gmaps]", err instanceof Error ? err.message : err);
+    debug.push(`exception ${err instanceof Error ? err.message : String(err)}`);
+    console.error("[resolve-gmaps]", debug.join(" | "));
     return NextResponse.json(
-      { ok: false, error: "Error al resolver el link" },
+      { ok: false, error: "Error al resolver el link", debug: debug.join(" | ") },
       { status: 500 }
     );
   }

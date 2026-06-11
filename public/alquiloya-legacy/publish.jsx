@@ -1050,14 +1050,24 @@ function LeafletPickerWidget({ lat, lng, onChange }) {
     setLinkBusy(true);
     try {
       const r = await fetch('/api/public/alquiloya/resolve-gmaps?url=' + encodeURIComponent(raw), { cache: 'no-store' });
-      const b = await r.json().catch(() => ({}));
-      if (!r.ok || !b || !b.ok || typeof b.lat !== 'number' || typeof b.lng !== 'number') {
-        throw new Error((b && b.error) || 'No pudimos resolver el link');
+      let b = {};
+      try { b = await r.json(); } catch { /* respuesta no-JSON */ }
+      // Si el endpoint no existe (404), probablemente el deploy aun no se
+      // actualizo. Damos un mensaje claro al usuario para que sepa que
+      // intente despues o use el pin manual.
+      if (r.status === 404) {
+        setLinkErr('El servicio para resolver links cortos todavía no está disponible en este servidor. Probá pegar el link largo de Google Maps (no el de maps.app.goo.gl) o marcá el punto en el mapa.');
+        return;
+      }
+      if (!r.ok || !b || b.ok !== true || typeof b.lat !== 'number' || typeof b.lng !== 'number') {
+        const motivo = (b && (b.error || b.message)) || ('HTTP ' + r.status);
+        setLinkErr('No pudimos extraer la ubicación: ' + motivo + '. Probá abrir el link en Google Maps, luego "Compartir → Copiar enlace".');
+        return;
       }
       onChange(Number(Number(b.lat).toFixed(6)), Number(Number(b.lng).toFixed(6)));
       setLinkInput('');
     } catch (e) {
-      setLinkErr('No pudimos extraer la ubicación de ese link. Abrí el link en Google Maps, después "Compartir → Copiar enlace" y pegá el link largo (no el corto).');
+      setLinkErr('Error de red al resolver el link: ' + (e && e.message ? e.message : 'desconocido'));
     } finally {
       setLinkBusy(false);
     }
