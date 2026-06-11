@@ -673,8 +673,6 @@ function AdminAgentPage({ route, onNav }) {
               const isBoosted = !!boostedIds[p.id] || !!p.destacada;
               const status = isPaused ? 'paused' : 'active';
               if (propFilter !== 'all' && propFilter !== status) return null;
-              const vistas = 120 + i * 87;
-              const consultas = 2 + i * 3;
               // Banner plan gratis: aviso si quedan <=7 dias o ya vencio.
               const showPlanGratisWarning = p._real && p.plan_es_gratis && !p.plan_gratis_expirado
                 && typeof p.plan_gratis_dias_restantes === 'number'
@@ -749,9 +747,6 @@ function AdminAgentPage({ route, onNav }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
                       {p.codigo ? <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{p.codigo}</span> : null}
                       <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{formatGs(p.price)}<span style={{ color: 'var(--ink-4)', fontWeight: 500 }}> /mes</span></span>
-                      <span style={{ color: 'var(--ink-4)' }}>·</span>
-                      <span><I.eye s={11}/> <strong style={{ color: 'var(--ink-2)' }}>{vistas}</strong> vistas</span>
-                      <span><I.chat s={11}/> <strong style={{ color: 'var(--ink-2)' }}>{consultas}</strong> consultas</span>
                     </div>
                   </div>
 
