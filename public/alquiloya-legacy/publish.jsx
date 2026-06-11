@@ -132,6 +132,30 @@ function PublishPage() {
     return null;
   }
 
+  // Validacion por paso del wizard: bloquea "Continuar" si el paso actual no
+  // tiene completos sus campos obligatorios. Devuelve null si esta OK, o el
+  // mensaje a mostrar.
+  function validateStep(s) {
+    if (s === 0) {
+      if (!(form.titulo || '').trim()) return 'Ingresá el título de la publicación.';
+      const precio = Number(String(form.precio).replace(/[^\d.]/g, ''));
+      if (!Number.isFinite(precio) || precio <= 0) return 'Ingresá un precio válido.';
+      return null;
+    }
+    if (s === 1) {
+      if (!(form.ciudad || '').trim()) return 'Indicá la ciudad del inmueble.';
+      return null;
+    }
+    if (s === 4) {
+      if (!(form.propietario_nombre || '').trim()) return 'Ingresá tu nombre.';
+      const telDigits = (form.propietario_telefono || '').replace(/\D/g, '');
+      if (telDigits.length < 7) return 'El teléfono / WhatsApp es obligatorio (es el contacto que verán los interesados).';
+      return null;
+    }
+    return null;
+  }
+  const [stepError, setStepError] = React.useState(null);
+
   async function onEnviar() {
     setSubmitState({ loading: false, error: null, success: null });
     const err = validateAll();
@@ -364,15 +388,25 @@ function PublishPage() {
             </div>
           )}
 
+          {stepError && (
+            <div style={{ marginTop: 16, padding: 12, background: '#fdecec', borderRadius: 12, border: '1px solid #f3c2c2', color: '#a8312f', fontSize: 13 }}>
+              {stepError}
+            </div>
+          )}
           <div className="row between" style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--line-2)' }}>
-            <button className="btn btn-outline" disabled={step === 0} onClick={() => setStep(s => Math.max(0, s - 1))}
+            <button className="btn btn-outline" disabled={step === 0} onClick={() => { setStepError(null); setStep(s => Math.max(0, s - 1)); }}
               style={{ opacity: step === 0 ? 0.4 : 1 }}>
               ← Anterior
             </button>
             <div className="row gap-12">
               <span className="muted xs">Paso {step + 1} de {steps.length}</span>
               {step < steps.length - 1 ? (
-                <button className="btn btn-blue" onClick={() => setStep(s => Math.min(steps.length - 1, s + 1))}>
+                <button className="btn btn-blue" onClick={() => {
+                  const err = validateStep(step);
+                  if (err) { setStepError(err); return; }
+                  setStepError(null);
+                  setStep(s => Math.min(steps.length - 1, s + 1));
+                }}>
                   Continuar <I.arrow s={14}/>
                 </button>
               ) : (
@@ -700,13 +734,13 @@ function StepBasics({ form, setF }) {
           </div>
         </div>
         <div className="field" style={{ marginBottom: 18 }}>
-          <label>Título de la publicación</label>
+          <label>Título de la publicación *</label>
           <input className="input" value={form.titulo} onChange={(e) => setF({ titulo: e.target.value })} placeholder="Ej. Dúplex moderno con balcón en Villa Morra" maxLength={120}/>
           <span className="muted xs">Sé claro y específico.</span>
         </div>
         <FormGrid>
           <div className="field">
-            <label>Precio (Gs.)</label>
+            <label>Precio (Gs.) *</label>
             <input className="input" value={form.precio} onChange={(e) => setF({ precio: e.target.value.replace(/[^\d]/g, '') })} placeholder="Ej. 3800000" inputMode="numeric"/>
           </div>
           <div className="field">
