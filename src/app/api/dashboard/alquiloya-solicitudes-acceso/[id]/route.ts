@@ -122,12 +122,55 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
     // aprobar → crear agente o propietario y vincular resultado_id
 
-    // Pre-validar unicidad de email para agente/referido (los que sí abren
-    // cuenta de portal). Si el email ya está en uso en cualquier tabla ERP,
-    // abortamos ANTES de crear el agente para no dejar un registro huérfano
-    // sin acceso. Auth.users se sigue validando vía createUser más abajo.
+    // Cliente admin para borrar auth.users huérfanos en la pre-validación y
+    // para createUser dentro de la transacción.
+    const supabaseAdmin = createServiceRoleClient();
+
+    // Pre-validar unicidad de email para agente/referido. Antes del check,
+    // limpiamos filas HUÉRFANAS de alquiloya.usuarios — son las que quedan
+    // cuando se borra un agente/propietario pero la fila en usuarios (y
+    // su auth.users) sobrevive y bloquea reaprobar el mismo email.
     if (sol.email && sol.tipo !== "propietario") {
       const emailLc = sol.email.toLowerCase();
+
+      // 1. Buscar usuarios "fantasma" con este email (agente_id apunta a
+      // un agente que ya no existe, o propietario_id idem). Capturamos
+      // auth_user_id para borrar también en auth.users.
+      const { rows: ghosts } = await queryWithRetry<{ id: string; auth_user_id: string | null }>(
+        pool,
+        `SELECT u.id, u.auth_user_id::text AS auth_user_id
+           FROM ${t("usuarios")} u
+          WHERE u.empresa_id=$1::uuid
+            AND lower(u.email)=$2
+            AND (
+              (u.agente_id IS NOT NULL AND NOT EXISTS (
+                 SELECT 1 FROM ${t("agentes")} a WHERE a.id = u.agente_id))
+              OR (u.propietario_id IS NOT NULL AND NOT EXISTS (
+                 SELECT 1 FROM ${t("propietarios")} p WHERE p.id = u.propietario_id))
+              OR (u.agente_id IS NULL AND u.propietario_id IS NULL AND COALESCE(u.activo, false) = false)
+            )`,
+        [ALQUILOYA_EMPRESA_ID, emailLc]
+      );
+      for (const g of ghosts) {
+        try {
+          await queryWithRetry(
+            pool,
+            `DELETE FROM ${t("usuarios")} WHERE id = $1::uuid`,
+            [g.id]
+          );
+        } catch (e) {
+          console.warn("[solicitudes-acceso] no se pudo borrar usuario huérfano:", e instanceof Error ? e.message : e);
+        }
+        if (g.auth_user_id) {
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(g.auth_user_id);
+          } catch (e) {
+            console.warn("[solicitudes-acceso] no se pudo borrar auth.user huérfano:", e instanceof Error ? e.message : e);
+          }
+        }
+      }
+
+      // 2. Ahora sí, chequeo de duplicados reales.
       const { rows: dup } = await queryWithRetry<{ source: string }>(
         pool,
         `(SELECT 'usuarios' AS source FROM ${t("usuarios")}
@@ -181,9 +224,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
     }
 
     const client = await pool.connect();
-    // Declarados fuera del try para que el catch pueda compensar el auth.user
+    // Declarado fuera del try para que el catch pueda compensar el auth.user
     // creado si la transacción del ERP falla.
-    const supabaseAdmin = createServiceRoleClient();
     let createdAuthUserId: string | null = null;
     try {
       await client.query("BEGIN");
