@@ -15,6 +15,7 @@ import {
   UserCog,
   Building2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Star,
   Sparkles,
@@ -764,7 +765,7 @@ export default function Sidebar() {
         title={collapsed ? "Expandir" : "Colapsar"}
         className="absolute top-[8rem] -right-3 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--zentra-sidebar-border)] bg-[color:var(--zentra-sidebar-elevated)] text-slate-300 shadow-[0_4px_10px_rgba(0,0,0,0.35)] transition-[background-color,color,transform] hover:bg-[color:var(--zentra-sidebar-hover)] hover:text-white"
       >
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 -rotate-90" />}
+        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>
 
       {!collapsed && (
