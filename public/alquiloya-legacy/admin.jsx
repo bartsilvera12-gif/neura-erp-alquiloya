@@ -281,9 +281,17 @@ function Donut({ data }) {
 }
 
 function AdminAgentPage({ route, onNav }) {
+  // Snapshot persistente del estado derivado de AdminAgentPage. Sin esto,
+  // cada vez que el usuario navega a "Carteles QR" (que es otro componente,
+  // PostersPage) y vuelve a Resumen, AdminAgentPage se remonta con state
+  // null y muestra los skeletons aunque la respuesta este cacheada — el
+  // useEffect tiene que correr y resetear el state, lo que genera un flash.
+  // Inicializamos directamente desde el snapshot para que el primer render
+  // ya tenga los datos.
+  const SNAP = (window.__AY_PANEL_SNAPSHOT = window.__AY_PANEL_SNAPSHOT || {});
   const [impulsesFree, setImpulsesFree] = React.useState(0);
-  const [impulsesPaid, setImpulsesPaid] = React.useState(0);   // saldo real desde alquiloya.propietarios.impulsos_saldo
-  const [meData, setMeData] = React.useState(null); // { propietario, usuario, agente }
+  const [impulsesPaid, setImpulsesPaid] = React.useState(() => SNAP.impulsesPaid || 0);
+  const [meData, setMeData] = React.useState(() => SNAP.meData || null); // { propietario, usuario, agente }
   const [meError, setMeError] = React.useState(null);
 
   // Cargar perfil real: agente PRIMERO (si la cuenta tiene agente_id ese es su
@@ -299,7 +307,9 @@ function AdminAgentPage({ route, onNav }) {
           const body2 = await r2.json();
           if (cancelled) return;
           if (body2?.agente) {
-            setMeData({ kind: 'agente', usuario: body2.usuario, agente: body2.agente });
+            const next = { kind: 'agente', usuario: body2.usuario, agente: body2.agente };
+            setMeData(next);
+            SNAP.meData = next;
             return;
           }
         }
@@ -308,8 +318,12 @@ function AdminAgentPage({ route, onNav }) {
           const body = await r.json();
           if (cancelled) return;
           if (body?.propietario) {
-            setMeData({ kind: 'propietario', usuario: body.usuario, propietario: body.propietario });
-            setImpulsesPaid(Number(body.propietario.impulsos_saldo) || 0);
+            const next = { kind: 'propietario', usuario: body.usuario, propietario: body.propietario };
+            setMeData(next);
+            const saldo = Number(body.propietario.impulsos_saldo) || 0;
+            setImpulsesPaid(saldo);
+            SNAP.meData = next;
+            SNAP.impulsesPaid = saldo;
             return;
           }
         }
@@ -323,11 +337,12 @@ function AdminAgentPage({ route, onNav }) {
 
   // Fase 9B: "Mis propiedades" desde API real. Probamos primero propietario (si la
   // sesion es propietaria devuelve sus inmuebles), si no agente.
-  const [myPropiedades, setMyPropiedades] = React.useState(null);
+  const [myPropiedades, setMyPropiedades] = React.useState(() => SNAP.myPropiedades ?? null);
   // propsLoading: mientras es true mostramos skeleton, NO la data mock. Antes,
   // durante la carga, propsForRender caia a PROPERTIES (seed) y el usuario veia
   // un flash de propiedades ajenas/inventadas antes de que llegaran las suyas.
-  const [propsLoading, setPropsLoading] = React.useState(true);
+  // Si ya tenemos snapshot, arrancamos en false (no hay nada que esperar).
+  const [propsLoading, setPropsLoading] = React.useState(() => SNAP.myPropiedades == null);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -392,6 +407,7 @@ function AdminAgentPage({ route, onNav }) {
       }));
       // Marcamos como cargado AUNQUE este vacio. Empty array = "tengo sesion pero 0 propiedades".
       setMyPropiedades(mapped);
+      SNAP.myPropiedades = mapped;
       setPropsLoading(false);
     })();
     return () => { cancelled = true; };
@@ -440,6 +456,12 @@ function AdminAgentPage({ route, onNav }) {
           window.ayInvalidate('/api/propietario/propiedades');
           window.ayInvalidate('/api/propietario/me');
           window.ayInvalidate('/api/agente/propiedades');
+        }
+        // Bustear snapshot para que la proxima remontada del panel
+        // refetchee y refleje el nuevo saldo / destacada.
+        if (window.__AY_PANEL_SNAPSHOT) {
+          window.__AY_PANEL_SNAPSHOT.myPropiedades = null;
+          window.__AY_PANEL_SNAPSHOT.impulsesPaid = Number(data.saldo_restante) || 0;
         }
         setBoostedIds(b => ({ ...b, [id]: true }));
         setImpulsesPaid(Number(data.saldo_restante) || 0);
