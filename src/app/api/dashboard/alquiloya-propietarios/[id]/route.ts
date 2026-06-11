@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
+import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,39 @@ export async function DELETE(request: Request, ctx: Ctx) {
         );
       }
       try {
+        // Cascada manual: antes de borrar el propietario, eliminamos las filas
+        // vinculadas en alquiloya.usuarios y sus auth.users. Sin esto el email
+        // queda "fantasma" y bloquea reintentos de alta directa con el mismo
+        // correo. Mismo patron que el DELETE de agentes.
+        const { rows: linkedUsers } = await queryWithRetry<{ id: string; auth_user_id: string | null }>(
+          pool,
+          `SELECT id, auth_user_id::text AS auth_user_id
+             FROM ${t("usuarios")}
+            WHERE empresa_id=$1::uuid AND propietario_id=$2::uuid`,
+          [ALQUILOYA_EMPRESA_ID, id]
+        );
+        if (linkedUsers.length > 0) {
+          await queryWithRetry(
+            pool,
+            `DELETE FROM ${t("usuarios")}
+              WHERE empresa_id=$1::uuid AND propietario_id=$2::uuid`,
+            [ALQUILOYA_EMPRESA_ID, id]
+          );
+          const supabaseAdmin = createServiceRoleClient();
+          for (const u of linkedUsers) {
+            if (!u.auth_user_id) continue;
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(u.auth_user_id);
+            } catch (cleanupErr) {
+              console.warn(
+                "[alquiloya-propietarios DELETE] no se pudo borrar auth.user",
+                u.auth_user_id,
+                cleanupErr instanceof Error ? cleanupErr.message : cleanupErr
+              );
+            }
+          }
+        }
+
         const r = await queryWithRetry<{ id: string }>(
           pool,
           `DELETE FROM ${t("propietarios")}

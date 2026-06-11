@@ -54,6 +54,53 @@ export async function POST(request: Request) {
       return NextResponse.json(errorResponse("Pool no disponible"), { status: 500 });
     }
 
+    // Cliente admin para limpiar auth.users huerfanos antes del check de
+    // duplicados y para crear el auth.user definitivo despues.
+    const supabaseAdmin = createServiceRoleClient();
+
+    // 0) Limpieza de huerfanos: si el email vive en alquiloya.usuarios pero
+    // su propietario_id apunta a una fila que ya no existe (admin borro al
+    // propietario sin cascada), borramos esa fila y su auth.users para
+    // permitir reusar el correo. Misma logica que la aprobacion de agentes.
+    const { rows: ghosts } = await queryWithRetry<{ id: string; auth_user_id: string | null }>(
+      pool,
+      `SELECT u.id, u.auth_user_id::text AS auth_user_id
+         FROM ${t("usuarios")} u
+        WHERE u.empresa_id=$1::uuid
+          AND lower(u.email)=lower($2)
+          AND (
+            (u.propietario_id IS NOT NULL AND NOT EXISTS (
+               SELECT 1 FROM ${t("propietarios")} p WHERE p.id = u.propietario_id))
+            OR (u.agente_id IS NOT NULL AND NOT EXISTS (
+               SELECT 1 FROM ${t("agentes")} a WHERE a.id = u.agente_id))
+          )`,
+      [ALQUILOYA_EMPRESA_ID, email]
+    );
+    for (const g of ghosts) {
+      try {
+        await queryWithRetry(
+          pool,
+          `DELETE FROM ${t("usuarios")} WHERE id = $1::uuid`,
+          [g.id]
+        );
+      } catch (e) {
+        console.warn(
+          "[registro-propietario] no se pudo borrar usuario huerfano:",
+          e instanceof Error ? e.message : e
+        );
+      }
+      if (g.auth_user_id) {
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(g.auth_user_id);
+        } catch (e) {
+          console.warn(
+            "[registro-propietario] no se pudo borrar auth.user huerfano:",
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
+    }
+
     // 1) Email único: ni en propietarios, ni en agentes, ni en usuarios.
     const { rows: emailHits } = await queryWithRetry<{ source: string }>(
       pool,
@@ -92,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     // 3) Crear auth user + filas en propietarios + usuarios (transaccional para el ERP).
-    const supabase = createServiceRoleClient();
+    const supabase = supabaseAdmin;
     const { data: created, error: createErr } = await supabase.auth.admin.createUser({
       email,
       password,
