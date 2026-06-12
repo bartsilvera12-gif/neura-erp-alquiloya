@@ -96,8 +96,8 @@ function HelpPage({ onNav }) {
       <div className="container" style={{ marginTop: -40, position: 'relative' }}>
         {(() => {
           const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
-            whatsapp: '595985489178',
-            whatsappLabel: '0985 489 178',
+            whatsapp: '595983000292',
+            whatsappLabel: '0983 000 292',
             email: 'Info@alquiloya.com.py',
           };
           // A pedido del cliente: el email del centro de ayuda usa el MISMO
@@ -174,8 +174,8 @@ function HelpPage({ onNav }) {
               <div className="muted" style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.45 }}>Te respondemos en menos de 24 hs hábiles.</div>
               {(() => {
                 const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
-                  whatsapp: '595985489178',
-                  whatsappLabel: '0985 489 178',
+                  whatsapp: '595983000292',
+                  whatsappLabel: '0983 000 292',
                   email: 'Info@alquiloya.com.py',
                 };
                 const emailH = C.email || 'Info@alquiloya.com.py';
@@ -216,7 +216,7 @@ function HelpPage({ onNav }) {
           <p className="muted" style={{ marginTop: 8, fontSize: 14.5 }}>Nuestro equipo de soporte responde de lunes a sábado, de 8:00 a 20:00.</p>
           {(() => {
             const C = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA) || {
-              whatsapp: '595985489178',
+              whatsapp: '595983000292',
               email: 'Info@alquiloya.com.py',
             };
             const emailH = C.email || 'Info@alquiloya.com.py';

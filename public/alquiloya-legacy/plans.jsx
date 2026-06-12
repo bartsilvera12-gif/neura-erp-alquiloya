@@ -578,7 +578,7 @@ function ImpulsoCompraModal({ pack, onClose }) {
           </div>
           {/* CTA principal: WhatsApp directo */}
           {(() => {
-            const wa = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595985489178';
+            const wa = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595983000292';
             const msg = encodeURIComponent(`Hola AlquiloYa, quiero comprar un pack de ${pack.qty} impulso${pack.qty > 1 ? 's' : ''} por Gs. ${Number(pack.price || 0).toLocaleString('es-PY')}.`);
             const wHref = `https://wa.me/${wa}?text=${msg}`;
             return (
