@@ -240,8 +240,11 @@ export async function getPublicPropiedad(id: string) {
           json_build_object(
             'tipo', CASE WHEN a.id IS NOT NULL THEN 'agente' ELSE 'propietario' END,
             'nombre', COALESCE(a.nombre, pr.nombre),
-            'telefono', COALESCE(a.telefono, pr.telefono),
-            'whatsapp', COALESCE(a.whatsapp, a.telefono, pr.telefono)
+            -- Para el contacto publico de la ficha preferimos el telefono_contacto
+            -- del propietario (numero PUBLICO que el dueño puso en el form de
+            -- publicar), y si no esta seteado caemos al telefono personal.
+            'telefono', COALESCE(a.telefono, pr.telefono_contacto, pr.telefono),
+            'whatsapp', COALESCE(a.whatsapp, a.telefono, pr.telefono_contacto, pr.telefono)
           ) AS contacto,
           COALESCE((
             SELECT json_agg(

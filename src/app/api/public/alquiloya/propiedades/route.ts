@@ -114,6 +114,9 @@ type Body = {
   propietario_nombre?: string;
   propietario_email?: string;
   propietario_telefono?: string;
+  // Numero PUBLICO que aparece en la ficha (boton "Consultar por WhatsApp").
+  // Si NO lo manda, se usa propietario_telefono como fallback.
+  propietario_telefono_contacto?: string;
   propietario_documento?: string;
   plan_publicacion_id?: string | null;
   notas_propietario?: string;
@@ -320,6 +323,7 @@ export async function POST(request: Request) {
     const propNombre = s(body.propietario_nombre, 240);
     const propEmail = s(body.propietario_email, 240);
     const propTelefono = s(body.propietario_telefono, 60);
+    const propTelefonoContacto = s(body.propietario_telefono_contacto, 60);
 
     if (!titulo) return NextResponse.json({ error: "titulo requerido" }, { status: 400 });
     if (!tipo) return NextResponse.json({ error: "tipo invalido" }, { status: 400 });
@@ -365,6 +369,15 @@ export async function POST(request: Request) {
     const client: PoolClient = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // Bootstrap idempotente: aseguramos que la columna telefono_contacto
+      // exista en alquiloya.propietarios. Mirror de la migracion
+      // 20260704120000. Sin esto, si la DB de prod todavia no corrio la
+      // migracion el INSERT de abajo explota con "column does not exist".
+      await client.query(
+        `ALTER TABLE "alquiloya"."propietarios"
+           ADD COLUMN IF NOT EXISTS telefono_contacto text`
+      );
 
       // 1. Resolver propietario_id.
       //   - Si el usuario es propietario directo (usuarioPropietarioId set),
@@ -421,31 +434,33 @@ export async function POST(request: Request) {
       if (!propietarioId) {
         const r = await client.query<{ id: string }>(
           `INSERT INTO "alquiloya"."propietarios" (
-             empresa_id, nombre, email, telefono, documento,
+             empresa_id, nombre, email, telefono, telefono_contacto, documento,
              estado, activo, plan_publicacion_id, observaciones
            )
-           VALUES ($1::uuid, $2, $3, $4, $5, 'pendiente', true, $6, $7)
+           VALUES ($1::uuid, $2, $3, $4, $5, $6, 'pendiente', true, $7, $8)
            RETURNING id`,
           [
             ALQUILOYA_EMPRESA_ID,
             propNombre,
             propEmail,
             propTelefono,
+            propTelefonoContacto,
             s(body.propietario_documento, 60),
             planId,
             notas,
           ]
         );
         propietarioId = r.rows[0].id;
-      } else if (planId || notas) {
-        // Actualizar plan / observaciones si llegaron y la fila ya existía
+      } else if (planId || notas || propTelefonoContacto) {
+        // Actualizar plan / observaciones / telefono_contacto si llegaron y la fila ya existia
         await client.query(
           `UPDATE "alquiloya"."propietarios"
               SET plan_publicacion_id = COALESCE($1, plan_publicacion_id),
                   observaciones       = COALESCE($2, observaciones),
+                  telefono_contacto   = COALESCE($3, telefono_contacto),
                   updated_at = now()
-            WHERE id = $3::uuid`,
-          [planId, notas, propietarioId]
+            WHERE id = $4::uuid`,
+          [planId, notas, propTelefonoContacto, propietarioId]
         );
       }
 

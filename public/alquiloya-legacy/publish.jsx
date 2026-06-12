@@ -101,6 +101,11 @@ function PublishPage() {
     propietario_nombre: '',
     propietario_email: '',
     propietario_telefono: '',
+    // Numero PUBLICO que aparece en la ficha y dispara el boton "Consultar
+    // por WhatsApp". Permite que el propietario use un numero distinto al
+    // personal (ej. para no compartir su celular). Si queda vacio, el
+    // backend usa propietario_telefono como fallback.
+    propietario_telefono_contacto: '',
   });
   const setF = React.useCallback((patch) => setForm(f => Object.assign({}, f, typeof patch === 'function' ? patch(f) : patch)), []);
 
@@ -166,6 +171,7 @@ function PublishPage() {
       propietario_nombre: f.propietario_nombre || perfil.nombre || '',
       propietario_email: f.propietario_email || perfil.email || '',
       propietario_telefono: f.propietario_telefono || perfil.telefono || perfil.whatsapp || '',
+      propietario_telefono_contacto: f.propietario_telefono_contacto || perfil.telefono_contacto || '',
     }));
   }, [ctxAgente, ctxPropietario]);
 
@@ -263,6 +269,7 @@ function PublishPage() {
         propietario_nombre: form.propietario_nombre,
         propietario_email: form.propietario_email || null,
         propietario_telefono: form.propietario_telefono || null,
+        propietario_telefono_contacto: form.propietario_telefono_contacto || null,
         plan_publicacion_id: form.plan_id || null,
       };
       const isEdit = !!editingId;
@@ -1618,12 +1625,22 @@ function StepPreview({ form, setF }) {
             <label>Email</label>
             <input type="email" className="input" value={form.propietario_email} onChange={(e) => setF({ propietario_email: e.target.value })} placeholder="usuario@dominio.com"/>
           </div>
-          <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <label>Teléfono / WhatsApp *</label>
+          <div className="field">
+            <label>Tu teléfono / WhatsApp personal *</label>
             <input className="input" value={form.propietario_telefono} onChange={(e) => setF({ propietario_telefono: e.target.value })} placeholder="+595 ..."/>
+            <div className="muted xs" style={{ marginTop: 6 }}>Para uso interno de AlquiloYa (no se publica).</div>
+          </div>
+          <div className="field">
+            <label>Teléfono de contacto para la publicación</label>
+            <input
+              className="input"
+              value={form.propietario_telefono_contacto}
+              onChange={(e) => setF({ propietario_telefono_contacto: e.target.value })}
+              placeholder="+595 ... (opcional)"
+            />
+            <div className="muted xs" style={{ marginTop: 6 }}>Si lo dejás vacío, usamos tu número personal. Útil si querés que los interesados te contacten en otro número (ej. WhatsApp de trabajo).</div>
           </div>
         </FormGrid>
-        <div className="muted xs" style={{ marginTop: 8 }}>El teléfono / WhatsApp es obligatorio: es el contacto al que llega el botón “Consultar por WhatsApp” de tu publicación.</div>
       </div>
 
       <div style={{ marginTop: 16, padding: 18, background: 'var(--yellow-50)', borderRadius: 12, fontSize: 13.5, color: '#8a5e00' }}>
