@@ -1446,10 +1446,12 @@ function extractPlanLimitsFromBullets(bullets) {
 function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
   const [apiPlans, setApiPlans] = React.useState(null);
   const [agentPickerOpen, setAgentPickerOpen] = React.useState(false);
-  // Solo propietarios logueados (no agentes, ni editando una propiedad existente)
-  // ven el atajo "que un agente publique por mi". Esto crea una captacion en
-  // el panel del agente elegido, sin que el propietario tenga que seguir el wizard.
-  const canRequestAgent = !!ctxPropietario && !ctxAgente && !editingId;
+  // El atajo "que un agente publique por mi" es para CUALQUIER usuario que
+  // no sea agente ni este editando una propiedad existente. Antes solo se
+  // mostraba a propietarios logueados; ahora que los propietarios pueden
+  // publicar sin cuenta, tambien aplica a anonimos — el modal pide sus datos
+  // de contacto inline si no estan ya seteados.
+  const canRequestAgent = !ctxAgente && !editingId;
   React.useEffect(() => {
     let cancelled = false;
     fetch('/api/public/alquiloya/planes-publicacion', { cache: 'no-store' })
@@ -1523,7 +1525,11 @@ function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
 
       {agentPickerOpen && (
         <AgentPickerModal
-          ctxPropietario={ctxPropietario}
+          defaultContact={{
+            nombre: (ctxPropietario && ctxPropietario.nombre) || form.propietario_nombre || '',
+            email: (ctxPropietario && ctxPropietario.email) || form.propietario_email || '',
+            telefono: (ctxPropietario && (ctxPropietario.telefono || ctxPropietario.whatsapp)) || form.propietario_telefono || '',
+          }}
           onClose={() => setAgentPickerOpen(false)}
         />
       )}
@@ -2229,12 +2235,19 @@ function ConfirmPublishModal({ form, loading, isAgent, onCancel, onConfirm }) {
 // POST /api/public/alquiloya/captaciones. La captacion aparece en el panel
 // del agente elegido (Captaciones).
 // ─────────────────────────────────────────────────────────────────────────────
-function AgentPickerModal({ ctxPropietario, onClose }) {
+function AgentPickerModal({ defaultContact, onClose }) {
   const [agentes, setAgentes] = React.useState(null); // null = loading
   const [error, setError] = React.useState(null);
   const [pickedId, setPickedId] = React.useState(null);
   const [mensaje, setMensaje] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  // Datos de contacto del propietario. Si vinieron prefilled del wizard
+  // (ctxPropietario o form), arrancan llenos; si no, los pide al usuario
+  // dentro del modal. Esto cubre el caso anonimo (sin sesion).
+  const dc = defaultContact || {};
+  const [contactNombre, setContactNombre] = React.useState(dc.nombre || '');
+  const [contactEmail, setContactEmail] = React.useState(dc.email || '');
+  const [contactTelefono, setContactTelefono] = React.useState(dc.telefono || '');
 
   React.useEffect(() => {
     let cancelled = false;
@@ -2254,11 +2267,15 @@ function AgentPickerModal({ ctxPropietario, onClose }) {
 
   const enviar = async () => {
     if (!pickedId || submitting) return;
-    const nombre = (ctxPropietario?.nombre || '').trim();
-    const email = (ctxPropietario?.email || '').trim();
-    const telefono = (ctxPropietario?.telefono || ctxPropietario?.whatsapp || '').trim();
-    if (!nombre || (!email && !telefono)) {
-      if (window.ayToast) window.ayToast('Faltan tus datos de contacto en el perfil.', { variant: 'error' });
+    const nombre = contactNombre.trim();
+    const email = contactEmail.trim();
+    const telefono = contactTelefono.trim();
+    if (!nombre) {
+      if (window.ayToast) window.ayToast('Ingresá tu nombre.', { variant: 'error' });
+      return;
+    }
+    if (!email && !telefono) {
+      if (window.ayToast) window.ayToast('Ingresá email o teléfono para que el agente te contacte.', { variant: 'error' });
       return;
     }
     setSubmitting(true);
@@ -2363,6 +2380,43 @@ function AgentPickerModal({ ctxPropietario, onClose }) {
             </div>
           )}
 
+          {/* Datos de contacto. Prefilled si el usuario esta logueado o ya
+              cargo algo en el wizard; si no, los pide aca. */}
+          <div style={{ marginTop: 16, padding: 14, background: 'var(--bg-2)', borderRadius: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Tus datos de contacto *</div>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Nombre y apellido *</label>
+              <input
+                className="input"
+                value={contactNombre}
+                onChange={(e) => setContactNombre(e.target.value.slice(0, 160))}
+                placeholder="Ej: María González"
+              />
+            </div>
+            <div className="row gap-10" style={{ flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: '1 1 220px' }}>
+                <label>Email</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value.slice(0, 160))}
+                  placeholder="usuario@dominio.com"
+                />
+              </div>
+              <div className="field" style={{ flex: '1 1 220px' }}>
+                <label>Teléfono / WhatsApp</label>
+                <input
+                  className="input"
+                  value={contactTelefono}
+                  onChange={(e) => setContactTelefono(e.target.value.slice(0, 40))}
+                  placeholder="+595 ..."
+                />
+              </div>
+            </div>
+            <div className="muted xs" style={{ marginTop: 6 }}>Email o teléfono — al menos uno para que el agente te contacte.</div>
+          </div>
+
           <div className="field" style={{ marginTop: 16 }}>
             <label>Mensaje para el agente (opcional)</label>
             <textarea
@@ -2380,7 +2434,7 @@ function AgentPickerModal({ ctxPropietario, onClose }) {
           padding: '14px 28px', borderTop: '1px solid var(--line-2)', background: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0,
         }}>
-          <span className="muted xs">Tus datos del perfil se envían como contacto.</span>
+          <span className="muted xs">El agente te va a contactar por WhatsApp / email.</span>
           <div className="row gap-10">
             <button className="btn btn-outline" onClick={onClose} disabled={submitting}>Cancelar</button>
             <button
