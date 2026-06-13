@@ -34,7 +34,6 @@ import {
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import { cachedSessionFetch } from "@/lib/api/cached-session-fetch";
 import GerencialOverview from "@/components/dashboard/GerencialOverview";
-import GerencialActividadReciente from "@/components/dashboard/GerencialActividadReciente";
 import {
   ListChecks,
   Inbox as InboxIcon,
@@ -2849,9 +2848,9 @@ export default function DashboardPage() {
 
       {tab === "captaciones" && <DashCaptaciones />}
 
-      {/* Actividad reciente al FINAL del dashboard (pedido del cliente).
-          Comparte cache 60s con GerencialOverview, sin doble fetch. */}
-      <GerencialActividadReciente />
+      {/* "Actividad reciente" sacada del dash a pedido del cliente. El
+          componente <GerencialActividadReciente /> queda definido por si
+          se reactiva, pero ya no se renderiza aca. */}
 
     </div>
   );
