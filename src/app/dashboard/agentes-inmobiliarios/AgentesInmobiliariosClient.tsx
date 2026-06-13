@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -31,6 +31,14 @@ function IconPower() {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
       <line x1="12" y1="2" x2="12" y2="12" />
+    </svg>
+  );
+}
+function IconTag() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
     </svg>
   );
 }
@@ -167,58 +175,34 @@ function Badge({ on, label }: { on: boolean | null; label: string }) {
 
 export function AgentesInmobiliariosClient({
   agentes,
-  propietarios,
   agentesError,
-  propietariosError,
 }: {
   agentes: ErpAgenteInmobiliarioRow[];
-  propietarios: ErpPropietarioRow[];
+  // Las props de propietarios siguen aceptandose para compat con el page,
+  // pero el tab fue removido del cliente: AlquiloYa ya no gestiona
+  // propietarios desde este modulo (los dueños publican sin cuenta).
+  propietarios?: ErpPropietarioRow[];
   agentesError: string | null;
-  propietariosError: string | null;
+  propietariosError?: string | null;
 }) {
-  const [tab, setTab] = useState<Tab>("agentes");
-
   return (
     <div>
-      <div className="mb-4 flex items-end justify-between gap-4 border-b border-slate-200">
-        <nav className="-mb-px flex gap-1" aria-label="Pestañas">
-          <TabButton active={tab === "agentes"} onClick={() => setTab("agentes")}>
-            Agentes inmobiliarios
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-              {agentes.length}
-            </span>
-          </TabButton>
-          <TabButton active={tab === "propietarios"} onClick={() => setTab("propietarios")}>
-            Propietarios
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-              {propietarios.length}
-            </span>
-          </TabButton>
-        </nav>
-        <div className="mb-2 flex items-center gap-2">
-          {tab === "agentes" ? (
-            <Link
-              href="/dashboard/agentes-inmobiliarios/agentes/nuevo"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91]"
-            >
-              + Nuevo agente
-            </Link>
-          ) : (
-            <Link
-              href="/dashboard/agentes-inmobiliarios/propietarios/nuevo"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91]"
-            >
-              + Nuevo propietario
-            </Link>
-          )}
-        </div>
+      <div className="mb-4 flex items-end justify-between gap-4 border-b border-slate-200 pb-3">
+        <h2 className="text-base font-semibold text-slate-800">
+          Agentes inmobiliarios
+          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+            {agentes.length}
+          </span>
+        </h2>
+        <Link
+          href="/dashboard/agentes-inmobiliarios/agentes/nuevo"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3F8E91]"
+        >
+          + Nuevo agente
+        </Link>
       </div>
 
-      {tab === "agentes" ? (
-        <AgentesTab rows={agentes} error={agentesError} />
-      ) : (
-        <PropietariosTab rows={propietarios} error={propietariosError} />
-      )}
+      <AgentesTab rows={agentes} error={agentesError} />
     </div>
   );
 }
@@ -302,6 +286,7 @@ function ActionsCell({
   onDesactivar,
   onReactivar,
   onEliminar,
+  onCambiarPlan,
   disabled,
 }: {
   active: boolean;
@@ -310,6 +295,7 @@ function ActionsCell({
   onDesactivar: () => void;
   onReactivar: () => void;
   onEliminar: () => void;
+  onCambiarPlan?: () => void;
   disabled: boolean;
 }) {
   return (
@@ -330,6 +316,18 @@ function ActionsCell({
       >
         <IconPencil />
       </Link>
+      {onCambiarPlan && (
+        <button
+          type="button"
+          onClick={onCambiarPlan}
+          disabled={disabled}
+          title="Cambiar plan"
+          aria-label="Cambiar plan"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 transition-colors hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60"
+        >
+          <IconTag />
+        </button>
+      )}
       {active ? (
         <button
           type="button"
@@ -451,6 +449,9 @@ function AgentesTab({
   const [showInactive, setShowInactive] = useState(false);
   const [planFilter, setPlanFilter] = useState<"todos" | PlanEstadoUI>("todos");
   const { busyId, pending, setPending, err, setErr, run, noun } = useToggleHandler("agente");
+  // Estado del modal "Cambiar plan" — guarda el agente sobre el que se
+  // edita el plan. null = modal cerrado.
+  const [planTarget, setPlanTarget] = useState<ErpAgenteInmobiliarioRow | null>(null);
 
   const inactiveCount = useMemo(() => rows.filter((r) => !r.activo).length, [rows]);
   const planCounts = useMemo(() => {
@@ -578,6 +579,7 @@ function AgentesTab({
                         onDesactivar={() => { setErr(null); setPending({ id: a.id, nombre: a.nombre, action: "desactivar" }); }}
                         onReactivar={() => { setErr(null); setPending({ id: a.id, nombre: a.nombre, action: "reactivar" }); }}
                         onEliminar={() => { setErr(null); setPending({ id: a.id, nombre: a.nombre, action: "eliminar" }); }}
+                        onCambiarPlan={a.activo ? () => { setErr(null); setPlanTarget(a); } : undefined}
                         disabled={busyId === a.id}
                       />
                     </td>
@@ -595,6 +597,12 @@ function AgentesTab({
         onConfirm={run}
         onCancel={() => busyId !== pending?.id && setPending(null)}
       />
+      {planTarget && (
+        <CambiarPlanModal
+          agente={planTarget}
+          onClose={() => setPlanTarget(null)}
+        />
+      )}
     </>
   );
 }
@@ -744,3 +752,168 @@ function PropietariosTab({
     </>
   );
 }
+
+// ── CambiarPlanModal ────────────────────────────────────────────────────────
+// Lista los planes activos del dashboard y deja al admin asignar uno (o
+// quitarlo) a un agente + fijar vencimiento. Pega un PATCH al endpoint
+// /api/dashboard/alquiloya-agentes/[id] con { plan_publicacion_id,
+// plan_vencimiento_at }. Refresca la pagina al guardar.
+type PlanRow = {
+  id: string;
+  tier: string | null;
+  nombre: string | null;
+  billing: string | null;
+};
+
+function CambiarPlanModal({
+  agente,
+  onClose,
+}: {
+  agente: ErpAgenteInmobiliarioRow;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [planes, setPlanes] = useState<PlanRow[] | null>(null);
+  const [planId, setPlanId] = useState<string>(agente.plan_publicacion_id ?? "");
+  // Default: si el agente ya tenia vencimiento, lo prefilleamos. Si no, 30 dias
+  // a partir de hoy (calculado al renderizar — no usa Date.now() en cache).
+  const initialFecha = (() => {
+    if (agente.plan_vencimiento_at) {
+      try {
+        return new Date(agente.plan_vencimiento_at).toISOString().slice(0, 10);
+      } catch { /* ignore */ }
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  })();
+  const [vencimiento, setVencimiento] = useState<string>(initialFecha);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Carga la lista una vez al montar.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetchWithSupabaseSession("/api/dashboard/alquiloya-planes-publicacion");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const body = (await r.json()) as { data?: { planes?: PlanRow[] }; planes?: PlanRow[] };
+        if (cancelled) return;
+        const list = body?.data?.planes ?? body?.planes ?? [];
+        setPlanes(list);
+      } catch (e) {
+        if (cancelled) return;
+        setPlanes([]);
+        setErr(e instanceof Error ? e.message : "No pudimos cargar los planes");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function guardar() {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const payload: Record<string, unknown> = {
+        plan_publicacion_id: planId || null,
+        plan_vencimiento_at: planId && vencimiento ? new Date(vencimiento + "T00:00:00").toISOString() : null,
+      };
+      const r = await fetchWithSupabaseSession(
+        `/api/dashboard/alquiloya-agentes/${agente.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error((body as { error?: string })?.error ?? "HTTP " + r.status);
+      }
+      onClose();
+      router.refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error guardando");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/55 p-4 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
+    >
+      <div className="mt-16 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold text-slate-900">Cambiar plan</h3>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Agente: <strong className="text-slate-700">{agente.nombre ?? "—"}</strong>
+          </p>
+        </div>
+
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Plan
+        </label>
+        <select
+          value={planId}
+          onChange={(e) => setPlanId(e.target.value)}
+          disabled={planes === null}
+          className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30"
+        >
+          <option value="">Sin plan</option>
+          {(planes ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre ?? p.tier ?? p.id}
+              {p.billing ? ` · ${p.billing}` : ""}
+            </option>
+          ))}
+        </select>
+
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Vencimiento {planId ? "" : "(no aplica sin plan)"}
+        </label>
+        <input
+          type="date"
+          value={vencimiento}
+          onChange={(e) => setVencimiento(e.target.value)}
+          disabled={!planId}
+          className="mb-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 disabled:bg-slate-50 disabled:text-slate-400"
+        />
+        <p className="mb-4 text-[11px] text-slate-500">
+          Para planes mensuales se sugiere 30 días desde hoy. Editalo si el cliente pagó otro período.
+        </p>
+
+        {err ? (
+          <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {err}
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={busy || planes === null}
+            className="rounded-xl bg-[#4FAEB2] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3F8E91] disabled:cursor-wait disabled:opacity-60"
+          >
+            {busy ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

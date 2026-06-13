@@ -211,6 +211,30 @@ export async function PATCH(request: Request, ctx: Ctx) {
       const v = b(body.activo);
       if (v !== undefined) push("activo", v);
     }
+    // Plan del agente: el admin del ERP puede asignar/quitar plan y fijar
+    // vencimiento. UUID o null para plan; fecha ISO o null para vencimiento.
+    if ("plan_publicacion_id" in body && colSet.has("plan_publicacion_id")) {
+      const raw = body.plan_publicacion_id;
+      if (raw === null) {
+        push("plan_publicacion_id", null);
+      } else if (typeof raw === "string" && uuidRe.test(raw)) {
+        push("plan_publicacion_id", raw);
+      } else {
+        return NextResponse.json({ error: "plan_publicacion_id invalido" }, { status: 400 });
+      }
+    }
+    if ("plan_vencimiento_at" in body && colSet.has("plan_vencimiento_at")) {
+      const raw = body.plan_vencimiento_at;
+      if (raw === null || raw === "") {
+        push("plan_vencimiento_at", null);
+      } else if (typeof raw === "string") {
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) {
+          return NextResponse.json({ error: "plan_vencimiento_at invalido" }, { status: 400 });
+        }
+        push("plan_vencimiento_at", d.toISOString());
+      }
+    }
     if (sets.length === 0) return NextResponse.json({ error: "sin cambios" }, { status: 400 });
 
     vals.push(ALQUILOYA_EMPRESA_ID);
