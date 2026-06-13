@@ -1159,10 +1159,13 @@ function Faq() {
   );
 }
 
-function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
-  const [tipo, setTipo] = React.useState(defaultTipo === 'agente' ? 'agente' : 'propietario');
+function RequestAccessModal({ onClose, planTier, planLabel }) {
+  // Solo flujo de agente: los propietarios ya publican sin cuenta, asi
+  // que el toggle "Propietario / Agente" se saca. El modal queda como
+  // "Solicitar acceso" puro (kind=agente del endpoint solicitudes-acceso).
+  const tipo = 'agente';
   const [subTipo, setSubTipo] = React.useState('Independiente');
-  const [form, setForm] = React.useState({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '', password: '', password2: '' });
+  const [form, setForm] = React.useState({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
   const [busy, setBusy] = React.useState(false);
   const [feedback, setFeedback] = React.useState(null); // {kind:'error'|'success', text, portalUrl?}
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -1176,55 +1179,11 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
     e.preventDefault();
     setFeedback(null);
     if (!form.nombre.trim()) return setFeedback({ kind: 'error', text: 'Ingresá tu nombre.' });
-
-    // Flujo PROPIETARIO: directo, valida unicidad y crea la cuenta con contraseña.
-    if (tipo === 'propietario') {
-      if (!form.email.trim()) return setFeedback({ kind: 'error', text: 'Ingresá tu email.' });
-      if (!form.telefono.trim()) return setFeedback({ kind: 'error', text: 'Ingresá tu teléfono.' });
-      if (form.password.length < 8) return setFeedback({ kind: 'error', text: 'La contraseña debe tener al menos 8 caracteres.' });
-      if (form.password !== form.password2) return setFeedback({ kind: 'error', text: 'Las contraseñas no coinciden.' });
-      setBusy(true);
-      try {
-        const payload = {
-          nombre: form.nombre.trim(),
-          email: form.email.trim(),
-          telefono: form.telefono.trim(),
-          ciudad: form.ciudad.trim() || null,
-          password: form.password,
-        };
-        const res = await fetch('/api/public/alquiloya/registro-propietario', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
-        const portalUrl = (data && data.data && data.data.portal_url) || '/portal-agentes/login';
-        const autoLogged = !!(data && data.data && data.data.auto_logged);
-        setFeedback({
-          kind: 'success',
-          text: autoLogged
-            ? '¡Listo! Cuenta creada. Llevándote al panel…'
-            : '¡Listo! Tu cuenta de propietario está activa. Podés iniciar sesión y publicar tu inmueble.',
-          portalUrl,
-        });
-        setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '', password: '', password2: '' });
-        // Si auto-logueamos, redirigimos directo al panel.
-        if (autoLogged) {
-          setTimeout(() => { window.location.assign(portalUrl); }, 600);
-        }
-      } catch (err) {
-        setFeedback({ kind: 'error', text: 'No pudimos crear tu cuenta. ' + (err.message || '') });
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-
-    // Flujo AGENTE: solicitud con aprobación manual + correo al aprobar.
     if (!form.email.trim() && !form.telefono.trim()) return setFeedback({ kind: 'error', text: 'Ingresá email o teléfono.' });
     setBusy(true);
     try {
       const payload = {
-        tipo, sub_tipo: tipo === 'agente' ? subTipo : null,
+        tipo: 'agente', sub_tipo: subTipo,
         nombre: form.nombre.trim(),
         email: form.email.trim() || null,
         telefono: form.telefono.trim() || null,
@@ -1239,7 +1198,7 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
       setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.' });
-      setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '', password: '', password2: '' });
+      setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
     } catch (err) {
       setFeedback({ kind: 'error', text: 'No pudimos registrar tu solicitud. ' + (err.message || '') });
     } finally {
@@ -1268,8 +1227,8 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
       <form onSubmit={submit} style={modal}>
         {/* Header sticky */}
         <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
-          <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>{tipo === 'propietario' ? 'Crear cuenta de propietario' : (planTier ? 'Quiero este plan' : 'Solicitar acceso')}</h2>
-          <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)' }}>{tipo === 'propietario' ? 'Registrate directo y publicá tu inmueble (1 publicación incluida).' : 'Contanos quién sos. Nuestro equipo revisa cada pedido y te contactamos.'}</p>
+          <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>{planTier ? 'Quiero este plan' : 'Solicitar acceso de agente'}</h2>
+          <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)' }}>Contanos quién sos. Nuestro equipo revisa cada pedido y te contactamos. Si sos propietario, podés publicar directo desde "Publicar inmueble" sin crear cuenta.</p>
           {planTier && (
             <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--blue-50)', border: '1px solid var(--blue-100)' }}>
               <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.06em', color: 'var(--blue)', textTransform: 'uppercase' }}>Plan elegido</div>
@@ -1281,69 +1240,42 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
         {/* Body scrollable */}
         <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <div>
-            <label style={fieldLabel}>¿Qué tipo de cuenta querés?</label>
+            <label style={fieldLabel}>Tipo de agente</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button type="button" style={segBtn(tipo === 'propietario')} onClick={() => setTipo('propietario')}>Propietario</button>
-              <button type="button" style={segBtn(tipo === 'agente')} onClick={() => setTipo('agente')}>Agente inmobiliario</button>
+              <button type="button" style={segBtn(subTipo === 'Independiente')} onClick={() => setSubTipo('Independiente')}>
+                <span style={{ display: 'block', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 13.5 }}>Independiente</span>
+                <span style={{ display: 'block', fontSize: 11, color: subTipo === 'Independiente' ? 'var(--blue)' : 'var(--ink-3)', marginTop: 2, fontWeight: 500 }}>Trabajo por mi cuenta</span>
+              </button>
+              <button type="button" style={segBtn(subTipo === 'Inmobiliaria')} onClick={() => setSubTipo('Inmobiliaria')}>
+                <span style={{ display: 'block', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 13.5 }}>Inmobiliaria</span>
+                <span style={{ display: 'block', fontSize: 11, color: subTipo === 'Inmobiliaria' ? 'var(--blue)' : 'var(--ink-3)', marginTop: 2, fontWeight: 500 }}>Tengo una empresa</span>
+              </button>
             </div>
           </div>
-          {tipo === 'agente' && (
-            <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>Tipo de agente</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <button type="button" style={segBtn(subTipo === 'Independiente')} onClick={() => setSubTipo('Independiente')}>
-                  <span style={{ display: 'block', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 13.5 }}>Independiente</span>
-                  <span style={{ display: 'block', fontSize: 11, color: subTipo === 'Independiente' ? 'var(--blue)' : 'var(--ink-3)', marginTop: 2, fontWeight: 500 }}>Trabajo por mi cuenta</span>
-                </button>
-                <button type="button" style={segBtn(subTipo === 'Inmobiliaria')} onClick={() => setSubTipo('Inmobiliaria')}>
-                  <span style={{ display: 'block', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 13.5 }}>Inmobiliaria</span>
-                  <span style={{ display: 'block', fontSize: 11, color: subTipo === 'Inmobiliaria' ? 'var(--blue)' : 'var(--ink-3)', marginTop: 2, fontWeight: 500 }}>Tengo una empresa</span>
-                </button>
-              </div>
-            </div>
-          )}
           <div style={{ marginTop: 14 }}>
             <label style={fieldLabel}>Nombre completo *</label>
             <input style={inputStyle} maxLength={160} value={form.nombre} onChange={e => set('nombre', e.target.value)} required/>
           </div>
           <div style={{ marginTop: 14 }}>
-            <label style={fieldLabel}>Email {tipo === 'propietario' ? '*' : ''}</label>
-            <input style={inputStyle} type="email" maxLength={160} placeholder="vos@ejemplo.com" value={form.email} onChange={e => set('email', e.target.value)} required={tipo === 'propietario'}/>
+            <label style={fieldLabel}>Email</label>
+            <input style={inputStyle} type="email" maxLength={160} placeholder="vos@ejemplo.com" value={form.email} onChange={e => set('email', e.target.value)}/>
           </div>
           <div style={{ marginTop: 14 }}>
-            <label style={fieldLabel}>Teléfono / WhatsApp {tipo === 'propietario' ? '*' : ''}</label>
-            <input style={inputStyle} type="tel" maxLength={40} placeholder="+595 9XX XXX XXX" value={form.telefono} onChange={e => set('telefono', e.target.value)} required={tipo === 'propietario'}/>
+            <label style={fieldLabel}>Teléfono / WhatsApp</label>
+            <input style={inputStyle} type="tel" maxLength={40} placeholder="+595 9XX XXX XXX" value={form.telefono} onChange={e => set('telefono', e.target.value)}/>
           </div>
-          {tipo === 'propietario' && (
-            <>
-              <div style={{ marginTop: 14 }}>
-                <label style={fieldLabel}>Poné la contraseña que querés * <span style={{ color: 'var(--ink-3)', fontWeight: 500, textTransform: 'none' }}>(mín. 8 caracteres)</span></label>
-                <input style={inputStyle} type="password" minLength={8} maxLength={72} value={form.password} onChange={e => set('password', e.target.value)} required autoComplete="new-password"/>
-              </div>
-              <div style={{ marginTop: 14 }}>
-                <label style={fieldLabel}>Repetí la contraseña *</label>
-                <input style={inputStyle} type="password" minLength={8} maxLength={72} value={form.password2} onChange={e => set('password2', e.target.value)} required autoComplete="new-password"/>
-              </div>
-            </>
-          )}
-          {tipo === 'agente' && (
-            <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>Inmobiliaria / Razón social</label>
-              <input style={inputStyle} maxLength={160} value={form.empresa} onChange={e => set('empresa', e.target.value)}/>
-            </div>
-          )}
-          {tipo === 'agente' && (
-            <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>Ciudad</label>
-              <input style={inputStyle} maxLength={80} value={form.ciudad} onChange={e => set('ciudad', e.target.value)}/>
-            </div>
-          )}
-          {tipo === 'agente' && (
-            <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>Mensaje (opcional)</label>
-              <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} maxLength={1200} value={form.mensaje} onChange={e => set('mensaje', e.target.value)} placeholder="Contanos cuántos inmuebles tenés, qué buscás, etc."/>
-            </div>
-          )}
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Inmobiliaria / Razón social</label>
+            <input style={inputStyle} maxLength={160} value={form.empresa} onChange={e => set('empresa', e.target.value)}/>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Ciudad</label>
+            <input style={inputStyle} maxLength={80} value={form.ciudad} onChange={e => set('ciudad', e.target.value)}/>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={fieldLabel}>Mensaje (opcional)</label>
+            <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} maxLength={1200} value={form.mensaje} onChange={e => set('mensaje', e.target.value)} placeholder="Contanos cuántos inmuebles tenés, qué buscás, etc."/>
+          </div>
 
           {feedback && (
             <div style={{
@@ -1363,7 +1295,7 @@ function RequestAccessModal({ onClose, planTier, planLabel, defaultTipo }) {
         {/* Footer sticky */}
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line-2)', background: '#fff', flexShrink: 0, display: 'flex', gap: 8 }}>
           <button type="button" disabled={busy} onClick={onClose} className="btn" style={{ flex: 1, background: '#f1f5f9', color: 'var(--ink-2)' }}>Cancelar</button>
-          <button type="submit" disabled={busy} className="btn btn-primary" style={{ flex: 1 }}>{busy ? (tipo === 'propietario' ? 'Creando…' : 'Enviando…') : (tipo === 'propietario' ? 'Crear cuenta' : 'Enviar solicitud')}</button>
+          <button type="submit" disabled={busy} className="btn btn-primary" style={{ flex: 1 }}>{busy ? 'Enviando…' : 'Enviar solicitud'}</button>
         </div>
       </form>
     </div>,

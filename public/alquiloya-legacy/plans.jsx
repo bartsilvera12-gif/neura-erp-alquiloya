@@ -54,7 +54,16 @@ function PlansPage({ onNav }) {
       </div>
 
       <div className="plans-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 22, marginTop: 40, maxWidth: 960, margin: '40px auto 0' }}>
-        {filtered.map(p => <PlanCard key={p.tier} plan={p} onPick={() => setPicked({ tier: p.tier, name: p.name, audience })}/>)}
+        {filtered.map(p => <PlanCard key={p.tier} plan={p} onPick={() => {
+          // Planes de propietario: no requieren cuenta. Mandamos al wizard
+          // directo, asi no abren el modal "Solicitar acceso" (que es solo
+          // para agentes).
+          if (audience === 'owner') {
+            try { window.location.hash = '#publish'; } catch {}
+            return;
+          }
+          setPicked({ tier: p.tier, name: p.name, audience });
+        }}/>)}
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 24 }}>
@@ -76,7 +85,6 @@ function PlansPage({ onNav }) {
           onClose={() => setPicked(null)}
           planTier={picked.tier}
           planLabel={picked.name}
-          defaultTipo={picked.audience === 'agent' ? 'agente' : 'propietario'}
         />
       )}
       {changeOpen && <CambioPlanModal planes={filtered} onClose={() => setChangeOpen(false)}/>}
