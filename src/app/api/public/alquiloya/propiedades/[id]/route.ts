@@ -13,6 +13,53 @@ export const dynamic = "force-dynamic";
 const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Bootstrap idempotente del estado 'eliminada' para el soft-delete.
+// Espejo de la migracion 20260705120000_alquiloya_propiedades_estado_eliminada
+// — asegura que prod no quede esperando a que alguien corra la migracion
+// manualmente para que el DELETE saque las propiedades del contador de
+// pendientes. Corre UNA vez por proceso.
+let estadoEliminadaReady = false;
+async function ensureEstadoEliminada(pool: import("pg").Pool): Promise<void> {
+  if (estadoEliminadaReady) return;
+  try {
+    await pool.query(`
+      DO $$
+      BEGIN
+        PERFORM 1
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          JOIN pg_namespace n ON n.oid = t.relnamespace
+         WHERE n.nspname = 'alquiloya'
+           AND t.relname = 'propiedades'
+           AND c.conname = 'propiedades_estado_check';
+        IF FOUND THEN
+          EXECUTE 'ALTER TABLE alquiloya.propiedades DROP CONSTRAINT propiedades_estado_check';
+        END IF;
+      END $$;
+      ALTER TABLE alquiloya.propiedades
+        ADD CONSTRAINT propiedades_estado_check
+        CHECK (
+          estado IS NULL OR estado IN (
+            'disponible','reservado','alquilado','vendido','pausada',
+            'inactiva','rechazada','cerrado','cerrada','finalizado','eliminada'
+          )
+        );
+      UPDATE alquiloya.propiedades
+         SET estado = 'eliminada', updated_at = now()
+       WHERE activo = false
+         AND visible_web = false
+         AND estado = 'inactiva'
+         AND updated_at > created_at + interval '5 seconds';
+    `);
+    estadoEliminadaReady = true;
+  } catch (e) {
+    console.error("[ensureEstadoEliminada] bootstrap fail", e);
+    // No throw: si falla, el UPDATE de DELETE de abajo igual va a marcar
+    // visible_web=false / activo=false y el row quedara contado. El usuario
+    // puede reintentar despues de que se corra la migracion manualmente.
+  }
+}
+
 export async function GET(_request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params;
   return getPublicPropiedad(id);
@@ -330,12 +377,28 @@ export async function DELETE(request: Request, ctx: RouteCtx) {
       return NextResponse.json({ error: "No podes borrar esta propiedad" }, { status: 403 });
     }
 
-    await pool.query(
-      `UPDATE "alquiloya"."propiedades"
-          SET activo = false, visible_web = false, updated_at = now()
-        WHERE empresa_id=$1::uuid AND id=$2::uuid`,
-      [ALQUILOYA_EMPRESA_ID, id]
-    );
+    // Aseguramos que la DB acepte estado='eliminada' (bootstrap) ANTES de
+    // intentar setearlo. Si el bootstrap falla, el UPDATE de abajo cae al
+    // SET sin estado para no romper el flujo.
+    await ensureEstadoEliminada(pool);
+    try {
+      await pool.query(
+        `UPDATE "alquiloya"."propiedades"
+            SET activo = false, visible_web = false, estado = 'eliminada', updated_at = now()
+          WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+    } catch {
+      // Fallback (CHECK constraint todavia sin 'eliminada'): minimo dejamos
+      // la propiedad inactiva y fuera de la web. Reintentar el bootstrap
+      // luego termina de limpiarla cuando alguien borre la proxima.
+      await pool.query(
+        `UPDATE "alquiloya"."propiedades"
+            SET activo = false, visible_web = false, updated_at = now()
+          WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+        [ALQUILOYA_EMPRESA_ID, id]
+      );
+    }
     return NextResponse.json({ success: true, id, message: "Propiedad eliminada." });
   } catch (err) {
     console.error("[api/public/alquiloya/propiedades/[id] DELETE]", err);
