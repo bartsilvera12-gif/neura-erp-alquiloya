@@ -150,22 +150,16 @@ function CatalogHeader({ count, tipo, setTipo, filters, q, setQ }) {
             />
           </div>
         </div>
-        {/* Selector unico de tipo de inmueble. Reemplaza los chips viejos (4
-            opciones con ids legacy 'depto/casa/salon/temporal' que no
-            matcheaban contra los tipos reales del backend) por un dropdown
-            con TODOS los tipos que la API acepta. matchTipo() conserva la
-            compat con los chips del home (broad → lista). */}
-        <div className="row gap-12" style={{ marginTop: 20, alignItems: 'center', paddingBottom: 16 }}>
-          <span style={{ fontSize: 14, color: 'var(--ink-3)', fontWeight: 600 }}>Tipo de inmueble:</span>
-          <PrettySelect
-            value={tipo}
-            onChange={setTipo}
-            style={{ width: 260 }}
-            options={[
-              { value: 'all', label: 'Todos' },
-              ...CATALOG_TIPOS.map(t => ({ value: t.id, label: t.label })),
-            ]}
-          />
+        {/* Tabs de tipo: estilo original (todos / departamento / casa /
+            salon / lugar temporal). matchTipo() ya hace el broad mapping
+            contra los tipos reales del backend, asi que los chips legacy
+            siguen funcionando aunque sus ids ('depto', 'casa', 'salon',
+            'temporal') no matcheen 1:1 con lo que devuelve la API. */}
+        <div className="row gap-8" style={{ marginTop: 20 }}>
+          <CatTab label="Todos" active={tipo === 'all'} onClick={() => setTipo('all')} />
+          {TIPOS.map(t => (
+            <CatTab key={t.id} icon={t.icon} label={t.label} active={tipo === t.id} onClick={() => setTipo(t.id)} />
+          ))}
         </div>
       </div>
     </div>
