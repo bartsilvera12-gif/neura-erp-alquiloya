@@ -139,6 +139,9 @@ const TIPOS = [
   // (mismo concepto, redaccion mas neutra). El id sigue siendo 'temporal'
   // para mantener compat con BROAD_TO_TIPOS del catalogo.
   { id: 'temporal', label: 'Lugar Temporal', icon: 'cal' },
+  // Duplex como chip propio. BROAD_TO_TIPOS.duplex matchea con
+  // ['duplex','duplex_ph'] del backend.
+  { id: 'duplex', label: 'Dúplex', icon: 'apt' },
 ];
 
 // Unsplash photo IDs — modern real estate photos
