@@ -49,6 +49,9 @@ function Header({ route, onNav, onPublish }) {
     { id: 'home', label: 'Inicio' },
     { id: 'catalog', label: 'Alquileres' },
     { id: 'publish', label: 'Publicar propiedad' },
+    // Listado publico de agentes activos. Cada card abre el perfil del
+    // agente (#agent/<slug>) con sus propiedades y reseñas.
+    { id: 'agentes', label: 'Solicitar agente' },
     { id: 'plans', label: 'Planes' },
     { id: 'boost', label: 'Destacar propiedad' },
     { id: 'help', label: 'Ayuda' },

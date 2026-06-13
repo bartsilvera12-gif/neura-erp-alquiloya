@@ -666,4 +666,135 @@ function WriteReviewModal({ agent, onClose }) {
   );
 }
 
-Object.assign(window, { AgentProfilePage });
+// ─────────────────────────────────────────────────────────────────────────────
+// AgentesListPage — listado publico de agentes activos. Cada card linkea
+// al perfil del agente (route 'agent/<slug>') que ya muestra sus propiedades
+// y reseñas (tabs internos de AgentProfilePage). Acceso desde el menu
+// "Solicitar agente" del header.
+// ─────────────────────────────────────────────────────────────────────────────
+function AgentesListPage({ onNav }) {
+  const { agents } = useAlquiloYaPublicData();
+  const [q, setQ] = React.useState('');
+  const qn = String(q || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const visible = (agents || []).filter(a => {
+    if (!qn) return true;
+    const hay = [a.name, a.type, a.zone, a.bio].filter(Boolean).join(' ')
+      .toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return hay.includes(qn);
+  });
+
+  return (
+    <div className="fade-in">
+      <section style={{ background: 'linear-gradient(180deg, #fff 0%, var(--bg-2) 100%)', borderBottom: '1px solid var(--line)' }}>
+        <div className="container" style={{ padding: '40px 32px 32px' }}>
+          <div className="tag" style={{ color: 'var(--blue)' }}>Agentes inmobiliarios</div>
+          <h1 style={{ fontSize: 42, marginTop: 8, lineHeight: 1.1 }}>Elegí un agente y <span style={{ color: 'var(--blue)' }}>publicá sin esfuerzo</span></h1>
+          <p style={{ marginTop: 12, fontSize: 15.5, color: 'var(--ink-3)', maxWidth: 720, lineHeight: 1.55 }}>
+            Nuestros agentes activos te ayudan a cargar tu inmueble, sacarle fotos, fijar precio y coordinar visitas.
+            Mirá su perfil con propiedades publicadas y reseñas reales antes de elegir.
+          </p>
+          <div className="card" style={{ marginTop: 20, padding: 10, display: 'flex', alignItems: 'center', gap: 8, maxWidth: 480 }}>
+            <I.search s={16}/>
+            <input
+              className="input"
+              placeholder="Buscar por nombre, zona o inmobiliaria…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ border: 'none', padding: 8, width: '100%' }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="container" style={{ padding: '32px' }}>
+        {visible.length === 0 ? (
+          <div className="card" style={{ padding: 36, textAlign: 'center', color: 'var(--ink-3)' }}>
+            {(agents || []).length === 0
+              ? 'Todavía no hay agentes activos. Volvé pronto.'
+              : 'No encontramos agentes que coincidan con tu búsqueda.'}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
+            {visible.map(a => (
+              <AgenteCardPublic key={a.id} agent={a} onOpen={() => onNav('agent/' + (a.slug || a.id))}/>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AgenteCardPublic({ agent, onOpen }) {
+  const rating = Number(agent.rating) || 0;
+  const reviewsCount = Number(agent.reviews) || 0;
+  const propCount = Number(agent.activeProperties) || 0;
+  return (
+    <button onClick={onOpen} className="card" style={{
+      padding: 18, textAlign: 'left', cursor: 'pointer',
+      border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 12,
+      transition: 'border-color .12s, box-shadow .12s, transform .1s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-100)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,88,165,.08)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
+    >
+      <div className="row gap-12" style={{ alignItems: 'center' }}>
+        {agent.foto_url ? (
+          <Photo src={agent.foto_url} style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0 }}/>
+        ) : (
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--bg-3)', color: 'var(--ink-4)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <I.user s={22}/>
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>{agent.name || 'Agente'}</div>
+          <div className="muted xs" style={{ marginTop: 2 }}>{agent.type || 'Agente AlquiloYa'}{agent.zone ? ' · ' + agent.zone : ''}</div>
+        </div>
+      </div>
+
+      <AgentStarsPublic rating={rating} count={reviewsCount}/>
+
+      <div className="row gap-12" style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+        <span className="row gap-4"><I.house s={13}/> {propCount} {propCount === 1 ? 'publicación' : 'publicaciones'}</span>
+        {agent.verified && <span style={{ color: 'var(--blue)' }} className="row gap-4"><I.check s={11}/> Verificado</span>}
+      </div>
+
+      <div className="row gap-8" style={{ marginTop: 4 }}>
+        <span className="btn btn-blue" style={{ flex: 1, justifyContent: 'center' }}>Ver perfil →</span>
+      </div>
+    </button>
+  );
+}
+
+// Pequeña duplicacion de AgentStars (publish.jsx) para no depender de carga
+// de ese bundle en esta pagina. Mismo SVG + relleno proporcional.
+function AgentStarsPublic({ rating, count }) {
+  const r = Math.max(0, Math.min(5, Number(rating) || 0));
+  const pct = (r / 5) * 100;
+  const Star = ({ fill }) => (
+    <svg viewBox="0 0 20 20" width="14" height="14" style={{ display: 'block' }}>
+      <path d="M10 1.5l2.6 5.3 5.9.9-4.25 4.15 1 5.85L10 14.95 4.75 17.7l1-5.85L1.5 7.7l5.9-.9z" fill={fill} stroke="none"/>
+    </svg>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ position: 'relative', display: 'inline-block', height: 14 }}>
+        <div style={{ display: 'flex', gap: 1 }}>
+          {[0,1,2,3,4].map(i => <Star key={'b'+i} fill="#e2e8f0"/>)}
+        </div>
+        <div style={{ position: 'absolute', inset: 0, width: pct + '%', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', gap: 1 }}>
+            {[0,1,2,3,4].map(i => <Star key={'f'+i} fill="#F9B000"/>)}
+          </div>
+        </div>
+      </div>
+      {count > 0
+        ? <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            <strong style={{ color: 'var(--ink-2)' }}>{r.toFixed(1)}</strong> ({count} {count === 1 ? 'reseña' : 'reseñas'})
+          </span>
+        : <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>Sin reseñas todavía</span>}
+    </div>
+  );
+}
+
+Object.assign(window, { AgentProfilePage, AgentesListPage, AgenteCardPublic, AgentStarsPublic });

@@ -62,6 +62,7 @@ function App() {
       {route === 'plans' && <PlansPage onNav={nav}/>}
       {route === 'boost' && <BoostPage onNav={nav}/>}
       {route === 'help' && <HelpPage onNav={nav}/>}
+      {route === 'agentes' && <AgentesListPage onNav={nav}/>}
       {route.startsWith('agent/') && <AgentProfilePage slug={route.slice('agent/'.length)} onNav={nav} onProperty={openProperty}/>}
       {route === 'publish' && <PublishPage/>}
       {(route === 'posters' || route === 'admin-agent-qr') && <PostersPage route={route} onNav={nav}/>}
