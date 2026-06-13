@@ -510,6 +510,182 @@
     }
   }
 
+  /* === Catalogo en mobile: el sidebar de filtros stackea ARRIBA del grid de
+     resultados, lo cual fuerza al usuario a scrollear muchos campos antes de
+     ver propiedades. Cambiamos el order para que primero aparezca el grid de
+     propiedades y los filtros queden abajo (alternativa: un drawer, pero el
+     reorder es no-disruptivo y resuelve el peor problema). */
+  @media (max-width: 760px) {
+    /* CatalogPage grid: 290px 1fr -> stack con grid items en su default
+       order. Marcamos aside como order:2 para que vaya al final, y el div
+       de resultados como order:1. Solo aplica dentro del catalogo. */
+    .container[style*="290px"] > aside,
+    .container[style*="290px 1fr"] > aside {
+      order: 2 !important;
+    }
+    .container[style*="290px"] > aside ~ div,
+    .container[style*="290px 1fr"] > aside ~ div {
+      order: 1 !important;
+    }
+    /* sticky en el filter panel en mobile es contraproducente (queda pegado
+       al borde superior tapando contenido al hacer scroll). Lo desactivamos. */
+    aside[style*="position: sticky"],
+    aside[style*="position:sticky"] {
+      position: static !important;
+      top: auto !important;
+    }
+  }
+
+  /* === Publish wizard en mobile: la sidebar derecha de "Vista previa"
+     (360px hardcoded) ocupa demasiado espacio cuando stackea abajo. La
+     ocultamos en mobile — el usuario ya esta en el flujo del wizard, la
+     vista previa solo distrae. En desktop sigue visible. */
+  @media (max-width: 760px) {
+    /* El grid del wizard es "1fr 360px". Detectamos el aside-like del
+       lado derecho (card sticky con titulo "Vista previa") y lo ocultamos. */
+    [style*="1fr 360px"] > div:last-child,
+    [style*="1fr 360px"] > aside:last-child {
+      display: none !important;
+    }
+  }
+
+  /* === Detail page sticky AgentCard en mobile: el sidebar sticky (380px)
+     queda en su contenedor stackeado abajo. position:sticky con top:92
+     puede tapar contenido al scrollear. Lo hacemos static en mobile. */
+  @media (max-width: 760px) {
+    [style*="position: sticky"][style*="top: 92"],
+    [style*="position:sticky"][style*="top:92"] {
+      position: static !important;
+      top: auto !important;
+    }
+  }
+
+  /* === Modales en mobile: paddings interiores demasiado grandes. Reducimos
+     el padding del header/body/footer y aseguramos que los inputs no
+     desborden. Aplica a cualquier modal con padding hardcodeado de 24-28px. */
+  @media (max-width: 760px) {
+    /* Modales del wizard (publish.jsx) y modal de captacion. */
+    [style*="padding: 24px 28px"],
+    [style*="padding:24px 28px"],
+    [style*="padding: 20px 24px"],
+    [style*="padding:20px 24px"],
+    [style*="padding: 16px 28px"],
+    [style*="padding:16px 28px"],
+    [style*="padding: 14px 28px"],
+    [style*="padding:14px 28px"] {
+      padding: 14px 16px !important;
+    }
+    /* Grid 1fr 1fr dentro de modales (VerificationModal CCC + Catastral,
+       AgentPickerModal contacto) -> 1col. Ya lo hace el catch-all, pero
+       reforzamos en .field para que el label + input queden agrupados. */
+    .field { min-width: 0 !important; }
+    .field input.input, .field textarea.input, .field select.input {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+  }
+
+  /* === HelpPage en mobile: 2 columnas de contact cards -> 1 col. La
+     sidebar de categorias (260px sticky) se vuelve un dropdown plegable
+     visualmente (no JS, solo deshabilitamos sticky y reducimos padding). */
+  @media (max-width: 760px) {
+    /* HelpPage aside (categorias) */
+    .container > div[style*="260px 1fr"] > aside {
+      position: static !important;
+      top: auto !important;
+      padding: 10px 14px !important;
+    }
+    /* Contact cards: 2col -> 1col handled by catch-all. */
+  }
+
+  /* === PostersPage en mobile: el grid de carteles QR no debe forzar
+     scroll horizontal cuando los items son grandes. */
+  @media (max-width: 760px) {
+    /* PostersPage usa grids variados; el catch-all stackea. Lo que
+       agregamos: cards de QR no expanden la imagen mas del ancho. */
+    [style*="width: 260px"][style*="height: 260px"],
+    [style*="width:260px"][style*="height:260px"] {
+      width: min(260px, 80vw) !important;
+      height: auto !important;
+      aspect-ratio: 1 !important;
+    }
+  }
+
+  /* === TemporalPage en mobile: layouts varios — el catch-all stackea. */
+  @media (max-width: 760px) {
+    /* Asegurar que el calendario no haga overflow horizontal */
+    [class*="calendar"], [style*="grid-template-columns: repeat(7"],
+    [style*="grid-template-columns:repeat(7"] {
+      grid-template-columns: repeat(7, 1fr) !important;
+      gap: 2px !important;
+      font-size: 11px !important;
+    }
+  }
+
+  /* === Wizard step indicator (5 pasos): en mobile el row de pasos puede
+     overflowearse. Lo hacemos scroll horizontal. */
+  @media (max-width: 760px) {
+    /* El stepper esta dentro de .card con padding 20px 24px y contiene
+       una row con justify-content: space-between. La hacemos scroll. */
+    .card .row[style*="justify-content: space-between"]:has(.row.gap-12),
+    .card .row[style*="justify-content:space-between"]:has(.row.gap-12) {
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      flex-wrap: nowrap !important;
+      scrollbar-width: none !important;
+      padding-bottom: 4px !important;
+    }
+    .card .row > .row.gap-12 {
+      flex-shrink: 0 !important;
+      flex: 0 0 auto !important;
+    }
+  }
+
+  /* === Gallery thumbnails en detail.jsx: 5 thumbs uniformes. En mobile
+     muy estrecho (<375), pueden no caber. Forzamos auto-fit minmax. */
+  @media (max-width: 760px) {
+    [style*="grid-template-columns: repeat(5, 1fr)"][style*="aspect-ratio"],
+    [style*="grid-template-columns:repeat(5,1fr)"][style*="aspect-ratio"] {
+      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)) !important;
+    }
+  }
+
+  /* === Brochure preview modal: contiene paginas A4 que en mobile causan
+     scroll horizontal. Hacemos zoom-fit al ancho del modal. */
+  @media (max-width: 760px) {
+    [style*="width: 794px"],
+    [style*="width:794px"] {
+      width: 100% !important;
+      max-width: 100% !important;
+      transform: scale(var(--brochure-scale, 0.45)) !important;
+      transform-origin: top left !important;
+    }
+  }
+
+  /* === FormGrid (publish.jsx) — wrap a 1col en mobile en lugar de 2col */
+  @media (max-width: 760px) {
+    [style*="grid-template-columns: 1fr 1fr"][style*="gap: 12"],
+    [style*="grid-template-columns:1fr 1fr"][style*="gap:12"],
+    [style*="grid-template-columns: 1fr 1fr"][style*="gap: 14"],
+    [style*="grid-template-columns:1fr 1fr"][style*="gap:14"] {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+  }
+
+  /* === Sub-menu / chips de filtros en CatalogHeader (tipos) — wrap */
+  @media (max-width: 760px) {
+    /* CatalogHeader chips row mantenia overflow horizontal cuando hay
+       muchos chips de tipo. Forzamos scroll horizontal en lugar de wrap
+       feo. */
+    [style*="border-bottom: 1px solid var(--line)"] > .container > .row.gap-8 {
+      overflow-x: auto !important;
+      flex-wrap: nowrap !important;
+      scrollbar-width: none !important;
+    }
+  }
+
   /* === Planes: ajustes finos en mobile ===
      El catch-all general (linea ~308) ya colapsa el grid 2x2 de PlanCard a 1col.
      Aca afinamos gap, padding y typografia para que se lea bien en celular,
@@ -634,23 +810,23 @@
 <script defer src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script defer src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <!-- Chatbot (define SENDPULSE_CONFIG/vivioSendpulse usado por shared) -->
-<script defer src="build/vivio-sendpulse.js?v=responsive-1"></script>
+<script defer src="build/vivio-sendpulse.js?v=responsive-2"></script>
 
 <!-- Núcleo + páginas, orden estricto de dependencias -->
-<script defer src="build/brand.js?v=responsive-1"></script>
-<script defer src="build/data.js?v=responsive-1"></script>
-<script defer src="build/api-data.js?v=responsive-1"></script>
-<script defer src="build/shared.js?v=responsive-1"></script>
-<script defer src="build/home.js?v=responsive-1"></script>
-<script defer src="build/catalog.js?v=responsive-1"></script>
-<script defer src="build/detail.js?v=responsive-1"></script>
-<script defer src="build/temporal.js?v=responsive-1"></script>
-<script defer src="build/plans.js?v=responsive-1"></script>
-<script defer src="build/publish.js?v=responsive-1"></script>
-<script defer src="build/posters.js?v=responsive-1"></script>
-<script defer src="build/admin.js?v=responsive-1"></script>
-<script defer src="build/agent.js?v=responsive-1"></script>
-<script defer src="build/help.js?v=responsive-1"></script>
-<script defer src="build/app.js?v=responsive-1"></script>
+<script defer src="build/brand.js?v=responsive-2"></script>
+<script defer src="build/data.js?v=responsive-2"></script>
+<script defer src="build/api-data.js?v=responsive-2"></script>
+<script defer src="build/shared.js?v=responsive-2"></script>
+<script defer src="build/home.js?v=responsive-2"></script>
+<script defer src="build/catalog.js?v=responsive-2"></script>
+<script defer src="build/detail.js?v=responsive-2"></script>
+<script defer src="build/temporal.js?v=responsive-2"></script>
+<script defer src="build/plans.js?v=responsive-2"></script>
+<script defer src="build/publish.js?v=responsive-2"></script>
+<script defer src="build/posters.js?v=responsive-2"></script>
+<script defer src="build/admin.js?v=responsive-2"></script>
+<script defer src="build/agent.js?v=responsive-2"></script>
+<script defer src="build/help.js?v=responsive-2"></script>
+<script defer src="build/app.js?v=responsive-2"></script>
 </body>
 </html>
