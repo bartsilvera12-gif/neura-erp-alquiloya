@@ -29,7 +29,20 @@ function App() {
       const id = new URLSearchParams(window.location.search).get('prop');
       if (id && window.AlquiloYaPublicData && window.AlquiloYaPublicData.getPropertyDetail) {
         window.AlquiloYaPublicData.getPropertyDetail(id).then(p => {
-          if (!cancelled && p) { setProperty(p); setRoute('detail'); }
+          if (cancelled) return;
+          if (p) {
+            setProperty(p);
+            setRoute('detail');
+          } else if (window.ayToast) {
+            // Si el deep-link de QR apunta a una propiedad que ya no
+            // existe (404 o UUID invalido), avisamos al usuario en vez
+            // de dejarlo en home sin contexto.
+            window.ayToast('La propiedad ya no está disponible. Revisá el catálogo.', {
+              title: 'Propiedad no encontrada',
+              variant: 'error',
+              duration: 7000,
+            });
+          }
         });
       }
     } catch { /* ignore */ }

@@ -78,7 +78,8 @@ function PlansPage({ onNav }) {
       </div>
 
       <CompareTable/>
-      <PlansFaq/>
+      {/* PlansFaq quedo como stub vacio (return null). El bloque FAQ vive en
+          /help. Removemos el render para no dejar un componente fantasma. */}
       {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
       {picked && (
         <RequestAccessModal
