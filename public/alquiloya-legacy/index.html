@@ -448,6 +448,68 @@
     .home-grid-4 { grid-template-columns: 1fr !important; }
   }
 
+  /* === Admin panel (admin-agent / admin-global) en mobile ===
+     El layout es grid "260px 1fr". El catch-all general lo colapsa a 1col
+     y stackea la sidebar arriba — pesa mucho UX porque obliga a scrollear
+     toda la lista de items para llegar al contenido. Convertimos la
+     sidebar en una barra horizontal scrollable con chips. */
+  @media (max-width: 900px) {
+    /* La aside del admin (cualquier .fade-in > div > aside con padding 24/16) */
+    .fade-in > div > aside,
+    aside[style*="border-right"] {
+      min-height: 0 !important;
+      padding: 10px 12px !important;
+      border-right: none !important;
+      border-bottom: 1px solid var(--line) !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      scrollbar-width: none !important;
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    .fade-in > div > aside::-webkit-scrollbar,
+    aside[style*="border-right"]::-webkit-scrollbar { display: none; }
+    /* Header de la cuenta (Panel de gestion / Admin Empresas) compacto */
+    .fade-in > div > aside > div[style*="border-bottom"],
+    aside[style*="border-right"] > div[style*="border-bottom"] {
+      border-bottom: none !important;
+      padding: 0 8px 0 0 !important;
+      margin-bottom: 0 !important;
+      margin-right: 8px !important;
+      border-right: 1px solid var(--line-2) !important;
+      flex-shrink: 0 !important;
+    }
+    /* Boton "Volver al sitio" -> chip compacto */
+    aside button[title="Volver al sitio"] {
+      width: auto !important;
+      flex-shrink: 0 !important;
+      margin: 0 8px 0 0 !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
+    }
+    /* Nav items en linea horizontal */
+    aside nav.col {
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      gap: 4px !important;
+      flex: 0 0 auto !important;
+    }
+    aside nav.col button {
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+      padding: 8px 12px !important;
+      font-size: 13px !important;
+    }
+    /* "Sin plan asignado" / banner del plan en horizontal */
+    aside > div[style*="border-top"],
+    aside > div[style*="padding"] {
+      flex-shrink: 0 !important;
+    }
+  }
+
   /* === Planes: ajustes finos en mobile ===
      El catch-all general (linea ~308) ya colapsa el grid 2x2 de PlanCard a 1col.
      Aca afinamos gap, padding y typografia para que se lea bien en celular,
@@ -572,23 +634,23 @@
 <script defer src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script defer src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <!-- Chatbot (define SENDPULSE_CONFIG/vivioSendpulse usado por shared) -->
-<script defer src="build/vivio-sendpulse.js?v=qa-deep-1"></script>
+<script defer src="build/vivio-sendpulse.js?v=responsive-1"></script>
 
 <!-- Núcleo + páginas, orden estricto de dependencias -->
-<script defer src="build/brand.js?v=qa-deep-1"></script>
-<script defer src="build/data.js?v=qa-deep-1"></script>
-<script defer src="build/api-data.js?v=qa-deep-1"></script>
-<script defer src="build/shared.js?v=qa-deep-1"></script>
-<script defer src="build/home.js?v=qa-deep-1"></script>
-<script defer src="build/catalog.js?v=qa-deep-1"></script>
-<script defer src="build/detail.js?v=qa-deep-1"></script>
-<script defer src="build/temporal.js?v=qa-deep-1"></script>
-<script defer src="build/plans.js?v=qa-deep-1"></script>
-<script defer src="build/publish.js?v=qa-deep-1"></script>
-<script defer src="build/posters.js?v=qa-deep-1"></script>
-<script defer src="build/admin.js?v=qa-deep-1"></script>
-<script defer src="build/agent.js?v=qa-deep-1"></script>
-<script defer src="build/help.js?v=qa-deep-1"></script>
-<script defer src="build/app.js?v=qa-deep-1"></script>
+<script defer src="build/brand.js?v=responsive-1"></script>
+<script defer src="build/data.js?v=responsive-1"></script>
+<script defer src="build/api-data.js?v=responsive-1"></script>
+<script defer src="build/shared.js?v=responsive-1"></script>
+<script defer src="build/home.js?v=responsive-1"></script>
+<script defer src="build/catalog.js?v=responsive-1"></script>
+<script defer src="build/detail.js?v=responsive-1"></script>
+<script defer src="build/temporal.js?v=responsive-1"></script>
+<script defer src="build/plans.js?v=responsive-1"></script>
+<script defer src="build/publish.js?v=responsive-1"></script>
+<script defer src="build/posters.js?v=responsive-1"></script>
+<script defer src="build/admin.js?v=responsive-1"></script>
+<script defer src="build/agent.js?v=responsive-1"></script>
+<script defer src="build/help.js?v=responsive-1"></script>
+<script defer src="build/app.js?v=responsive-1"></script>
 </body>
 </html>

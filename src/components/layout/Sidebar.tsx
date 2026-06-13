@@ -504,7 +504,22 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [modulos, setModulos] = useState<ModuloEmpresa[]>([]);
   const [favoritos, setFavoritos] = useState<string[]>([]);
-  const [collapsed, setCollapsed] = useState(false);
+  // En mobile arrancamos colapsada (icono-only) para que el contenido se vea.
+  // El usuario puede expandir con el toggle. window check para SSR safety.
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") return window.innerWidth < 768;
+    return false;
+  });
+  // Si el viewport cambia (rotacion, redimension de ventana), re-evaluamos.
+  // Solo forzamos colapsada si pasa a mobile; al volver a desktop no
+  // sobreescribimos la eleccion del usuario.
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth < 768) setCollapsed(true);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
     inventario: true,
     sorteos: true,
