@@ -2,11 +2,14 @@
 
 function HomePage({ onNav, onProperty }) {
   const { properties } = useAlquiloYaPublicData();
-  // "Propiedades destacadas" = SOLO las que tienen impulso/destaque vigente
-  // (p.featured viene de `destacada AND destacada_hasta vigente` en la API).
-  // Antes incluia `|| p.verified`, lo que metia cualquier inmueble verificado
-  // aunque no tuviera impulso — bug reportado por el cliente.
-  const featured = properties.filter(p => p.featured).slice(0, 6);
+  // "Propiedades destacadas" incluye:
+  //   1. Inmuebles con impulso/destaque vigente (p.featured -> destacada AND
+  //      destacada_hasta vigente en la API).
+  //   2. Inmuebles verificados (p.verified -> verificada en la API), porque
+  //      el cliente quiere que una verificacion completada (la solicitud que
+  //      cargan los agentes y aprueba el equipo) automaticamente le de
+  //      visibilidad en esta seccion.
+  const featured = properties.filter(p => p.featured || p.verified).slice(0, 6);
   const verifiedCount = properties.filter(p => p.verified).length;
   return (
     <div className="fade-in">

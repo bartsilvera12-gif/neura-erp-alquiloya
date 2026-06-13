@@ -6,7 +6,15 @@ function DetailPage({ p, onProperty, onNav }) {
   const baseProperty = p || properties[0] || PROPERTIES[0];
   const apiProperty = useAlquiloYaPublicProperty(baseProperty?.id);
   p = apiProperty || baseProperty;
-  const similar = properties.filter(x => x.id !== p.id && x.tipo === p.tipo).slice(0, 3);
+  // "Propiedades similares" muestra SOLO inmuebles verificados (badge
+  // azul) — pedido del cliente para que esta zona destaque trabajos
+  // serios. La verificacion se obtiene por la solicitud de verificacion
+  // que cargan los agentes (boton "Verificar" en su panel + revision
+  // manual). Si no hay verificadas del mismo tipo, no renderizamos la
+  // seccion para no mostrarla vacia.
+  const similar = properties
+    .filter(x => x.id !== p.id && x.tipo === p.tipo && x.verified)
+    .slice(0, 3);
   return (
     <div className="fade-in">
       <div className="container" style={{ padding: '24px 32px 8px' }}>
@@ -32,12 +40,14 @@ function DetailPage({ p, onProperty, onNav }) {
           <AgentCard agent={p.agent} price={p.price} tipo={p.tipo} onNav={onNav} property={p}/>
         </div>
       </div>
-      <section className="container" style={{ padding: '32px' }}>
-        <SectionHead eyebrow="También te pueden interesar" title="Propiedades similares" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22, marginTop: 28 }}>
-          {similar.map(s => <PropertyCard key={s.id} p={s} onClick={() => onProperty(s)}/>)}
-        </div>
-      </section>
+      {similar.length > 0 && (
+        <section className="container" style={{ padding: '32px' }}>
+          <SectionHead eyebrow="También te pueden interesar" title="Propiedades similares verificadas" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22, marginTop: 28 }}>
+            {similar.map(s => <PropertyCard key={s.id} p={s} onClick={() => onProperty(s)}/>)}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
