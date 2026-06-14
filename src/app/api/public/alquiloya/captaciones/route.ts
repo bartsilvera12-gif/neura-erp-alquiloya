@@ -74,14 +74,20 @@ export async function POST(request: Request) {
 
     const origen = (s(body.origen) ?? "web_publica").slice(0, 60);
 
+    // Defensa: seteamos etapa='nuevo' y estado='abierto' explicitos en el
+    // INSERT. La migracion 20260620120000 ya define ambos como DEFAULT, pero
+    // si en alguna instancia ese default se perdio (rollback parcial, ALTER
+    // accidental), el INSERT seguia fallando silencioso y el lead quedaba
+    // con NULL — invisible en el dashboard porque los queries filtran por
+    // etapa IN (...). Mejor explicito que dependiente del DEFAULT.
     const ins = await queryWithRetry<{ id: string }>(
       pool,
       `INSERT INTO alquiloya.agente_captaciones (
          empresa_id, agente_id, propietario_nombre, propietario_email, propietario_telefono,
          propiedad_titulo, tipo_propiedad, ciudad, barrio, direccion,
-         precio_estimado, mensaje, origen
+         precio_estimado, mensaje, origen, etapa, estado
        )
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'nuevo', 'abierto')
        RETURNING id`,
       [
         ALQUILOYA_EMPRESA_ID,

@@ -122,15 +122,21 @@ export async function PATCH(
     try {
       await client.query("BEGIN");
 
-      // Lock & verify ownership
-      const existing = await client.query(
-        `SELECT id FROM ${t("propiedades")} WHERE id = $1::uuid AND empresa_id = $2::uuid FOR UPDATE`,
+      // Lock & verify ownership + leer agente_id previo para detectar
+      // reasignacion. Cuando el admin re-asigna la propiedad a otro agente
+      // creamos una captacion automatica al nuevo agente con origen
+      // 'admin_asignacion'. Asi el agente nuevo ve la propiedad como un
+      // lead en su panel de Captaciones y los KPI del dashboard suman.
+      const existing = await client.query<{ id: string; agente_id: string | null; titulo: string | null; ciudad: string | null; barrio: string | null; direccion: string | null; precio: string | null; tipo: string | null; propietario_id: string | null }>(
+        `SELECT id, agente_id::text AS agente_id, titulo, ciudad, barrio, direccion, precio::text AS precio, tipo, propietario_id::text AS propietario_id
+           FROM ${t("propiedades")} WHERE id = $1::uuid AND empresa_id = $2::uuid FOR UPDATE`,
         [id, ALQUILOYA_EMPRESA_ID]
       );
       if (existing.rowCount === 0) {
         await client.query("ROLLBACK");
         return NextResponse.json({ error: "Propiedad no encontrada" }, { status: 404 });
       }
+      const previoAgenteId = existing.rows[0]?.agente_id ?? null;
 
       await client.query(
         `UPDATE ${t("propiedades")} SET
@@ -187,6 +193,60 @@ export async function PATCH(
           pubDias,
         ]
       );
+
+      // Si el admin reasigno la propiedad a un agente diferente del anterior
+      // (incluido el caso de NULL -> agenteId), creamos una captacion en el
+      // panel del agente nuevo. Asi el agente ve el lead como cualquier otro
+      // y los KPI de captaciones del dashboard suman correctamente.
+      if (agenteId && agenteId !== previoAgenteId) {
+        try {
+          const prev = existing.rows[0];
+          // Si la propiedad tiene propietario linkeado leemos su contacto
+          // para prefillear la captacion (el agente lo ve sin buscar).
+          let propNombre: string | null = null;
+          let propEmail: string | null = null;
+          let propTelefono: string | null = null;
+          if (prev.propietario_id) {
+            const pr = await client.query<{ nombre: string | null; email: string | null; telefono: string | null }>(
+              `SELECT nombre, email, telefono FROM "alquiloya"."propietarios"
+                WHERE empresa_id=$1::uuid AND id=$2::uuid LIMIT 1`,
+              [ALQUILOYA_EMPRESA_ID, prev.propietario_id]
+            );
+            propNombre = pr.rows[0]?.nombre ?? null;
+            propEmail = pr.rows[0]?.email ?? null;
+            propTelefono = pr.rows[0]?.telefono ?? null;
+          }
+          await client.query(
+            `INSERT INTO "alquiloya"."agente_captaciones" (
+               empresa_id, agente_id, propietario_nombre, propietario_email, propietario_telefono,
+               propiedad_titulo, tipo_propiedad, ciudad, barrio, direccion,
+               precio_estimado, origen, etapa, estado, mensaje
+             )
+             VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10,
+                     $11, 'admin_asignacion', 'nuevo', 'abierto',
+                     'Captacion generada automaticamente al asignarte esta propiedad desde el panel admin.')`,
+            [
+              ALQUILOYA_EMPRESA_ID,
+              agenteId,
+              propNombre ?? "Propietario",
+              propEmail,
+              propTelefono,
+              prev.titulo ?? titulo,
+              prev.tipo ?? tipo,
+              prev.ciudad,
+              prev.barrio,
+              prev.direccion,
+              prev.precio ? Number(prev.precio) : null,
+            ]
+          );
+        } catch (capErr) {
+          // No fallamos el PATCH entero si la captacion falla. Solo log.
+          console.warn(
+            "[propiedades PATCH] captacion auto-asignacion fallo:",
+            capErr instanceof Error ? capErr.message : capErr
+          );
+        }
+      }
 
       // Replace fotos (only if provided in body)
       if (Array.isArray(body.fotos)) {

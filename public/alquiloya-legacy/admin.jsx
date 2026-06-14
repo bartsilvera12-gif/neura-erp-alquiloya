@@ -1363,9 +1363,12 @@ function CapturesSection({ onNav }) {
   // - 'mock'    => el endpoint falló O no hay sesión: caemos al mock SOLO en ese caso
   const [realCapt, setRealCapt] = React.useState(null);
   const [realErr, setRealErr] = React.useState(null);
+  // Forzamos fetch directo (no ayCachedFetch) — los leads cambian de etapa
+  // desde el dashboard y el agente espera ver el cambio inmediato al
+  // volver a su panel. ayCachedFetch tiene TTL de 60s y dejaba data vieja.
   React.useEffect(() => {
     let cancelled = false;
-    (window.ayCachedFetch || fetch)('/api/agente/captaciones', { cache: 'no-store', credentials: 'include' })
+    fetch('/api/agente/captaciones', { cache: 'no-store', credentials: 'include' })
       .then(r => {
         if (cancelled) return null;
         if (r.status === 401 || r.status === 403) { setRealCapt('mock'); return null; }
@@ -1395,6 +1398,8 @@ function CapturesSection({ onNav }) {
     commission: 0,
     paid: false,
     _real: true,
+    _id: r.id,
+    _etapa: r.etapa || 'nuevo',
     _titulo: r.propiedad_titulo,
     _ciudad: r.ciudad,
     _barrio: r.barrio,
@@ -1646,9 +1651,45 @@ function CapturesSection({ onNav }) {
                 </div>
               )}
 
-              {/* Action */}
+              {/* Action: para captaciones reales mostramos un selector de
+                  etapa funcional que PATCHea /api/agente/captaciones/[id].
+                  Para mocks dejamos los botones decorativos viejos. */}
               <div style={{ flexShrink: 0 }}>
-                {c.status === 'gestionando'
+                {c._real ? (
+                  <select
+                    defaultValue={c._etapa || 'nuevo'}
+                    onChange={async (e) => {
+                      const nueva = e.target.value;
+                      try {
+                        const r = await fetch('/api/agente/captaciones/' + encodeURIComponent(c._id), {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ etapa: nueva }),
+                        });
+                        const b = await r.json().catch(() => ({}));
+                        if (!r.ok || !b.success) throw new Error(b.error || ('HTTP ' + r.status));
+                        if (window.ayToast) window.ayToast('Etapa actualizada.', { variant: 'success', duration: 3000 });
+                        setReloadKey(k => k + 1);
+                      } catch (err) {
+                        if (window.ayToast) window.ayToast('No se pudo actualizar.', { variant: 'error' });
+                        e.target.value = c._etapa || 'nuevo';
+                      }
+                    }}
+                    title="Cambiar etapa"
+                    style={{
+                      height: 30, borderRadius: 8, padding: '0 8px',
+                      border: '1px solid var(--line)', background: '#fff',
+                      color: 'var(--ink-2)', fontSize: 12, fontWeight: 600,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                    }}>
+                    <option value="nuevo">Nuevo</option>
+                    <option value="contacto">Contactado</option>
+                    <option value="negocio_activo">Negociación</option>
+                    <option value="cerrado">Cerrado</option>
+                    <option value="rechazado">Rechazado</option>
+                  </select>
+                ) : c.status === 'gestionando'
                   ? <button title="Marcar como alquilada" style={{
                       padding: '0 12px', height: 30, borderRadius: 8, background: 'var(--ink)',
                       color: '#fff', border: 'none', cursor: 'pointer',

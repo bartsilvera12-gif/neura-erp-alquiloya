@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
+import { createServiceRoleClient } from "@/lib/supabase/service-admin";
+import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +25,19 @@ export async function PATCH(request: Request, ctx: Ctx) {
   try {
     const user = await getAuthUserForApiRoute(request);
     if (!user?.id) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+    // Defensa: el endpoint es dashboard-only, asi que solo usuarios cuya
+    // empresa es AlquiloYa pueden tocar captaciones. Antes cualquier usuario
+    // logueado a Neura podia editar etapas de cualquier captacion de
+    // cualquier empresa (no se chequeaba empresa_id contra el usuario).
+    const supabase = createServiceRoleClient();
+    const usuarioErp = await resolveUsuarioErpFromAuthUser(supabase, user);
+    if (!usuarioErp || usuarioErp.empresa_id !== ALQUILOYA_EMPRESA_ID) {
+      return NextResponse.json(
+        { error: "No autorizado para esta empresa" },
+        { status: 403 }
+      );
+    }
 
     const { id } = await ctx.params;
     if (!uuidRe.test(id)) {
