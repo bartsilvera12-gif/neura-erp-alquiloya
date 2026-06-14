@@ -754,8 +754,11 @@ function AgenteCardPublic({ agent, onOpen }) {
 
       <AgentStarsPublic rating={rating} count={reviewsCount}/>
 
-      <div className="row gap-12" style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+      <div className="row gap-12" style={{ fontSize: 12.5, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
         <span className="row gap-4"><I.house s={13}/> {propCount} {propCount === 1 ? 'publicación' : 'publicaciones'}</span>
+        {agent.raw && Number(agent.raw.posts_count) > 0 && (
+          <span className="row gap-4"><I.doc s={13}/> {agent.raw.posts_count} {Number(agent.raw.posts_count) === 1 ? 'post' : 'posts'}</span>
+        )}
         {agent.verified && <span style={{ color: 'var(--blue)' }} className="row gap-4"><I.check s={11}/> Verificado</span>}
       </div>
 

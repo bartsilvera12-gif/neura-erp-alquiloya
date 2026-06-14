@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
+import { sanitizeBlogHtml } from "../../../agente/posts/route";
+
+function slugify(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,21 +50,28 @@ export async function PATCH(request: Request, ctx: Ctx) {
       vals.push(val);
       sets.push(`${col} = $${vals.length}`);
     }
+    let nuevoTitulo: string | null = null;
     if ("titulo" in body) {
       const v = s(body.titulo, 240);
       if (!v) return NextResponse.json({ error: "titulo vacio" }, { status: 400 });
       push("titulo", v);
+      nuevoTitulo = v;
     }
     if ("slug" in body) {
       const v = s(body.slug, 80);
       if (v) push("slug", v);
+      else if (nuevoTitulo) push("slug", slugify(nuevoTitulo));
     }
     if ("resumen" in body) push("resumen", s(body.resumen, 500));
-    if ("contenido" in body) push("contenido", s(body.contenido, 50000));
+    if ("contenido" in body) push("contenido", sanitizeBlogHtml(s(body.contenido, 50000)));
     if ("cover_url" in body) push("cover_url", s(body.cover_url, 500));
     if ("publicado" in body) {
       const v = b(body.publicado);
-      if (v !== undefined) push("publicado", v);
+      if (v !== undefined) {
+        push("publicado", v);
+        // Si pasa a publicado, sincronizamos publicado_at si era null.
+        if (v === true) sets.push("publicado_at = COALESCE(publicado_at, now())");
+      }
     }
     if ("destacado" in body) {
       const v = b(body.destacado);

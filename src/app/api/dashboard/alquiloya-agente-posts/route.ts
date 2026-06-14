@@ -3,6 +3,7 @@ import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { listErpAgentePosts } from "@/lib/alquiloya/erp-agente-posts";
+import { sanitizeBlogHtml } from "../../agente/posts/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
     const titulo = s(body.titulo, 240);
     if (!titulo) return NextResponse.json({ error: "titulo requerido" }, { status: 400 });
     const slug = s(body.slug, 80) ?? slugify(titulo);
-    const contenido = s(body.contenido, 50000);
+    const contenido = sanitizeBlogHtml(s(body.contenido, 50000));
     const resumen = s(body.resumen, 500);
     const coverUrl = s(body.cover_url, 500);
     const publicado = b(body.publicado, false);

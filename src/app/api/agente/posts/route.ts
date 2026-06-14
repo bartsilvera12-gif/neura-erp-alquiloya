@@ -36,6 +36,27 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 }
 
+// Sanitiza HTML del post: solo deja tags con sentido editorial. Aplica a
+// POST y PATCH antes de guardar. Tag whitelist coincide con el toolbar del
+// frontend (BlogContentEditor en admin.jsx) y con los estilos .post-html
+// definidos en /alquiloya-legacy/index.html.
+// NO es un sanitizer perfecto (sin DOMPurify por costo en serverless) pero
+// elimina los vectores de XSS clasicos: script, iframe, style, on* handlers,
+// javascript: URLs.
+export function sanitizeBlogHtml(input: string | null): string | null {
+  if (input == null) return null;
+  let h = input;
+  // Drop tags peligrosos enteros.
+  h = h.replace(/<(script|iframe|style|object|embed|link|meta|form|input|button)[\s\S]*?<\/\1>/gi, "");
+  // Drop tags self-closing peligrosos.
+  h = h.replace(/<(script|iframe|style|object|embed|link|meta|input)[^>]*\/?>/gi, "");
+  // Drop event handlers on*= en cualquier atributo.
+  h = h.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // Drop javascript: y data: URLs en href/src.
+  h = h.replace(/(\s(?:href|src|action)\s*=\s*)(["'])\s*(javascript|data|vbscript):[^"']*\2/gi, '$1$2#$2');
+  return h;
+}
+
 async function resolveAgenteId(request: Request): Promise<{ ok: false; res: NextResponse } | { ok: true; agenteId: string }> {
   const user = await getAuthUserForApiRoute(request);
   if (!user?.id) return { ok: false, res: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
@@ -106,7 +127,7 @@ export async function POST(request: Request) {
     const titulo = s(body.titulo, 240);
     if (!titulo) return NextResponse.json({ error: "titulo requerido" }, { status: 400 });
     const slug = s(body.slug, 80) ?? slugify(titulo);
-    const contenido = s(body.contenido, 50000);
+    const contenido = sanitizeBlogHtml(s(body.contenido, 50000));
     const resumen = s(body.resumen, 500);
     const coverUrl = s(body.cover_url, 500);
     const publicado = b(body.publicado, false);

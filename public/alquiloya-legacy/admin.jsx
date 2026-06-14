@@ -2099,6 +2099,99 @@ function ConsultasRecientes({ onNav }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BlogContentEditor — textarea + toolbar de formato minimo. Sin dependencias.
+// Inserta tags HTML al cursor o envuelve la seleccion. El HTML resultante se
+// renderiza con la clase post-html en el blog publico (estilos en index.html).
+// Tag whitelist (debe coincidir con sanitizeBlogHtml del backend):
+//   strong, em, h2, h3, ul, ol, li, blockquote, a, p, br
+// ─────────────────────────────────────────────────────────────────────────────
+function BlogContentEditor({ value, onChange }) {
+  const ref = React.useRef(null);
+  const apply = (action) => {
+    const ta = ref.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const before = value.slice(0, start);
+    const sel = value.slice(start, end);
+    const after = value.slice(end);
+    let snippet = sel;
+    let cursorOffset = 0;
+    switch (action) {
+      case 'bold':       snippet = `<strong>${sel || 'texto'}</strong>`; break;
+      case 'italic':     snippet = `<em>${sel || 'texto'}</em>`; break;
+      case 'h2':         snippet = `<h2>${sel || 'Subtítulo'}</h2>`; break;
+      case 'h3':         snippet = `<h3>${sel || 'Sub-subtítulo'}</h3>`; break;
+      case 'ul':         snippet = `<ul>\n  <li>${sel || 'Item'}</li>\n</ul>`; break;
+      case 'ol':         snippet = `<ol>\n  <li>${sel || 'Item'}</li>\n</ol>`; break;
+      case 'quote':      snippet = `<blockquote>${sel || 'Cita'}</blockquote>`; break;
+      case 'paragraph':  snippet = `<p>${sel || 'Texto del párrafo'}</p>`; break;
+      case 'link': {
+        const url = window.prompt('URL del link (https://...)', 'https://');
+        if (!url) return;
+        snippet = `<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${sel || url}</a>`;
+        break;
+      }
+      default: return;
+    }
+    const next = before + snippet + after;
+    onChange(next);
+    // Devolvemos foco y posicionamos el cursor al final del snippet insertado.
+    cursorOffset = before.length + snippet.length;
+    setTimeout(() => {
+      try {
+        ta.focus();
+        ta.setSelectionRange(cursorOffset, cursorOffset);
+      } catch { /* ignore */ }
+    }, 0);
+  };
+
+  const Btn = ({ act, children, title }) => (
+    <button type="button" onClick={() => apply(act)} title={title || act}
+      style={{
+        padding: '4px 9px', borderRadius: 6, border: '1px solid var(--line)',
+        background: '#fff', color: 'var(--ink-2)', cursor: 'pointer',
+        fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
+        minWidth: 30,
+      }}>
+      {children}
+    </button>
+  );
+
+  return (
+    <div>
+      <div className="row gap-4" style={{
+        flexWrap: 'wrap', marginBottom: 6, padding: 6, background: 'var(--bg-2)',
+        border: '1px solid var(--line)', borderBottom: 'none',
+        borderRadius: '8px 8px 0 0',
+      }}>
+        <Btn act="bold" title="Negrita"><strong>B</strong></Btn>
+        <Btn act="italic" title="Cursiva"><em>I</em></Btn>
+        <Btn act="h2" title="Título grande">H2</Btn>
+        <Btn act="h3" title="Subtítulo">H3</Btn>
+        <Btn act="paragraph" title="Párrafo">P</Btn>
+        <Btn act="ul" title="Lista">• Lista</Btn>
+        <Btn act="ol" title="Lista numerada">1. Num</Btn>
+        <Btn act="quote" title="Cita">❝ Cita</Btn>
+        <Btn act="link" title="Link">🔗 Link</Btn>
+      </div>
+      <textarea
+        ref={ref}
+        className="input"
+        rows={12}
+        style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
+          borderRadius: '0 0 8px 8px', borderTop: 'none',
+        }}
+        value={value}
+        onChange={(e) => onChange(e.target.value.slice(0, 60000))}
+        placeholder="Escribí tu post acá. Usá la barra para dar formato."
+      />
+    </div>
+  );
+}
+
 // ───────── Mi blog (CRUD de posts del agente logueado) ─────────
 function BlogSection() {
   const [posts, setPosts] = React.useState(null);
@@ -2252,7 +2345,14 @@ function BlogSection() {
             </div>
             <div className="field" style={{ marginTop: 12 }}>
               <label>Contenido</label>
-              <textarea className="input" rows={10} style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }} value={editing.contenido || ''} onChange={(e) => setEditing(x => ({ ...x, contenido: e.target.value }))}/>
+              <BlogContentEditor
+                value={editing.contenido || ''}
+                onChange={(v) => setEditing(x => ({ ...x, contenido: v }))}
+              />
+              <div className="muted xs" style={{ marginTop: 6 }}>
+                Tip: usá la barra para dar formato. Lo que ves se renderiza
+                con los mismos estilos en el blog público.
+              </div>
             </div>
             <div className="row gap-16" style={{ marginTop: 14, flexWrap: 'wrap' }}>
               <label className="checkbox">

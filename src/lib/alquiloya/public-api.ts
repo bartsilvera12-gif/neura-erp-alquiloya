@@ -327,7 +327,14 @@ export async function listPublicAgentes() {
               AND p.agente_id = a.id
               AND p.activo = true
               AND p.visible_web = true
-          ) AS propiedades_count
+          ) AS propiedades_count,
+          (
+            SELECT count(*)::int
+            FROM ${t("agente_posts")} pp
+            WHERE pp.empresa_id = a.empresa_id
+              AND pp.agente_id = a.id
+              AND pp.publicado = true
+          ) AS posts_count
         FROM ${t("agentes")} a
         WHERE a.empresa_id = $1::uuid
           AND a.activo = true
