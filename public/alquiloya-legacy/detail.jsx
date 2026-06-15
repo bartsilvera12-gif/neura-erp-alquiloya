@@ -699,7 +699,6 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
         </div>
         <div className="col gap-10" style={{ marginTop: 16 }}>
           <button type="button" className="btn btn-wa btn-lg" style={{ justifyContent: 'center' }} onClick={onClickWhatsApp}><I.whats s={18}/> Consultar por WhatsApp</button>
-          <button type="button" className="btn btn-blue" style={{ justifyContent: 'center' }} onClick={onClickVisita}><I.cal s={16}/> Solicitar visita</button>
         </div>
         <div style={{ marginTop: 16, padding: 12, background: 'var(--yellow-50)', borderRadius: 10, fontSize: 12.5, color: '#8a5e00', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <I.shield s={14}/>
@@ -744,7 +743,6 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
       </div>
       <div className="col gap-10" style={{ marginTop: 16 }}>
         <button type="button" className="btn btn-wa btn-lg" style={{ justifyContent: 'center' }} onClick={onClickWhatsApp}><I.whats s={18}/> Consultar por WhatsApp</button>
-        <button type="button" className="btn btn-blue" style={{ justifyContent: 'center' }} onClick={onClickVisita}><I.cal s={16}/> Solicitar visita</button>
       </div>
       <div style={{ marginTop: 16, padding: 12, background: 'var(--yellow-50)', borderRadius: 10, fontSize: 12.5, color: '#8a5e00', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <I.shield s={14}/>
