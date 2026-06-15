@@ -254,24 +254,21 @@ export async function POST(request: Request) {
           );
         }
       }
-    } else {
-      // Path propietario: validar activo + plan (vencimiento + cuota) si
-      // tiene plan_publicacion_id asignado. Si todavia no compro plan,
-      // se conserva el fallback "1 propiedad cada 30 dias" (mas abajo).
+    } else if (usuarioPropietarioId) {
+      // Path propietario LOGUEADO: validar plan (vencimiento + cuota) si tiene
+      // plan_publicacion_id asignado. NO chequeamos `activo`: política del
+      // cliente — los propietarios publican sin cuenta, no se les bloquea por
+      // estado de cuenta. Si está anónimo (sin usuarioPropietarioId) salteamos
+      // este bloque entero y la fila de propietario se crea/encuentra abajo
+      // por email/teléfono.
       const { data: prRow } = await supabase
         .from("propietarios")
-        .select("id, activo, plan_publicacion_id, plan_vencimiento_at")
-        .eq("id", usuarioPropietarioId!)
+        .select("id, plan_publicacion_id, plan_vencimiento_at")
+        .eq("id", usuarioPropietarioId)
         .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
         .limit(1)
         .maybeSingle();
-      if (!prRow || (prRow as { activo?: boolean }).activo !== true) {
-        return NextResponse.json(
-          { error: "Tu cuenta de propietario esta inactiva. Contactanos para reactivarla." },
-          { status: 403 }
-        );
-      }
-      const pPlanId = (prRow as { plan_publicacion_id?: string | null }).plan_publicacion_id ?? null;
+      const pPlanId = (prRow as { plan_publicacion_id?: string | null } | null)?.plan_publicacion_id ?? null;
       if (pPlanId) {
         const venc = (prRow as { plan_vencimiento_at?: string | null }).plan_vencimiento_at ?? null;
         if (venc && new Date(venc).getTime() < Date.now()) {
