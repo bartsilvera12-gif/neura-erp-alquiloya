@@ -20,6 +20,7 @@ function HomePage({ onNav, onProperty }) {
         <Featured properties={featured} onProperty={onProperty} onNav={onNav}/>
       )}
       <Categories properties={properties} onNav={onNav}/>
+      <AgentBanner onNav={onNav}/>
       <CatalogPreview properties={properties} onProperty={onProperty} onNav={onNav}/>
       <OwnersBlock onNav={onNav}/>
       <Faq/>
@@ -1327,4 +1328,50 @@ function RequestAccessModal({ onClose, planTier, planLabel }) {
   );
 }
 
-Object.assign(window, { HomePage, QRPosterMock, MiniMap, SectionHead, RequestAccessModal });
+// Banner entre Categorías e Inmuebles: invita al propietario a delegar la
+// publicación en un agente. CTA va al listado público de agentes
+// (#agentes), donde cada card tiene el botón "Solicitar agente" que abre el
+// formulario de captación (POST /api/public/alquiloya/captaciones).
+function AgentBanner({ onNav }) {
+  return (
+    <section style={{ padding: '24px 0 8px' }}>
+      <div className="container">
+        <div className="card" style={{
+          padding: 24,
+          background: 'linear-gradient(135deg, var(--blue-50) 0%, #fff 70%)',
+          border: '1px solid var(--blue-100)',
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          gap: 20,
+          alignItems: 'center',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'var(--blue)', color: '#fff',
+            display: 'grid', placeItems: 'center', flexShrink: 0,
+          }}>
+            <I.user s={28}/>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 19, color: 'var(--ink)', lineHeight: 1.25 }}>
+              ¿Preferís que un agente publique por vos?
+            </div>
+            <div className="muted" style={{ marginTop: 6, fontSize: 14, lineHeight: 1.5 }}>
+              Elegí un agente verificado de AlquiloYa. Él se encarga de cargar la publicación, sacar fotos, fijar precio y coordinar visitas.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-blue"
+            onClick={() => onNav && onNav('agentes')}
+            style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Solicitar agente <I.arrow s={14}/>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+Object.assign(window, { HomePage, QRPosterMock, MiniMap, SectionHead, RequestAccessModal, AgentBanner });
