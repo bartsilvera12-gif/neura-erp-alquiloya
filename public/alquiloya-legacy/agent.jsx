@@ -2,10 +2,26 @@
 
 function AgentProfilePage({ slug, onNav, onProperty }) {
   const { agents } = useAlquiloYaPublicData();
+  // El "slug" puede venir con query (?id=<uuid>) anexado porque el router
+  // legacy usa el hash entero como ruta. Lo descomponemos para tener slug
+  // limpio + posible id de fallback (cuando cambia el nombre del agente y el
+  // slug no matchea, igual encontramos el perfil por id).
+  const qIdx = String(slug || '').indexOf('?');
+  const slugClean = qIdx >= 0 ? slug.slice(0, qIdx) : slug;
+  let fallbackIdFromQuery = null;
+  if (qIdx >= 0) {
+    try {
+      const params = new URLSearchParams(slug.slice(qIdx + 1));
+      fallbackIdFromQuery = params.get('id') || null;
+    } catch { /* ignore */ }
+  }
   // Buscamos el agente solicitado por slug / id / apiId. Si NO se encuentra,
   // NO caemos a un agente mock (eso producia el bug de "Mariana Lopez" como
   // default visible). Pedimos detalle solo cuando hay match real.
-  const baseAgent = agents.find(a => a.slug === slug || a.id === slug || a.apiId === slug) || null;
+  const baseAgent = agents.find(a =>
+    a.slug === slugClean || a.id === slugClean || a.apiId === slugClean ||
+    (fallbackIdFromQuery && (a.id === fallbackIdFromQuery || a.apiId === fallbackIdFromQuery))
+  ) || null;
   const apiAgent = useAlquiloYaPublicAgent(baseAgent?.id);
   const agent = apiAgent || baseAgent;
 
