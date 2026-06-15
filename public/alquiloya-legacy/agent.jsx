@@ -680,6 +680,7 @@ function WriteReviewModal({ agent, onClose }) {
 function AgentesListPage({ onNav }) {
   const { agents } = useAlquiloYaPublicData();
   const [q, setQ] = React.useState('');
+  const [solicitarAgent, setSolicitarAgent] = React.useState(null);
   const qn = String(q || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const visible = (agents || []).filter(a => {
     if (!qn) return true;
@@ -721,21 +722,30 @@ function AgentesListPage({ onNav }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
             {visible.map(a => (
-              <AgenteCardPublic key={a.id} agent={a} onOpen={() => onNav('agent/' + (a.slug || a.id))}/>
+              <AgenteCardPublic
+                key={a.id}
+                agent={a}
+                onOpen={() => onNav('agent/' + (a.slug || a.id))}
+                onSolicitar={() => setSolicitarAgent(a)}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {solicitarAgent && (
+        <SolicitarAgenteModal agent={solicitarAgent} onClose={() => setSolicitarAgent(null)}/>
+      )}
     </div>
   );
 }
 
-function AgenteCardPublic({ agent, onOpen }) {
+function AgenteCardPublic({ agent, onOpen, onSolicitar }) {
   const rating = Number(agent.rating) || 0;
   const reviewsCount = Number(agent.reviews) || 0;
   const propCount = Number(agent.activeProperties) || 0;
   return (
-    <button onClick={onOpen} className="card" style={{
+    <div onClick={onOpen} className="card" style={{
       padding: 18, textAlign: 'left', cursor: 'pointer',
       border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 12,
       transition: 'border-color .12s, box-shadow .12s, transform .1s',
@@ -767,10 +777,11 @@ function AgenteCardPublic({ agent, onOpen }) {
         {agent.verified && <span style={{ color: 'var(--blue)' }} className="row gap-4"><I.check s={11}/> Verificado</span>}
       </div>
 
-      <div className="row gap-8" style={{ marginTop: 4 }}>
-        <span className="btn btn-blue" style={{ flex: 1, justifyContent: 'center' }}>Ver perfil →</span>
+      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button type="button" className="btn btn-blue" style={{ width: '100%', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); onOpen(); }}>Ver perfil →</button>
+        <button type="button" className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); onSolicitar && onSolicitar(); }}>Solicitar agente</button>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -805,4 +816,129 @@ function AgentStarsPublic({ rating, count }) {
   );
 }
 
-Object.assign(window, { AgentProfilePage, AgentesListPage, AgenteCardPublic, AgentStarsPublic });
+// Modal "Solicitar agente": el visitante deja sus datos + un mensaje y se crea
+// una captación para ese agente (POST /api/public/alquiloya/captaciones, que el
+// agente ve en su panel → Captaciones). Requiere nombre + (teléfono o email).
+function SolicitarAgenteModal({ agent, onClose }) {
+  const [form, setForm] = React.useState({ nombre: '', telefono: '', email: '', ciudad: '', mensaje: '' });
+  const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const agentId = agent.apiId || agent.id;
+  const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(agentId || ''));
+  const hasContacto = form.telefono.trim().length > 0 || form.email.trim().length > 0;
+  const ready = form.nombre.trim().length >= 2 && hasContacto && form.mensaje.trim().length >= 10;
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, []);
+
+  async function submit(e) {
+    e && e.preventDefault && e.preventDefault();
+    if (!ready || sending) return;
+    if (!validId) { setError('Este agente todavía no está disponible para solicitudes.'); return; }
+    setSending(true); setError(null);
+    try {
+      const res = await fetch('/api/public/alquiloya/captaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agente_id: agentId,
+          propietario_nombre: form.nombre.trim(),
+          propietario_email: form.email.trim() || undefined,
+          propietario_telefono: form.telefono.trim() || undefined,
+          ciudad: form.ciudad.trim() || undefined,
+          mensaje: form.mensaje.trim(),
+          origen: 'web_publica_solicitar_agente',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
+      setSent(true);
+    } catch (err) {
+      setError('No pudimos enviar tu solicitud. ' + (err && err.message ? err.message : ''));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (sent) {
+    return ReactDOM.createPortal(
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 200, display: 'grid', placeItems: 'center', padding: 20 }}>
+        <div onClick={(e) => e.stopPropagation()} className="card" style={{ padding: 32, maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--blue-50)', color: 'var(--blue)', display: 'grid', placeItems: 'center', margin: '0 auto' }}>
+            <I.check s={32}/>
+          </div>
+          <h3 style={{ fontSize: 20, marginTop: 14 }}>¡Solicitud enviada!</h3>
+          <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
+            {agent.name ? agent.name.split(' ')[0] : 'El agente'} va a recibir tu mensaje y te va a contactar a la brevedad.
+          </p>
+          <button onClick={onClose} className="btn btn-blue" style={{ marginTop: 20 }}>Entendido</button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="card" style={{ maxWidth: 480, width: '100%', position: 'relative', maxHeight: 'calc(100dvh - 32px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, margin: 'auto 0' }}>
+        <button type="button" onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'var(--bg-2)', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'grid', placeItems: 'center', zIndex: 2 }}>
+          <I.x s={14}/>
+        </button>
+
+        <div style={{ padding: '22px 26px 14px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+          <div className="tag">Solicitar agente</div>
+          <h3 style={{ fontSize: 20, marginTop: 6 }}>Contactá a {agent.name || 'este agente'}</h3>
+          <p className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+            Dejá tus datos y contanos qué necesitás. El agente recibe tu solicitud y te contacta.
+          </p>
+        </div>
+
+        <div style={{ padding: '16px 26px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div className="field">
+            <label>Tu nombre *</label>
+            <input className="input" value={form.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="Ej: Pablo Ramírez" maxLength={120}/>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
+            <div className="field" style={{ flex: 1, minWidth: 160 }}>
+              <label>Teléfono / WhatsApp</label>
+              <input className="input" value={form.telefono} onChange={(e) => set('telefono', e.target.value)} placeholder="09xx xxx xxx" maxLength={40}/>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 160 }}>
+              <label>Email</label>
+              <input className="input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="tucorreo@dominio.com" maxLength={160}/>
+            </div>
+          </div>
+          <div className="muted xs" style={{ marginTop: 4 }}>Dejá al menos un teléfono o un email para que te puedan contactar.</div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Ciudad / zona (opcional)</label>
+            <input className="input" value={form.ciudad} onChange={(e) => set('ciudad', e.target.value)} placeholder="Ej: Asunción, Villa Morra" maxLength={120}/>
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Tu mensaje *</label>
+            <textarea className="input" rows={4} value={form.mensaje} onChange={(e) => set('mensaje', e.target.value)} placeholder="Contale qué buscás o qué querés publicar. Mínimo 10 caracteres." maxLength={1000}/>
+            <div className="muted xs" style={{ textAlign: 'right' }}>{form.mensaje.length} caracteres</div>
+          </div>
+          {error ? <div style={{ marginTop: 8, color: '#b91c1c', fontSize: 13 }}>{error}</div> : null}
+        </div>
+
+        <div style={{ padding: '14px 26px', borderTop: '1px solid var(--line-2)', background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} className="btn btn-outline" disabled={sending}>Cancelar</button>
+          <button type="submit" className="btn btn-blue" disabled={!ready || sending} style={{ opacity: ready && !sending ? 1 : .5, cursor: ready && !sending ? 'pointer' : 'not-allowed' }}>
+            {sending ? 'Enviando…' : <>Enviar solicitud <I.arrow s={14}/></>}
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body
+  );
+}
+
+Object.assign(window, { AgentProfilePage, AgentesListPage, AgenteCardPublic, AgentStarsPublic, SolicitarAgenteModal });
