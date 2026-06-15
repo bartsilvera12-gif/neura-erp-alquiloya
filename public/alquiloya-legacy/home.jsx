@@ -1207,22 +1207,46 @@ function RequestAccessModal({ onClose, planTier, planLabel }) {
     if (!form.email.trim() && !form.telefono.trim()) return setFeedback({ kind: 'error', text: 'Ingresá email o teléfono.' });
     setBusy(true);
     try {
-      const payload = {
-        tipo: 'agente', sub_tipo: subTipo,
-        nombre: form.nombre.trim(),
-        email: form.email.trim() || null,
-        telefono: form.telefono.trim() || null,
-        empresa: form.empresa.trim() || null,
-        ciudad: form.ciudad.trim() || null,
-        mensaje: form.mensaje.trim() || null,
-        plan_tier_solicitado: planTier || null,
-      };
-      const res = await fetch('/api/public/alquiloya/solicitudes-acceso', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
+      let res;
+      if (planTier) {
+        // "Quiero este plan" → es una solicitud de servicio (cambio de plan),
+        // NO un alta de agente. Mensaje + plan elegido + extras como contexto.
+        const extras = [];
+        if (form.empresa.trim()) extras.push('Inmobiliaria: ' + form.empresa.trim());
+        if (form.ciudad.trim()) extras.push('Ciudad: ' + form.ciudad.trim());
+        if (subTipo) extras.push('Tipo: ' + subTipo);
+        const mensajeFinal = [form.mensaje.trim(), extras.join(' · ')].filter(Boolean).join('\n');
+        const payload = {
+          kind: 'cambio_plan',
+          plan_tier: planTier,
+          nombre: form.nombre.trim(),
+          email: form.email.trim() || null,
+          telefono: form.telefono.trim() || null,
+          mensaje: mensajeFinal || null,
+        };
+        res = await fetch('/api/public/alquiloya/solicitudes-servicio', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+      } else {
+        // "Solicitar acceso de agente" → alta de agente con aprobación admin.
+        const payload = {
+          tipo: 'agente', sub_tipo: subTipo,
+          nombre: form.nombre.trim(),
+          email: form.email.trim() || null,
+          telefono: form.telefono.trim() || null,
+          empresa: form.empresa.trim() || null,
+          ciudad: form.ciudad.trim() || null,
+          mensaje: form.mensaje.trim() || null,
+        };
+        res = await fetch('/api/public/alquiloya/solicitudes-acceso', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
-      setFeedback({ kind: 'success', text: '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.' });
+      setFeedback({ kind: 'success', text: planTier
+        ? '¡Listo! Recibimos tu solicitud del plan ' + (planLabel || planTier) + '. Te vamos a contactar para coordinar la activación.'
+        : '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.' });
       setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
     } catch (err) {
       setFeedback({ kind: 'error', text: 'No pudimos registrar tu solicitud. ' + (err.message || '') });
