@@ -1513,6 +1513,10 @@ function extractPlanLimitsFromBullets(bullets) {
 function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
   const [apiPlans, setApiPlans] = React.useState(null);
   const [agentPickerOpen, setAgentPickerOpen] = React.useState(false);
+  // Modal de "Solicitar plan" cuando un anónimo clickea un plan pago.
+  // Reusa RequestAccessModal (definido en home.jsx, expuesto en window).
+  const [planRequestFor, setPlanRequestFor] = React.useState(null); // {tier, name}
+  const isAnonOrOwner = !ctxAgente; // anónimo o propietario logueado
   // El atajo "que un agente publique por mi" es para CUALQUIER usuario que
   // no sea agente ni este editando una propiedad existente. Antes solo se
   // mostraba a propietarios logueados; ahora que los propietarios pueden
@@ -1611,9 +1615,24 @@ function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
       <div className="col gap-12" style={{ marginTop: 20 }}>
         {list.map(p => {
           const picked = form.plan_id === p.tier;
+          const isPaid = (p.price || 0) > 0 || (p.billing && p.billing !== 'gratis');
+          const requestSent = form.plan_request_tier === p.tier && form.plan_request_sent;
           return (
             <button key={p.tier} type="button" onClick={() => {
               const limits = extractPlanLimitsFromBullets(p.bullets);
+              // Plan PAGO + anónimo/propietario sin sesión real: en lugar de
+              // dejarlo elegir directo (no puede pagar desde el wizard),
+              // abrimos un formulario de solicitud al admin. Plan gratis o
+              // agente: comportamiento normal (selección directa).
+              if (isPaid && isAnonOrOwner && !requestSent) {
+                setF({
+                  plan_id: p.tier,
+                  plan_fotos_max: limits.fotosPorInmueble,
+                  plan_propiedades_max: limits.propiedadesActivas,
+                });
+                setPlanRequestFor({ tier: p.tier, name: p.name });
+                return;
+              }
               setF({
                 plan_id: p.tier,
                 plan_fotos_max: limits.fotosPorInmueble,
@@ -1644,11 +1663,30 @@ function StepPlan({ form, setF, ctxAgente, ctxPropietario, editingId }) {
                 {p.billing === 'gratis' ? 'Gratis' : formatGs(p.price)}
                 {p.billing === 'mensual' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>/ mes</div>}
                 {p.billing === 'unico' && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-3)' }}>pago único</div>}
+                {requestSent && (
+                  <div style={{ marginTop: 6, fontSize: 10.5, fontWeight: 700, color: 'var(--green)' }}>
+                    <I.check s={11}/> Solicitado
+                  </div>
+                )}
               </div>
             </button>
           );
         })}
       </div>
+
+      {planRequestFor && typeof window.RequestAccessModal === 'function' && (
+        React.createElement(window.RequestAccessModal, {
+          planTier: planRequestFor.tier,
+          planLabel: planRequestFor.name,
+          onSuccess: () => {
+            setF({ plan_request_sent: true, plan_request_tier: planRequestFor.tier });
+            if (window.ayToast) {
+              window.ayToast('Solicitud de plan enviada. Te contactamos para activarla.', { variant: 'success', duration: 6000 });
+            }
+          },
+          onClose: () => setPlanRequestFor(null),
+        })
+      )}
     </div>
   );
 }

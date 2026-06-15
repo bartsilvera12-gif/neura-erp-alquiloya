@@ -1184,7 +1184,7 @@ function Faq() {
   );
 }
 
-function RequestAccessModal({ onClose, planTier, planLabel }) {
+function RequestAccessModal({ onClose, planTier, planLabel, onSuccess }) {
   // Solo flujo de agente: los propietarios ya publican sin cuenta, asi
   // que el toggle "Propietario / Agente" se saca. El modal queda como
   // "Solicitar acceso" puro (kind=agente del endpoint solicitudes-acceso).
@@ -1248,6 +1248,10 @@ function RequestAccessModal({ onClose, planTier, planLabel }) {
         ? '¡Listo! Recibimos tu solicitud del plan ' + (planLabel || planTier) + '. Te vamos a contactar para coordinar la activación.'
         : '¡Listo! Recibimos tu solicitud. En 24 hs hábiles vas a recibir un correo con tus accesos si tu solicitud es aceptada.' });
       setForm({ nombre: '', email: '', telefono: '', empresa: '', ciudad: '', mensaje: '' });
+      // Aviso al padre que el submit fue exitoso (lo usa el wizard de
+      // publicar para marcar `plan_request_sent`).
+      try { if (typeof onSuccess === 'function') onSuccess({ planTier, planLabel }); } catch { /* ignore */ }
+      try { window.__ay_last_plan_request_ok = true; } catch { /* ignore */ }
     } catch (err) {
       setFeedback({ kind: 'error', text: 'No pudimos registrar tu solicitud. ' + (err.message || '') });
     } finally {
