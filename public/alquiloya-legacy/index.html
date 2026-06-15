@@ -792,6 +792,57 @@
   .post-html pre { background: var(--bg-3); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
   .post-html strong { font-weight: 700; }
   .post-html em { font-style: italic; }
+
+  /* ===========================================================================
+     Legibilidad y layout en móvil (web pública). Va al final para ganar a las
+     reglas previas con la misma especificidad. Scope: solo <=760px → no toca
+     desktop. Apunta a "texto/elementos muy chicos" y "columnas mal armadas".
+     =========================================================================== */
+  @media (max-width: 760px) {
+    /* Base más grande: mejora todo el texto relativo (rem/em) y la densidad. */
+    html, body { font-size: 16px; }
+
+    /* Pisos de legibilidad para utilidades de texto chico. */
+    .xs { font-size: 13px !important; }
+    .tag { font-size: 12px !important; }
+    .muted { line-height: 1.5; }
+
+    /* Targets táctiles cómodos (botones/links de acción). */
+    .btn { min-height: 44px; padding: 12px 18px; font-size: 15px; }
+    .btn-sm { min-height: 40px; padding: 10px 15px !important; font-size: 14px !important; }
+    a.btn, button.btn { display: inline-flex; align-items: center; justify-content: center; }
+
+    /* Tarjetas apiladas: full width y respiro consistente. */
+    .card { width: 100%; }
+
+    /* Grillas de estadísticas/atributos chicos: mejor 2 columnas que una sola
+       fila larga y vacía (la regla global las pasaba todas a 1fr). Aplica solo
+       a grids que pedían 3+ columnas de ancho fijo o repeat(N). */
+    [style*="repeat(3, 1fr)"],
+    [style*="repeat(3,1fr)"],
+    [style*="repeat(4, 1fr)"],
+    [style*="repeat(4,1fr)"] {
+      grid-template-columns: 1fr 1fr !important;
+    }
+    /* Listados principales (propiedades/agentes/posts) sí a 1 columna full. */
+    [style*="minmax(280px"],
+    [style*="minmax(300px"],
+    [style*="minmax(260px"] {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* Teléfonos chicos: priorizar 1 columna real y texto cómodo. */
+  @media (max-width: 460px) {
+    [style*="repeat(3, 1fr)"],
+    [style*="repeat(3,1fr)"],
+    [style*="repeat(4, 1fr)"],
+    [style*="repeat(4,1fr)"] {
+      grid-template-columns: 1fr !important;
+    }
+    .btn, .btn-sm { width: 100%; }
+    .row.gap-8 .btn, .row.gap-10 .btn, .row.gap-12 .btn { width: auto; }
+  }
 </style>
 </head>
 <body>
