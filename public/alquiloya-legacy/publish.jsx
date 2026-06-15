@@ -62,15 +62,30 @@ function PublishPage() {
     return () => { cancelled = true; };
   }, []);
   const isLoggedPublisher = !!(ctxAgente || ctxPropietario);
-  // Wizard de 5 pasos. Plan va PRIMERO para que el resto de los pasos
-  // (fotos en particular) puedan ajustarse al limite del plan elegido.
-  const steps = [
-    { id: 0, title: 'Plan', icon: 'star' },
-    { id: 1, title: 'Datos básicos', icon: 'doc' },
-    { id: 2, title: 'Ubicación', icon: 'pin' },
-    { id: 3, title: 'Fotos', icon: 'upload' },
-    { id: 4, title: 'Vista previa', icon: 'eye' },
-  ];
+  // Wizard dinámico por kinds:
+  // - Agente CON plan asignado → no se muestra el paso "Plan" (ya tiene plan
+  //   activo, sería redundante). El wizard arranca en "Datos básicos".
+  // - Agente SIN plan → primer paso "Solicitar plan": elige tier, manda
+  //   solicitud de cambio_plan (admin aprueba), y el resto del wizard queda
+  //   bloqueado hasta la aprobación.
+  // - Propietario o anónimo → primer paso "Plan" (gratis por default), igual
+  //   que antes. Los propietarios publican sin cuenta.
+  const agenteConPlan = !!(ctxAgente && ctxAgente.plan_publicacion_id);
+  const agenteSinPlan = !!(ctxAgente && !ctxAgente.plan_publicacion_id);
+  const stepKinds = agenteSinPlan
+    ? ['plan_request', 'basics', 'location', 'photos', 'preview']
+    : agenteConPlan
+      ? ['basics', 'location', 'photos', 'preview']
+      : ['plan', 'basics', 'location', 'photos', 'preview'];
+  const STEP_DEFS = {
+    plan: { title: 'Plan', icon: 'star' },
+    plan_request: { title: 'Solicitar plan', icon: 'star' },
+    basics: { title: 'Datos básicos', icon: 'doc' },
+    location: { title: 'Ubicación', icon: 'pin' },
+    photos: { title: 'Fotos', icon: 'upload' },
+    preview: { title: 'Vista previa', icon: 'eye' },
+  };
+  const steps = stepKinds.map((k, i) => ({ id: i, kind: k, title: STEP_DEFS[k].title, icon: STEP_DEFS[k].icon }));
 
   // ── Estado controlado del wizard ─────────────────────────────────────────
   const [form, setForm] = React.useState({
@@ -204,25 +219,34 @@ function PublishPage() {
 
   // Validacion por paso del wizard: bloquea "Continuar" si el paso actual no
   // tiene completos sus campos obligatorios. Devuelve null si esta OK, o el
-  // mensaje a mostrar. Orden de pasos: Plan, Basicos, Ubicacion, Fotos,
-  // Vista previa.
+  // mensaje a mostrar. Toma el kind del step actual (no su indice) para
+  // soportar wizards de longitud variable.
   function validateStep(s) {
-    if (s === 0) {
+    const kind = stepKinds[s];
+    if (kind === 'plan') {
       if (!(form.plan_id || '').trim()) return 'Elegí un plan para continuar.';
       return null;
     }
-    if (s === 1) {
+    if (kind === 'plan_request') {
+      // El paso "Solicitar plan" se valida adentro del componente (con su
+      // propio botón "Enviar solicitud"). Mientras no esté enviada, bloquea
+      // el avance del wizard.
+      if (!form.plan_request_sent) {
+        return 'Elegí un plan y envianos tu solicitud para continuar.';
+      }
+      return null;
+    }
+    if (kind === 'basics') {
       if (!(form.titulo || '').trim()) return 'Ingresá el título de la publicación.';
       const precio = Number(String(form.precio).replace(/[^\d.]/g, ''));
       if (!Number.isFinite(precio) || precio <= 0) return 'Ingresá un precio válido.';
       return null;
     }
-    if (s === 2) {
+    if (kind === 'location') {
       if (!(form.ciudad || '').trim()) return 'Indicá la ciudad del inmueble.';
       return null;
     }
-    if (s === 3) {
-      // Validar tope de fotos del plan elegido.
+    if (kind === 'photos') {
       const cap = Number(form.plan_fotos_max) > 0 ? Number(form.plan_fotos_max) : null;
       const n = (form.fotos || []).length;
       if (cap != null && n > cap) {
@@ -230,7 +254,7 @@ function PublishPage() {
       }
       return null;
     }
-    if (s === 4) {
+    if (kind === 'preview') {
       if (!(form.propietario_nombre || '').trim()) return 'Ingresá tu nombre.';
       const telDigits = (form.propietario_telefono || '').replace(/\D/g, '');
       if (telDigits.length < 7) return 'El teléfono / WhatsApp es obligatorio (es el contacto que verán los interesados).';
@@ -321,10 +345,9 @@ function PublishPage() {
   // Antes habia aca un gate que mostraba "Necesitas una cuenta activa" y
   // "Tu cuenta no es de publicador" — los dos quedaron deprecados.
 
-  // Gating de plan SOLO para agentes: sin plan -> no puede publicar.
-  // Con plan pero alcanzo la cuota -> tampoco puede.
-  if (ctxAgente && (!ctxAgente.plan_publicacion_id || ctxAgente.puede_publicar === false)) {
-    const sinPlan = !ctxAgente.plan_publicacion_id;
+  // Gating SOLO para agentes que alcanzaron la cuota de su plan (sin plan se
+  // maneja inline con el paso "Solicitar plan", ya no como takeover).
+  if (ctxAgente && ctxAgente.plan_publicacion_id && ctxAgente.puede_publicar === false) {
     const limite = ctxAgente.plan_limite_activas;
     const usadas = ctxAgente.propiedades_activas;
     return (
@@ -334,22 +357,13 @@ function PublishPage() {
             <I.bolt s={28}/>
           </div>
           <div className="tag" style={{ justifyContent: 'center' }}>Publicar inmueble</div>
-          {sinPlan ? (<>
-            <h2 style={{ marginTop: 8, fontSize: 26 }}>Necesitás un plan activo</h2>
-            <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-              Para publicar como agente tenés que elegir un plan. Cada plan define cuántas propiedades podés tener activas al mismo tiempo y cuántas fotos por inmueble.
-            </p>
-          </>) : (<>
-            <h2 style={{ marginTop: 8, fontSize: 26 }}>Llegaste al límite de tu plan</h2>
-            <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-              Tu plan permite hasta <strong>{limite}</strong> propiedades activas y ya tenés <strong>{usadas}</strong>. Pausá una propiedad o cambiá a un plan superior para seguir publicando.
-            </p>
-          </>)}
+          <h2 style={{ marginTop: 8, fontSize: 26 }}>Llegaste al límite de tu plan</h2>
+          <p style={{ marginTop: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            Tu plan permite hasta <strong>{limite}</strong> propiedades activas y ya tenés <strong>{usadas}</strong>. Pausá una propiedad o cambiá a un plan superior para seguir publicando.
+          </p>
           <div className="row gap-12" style={{ justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
-            <a className="btn btn-primary" href="#plans"><I.star s={16}/> {sinPlan ? 'Ver planes' : 'Cambiar de plan'}</a>
-            {!sinPlan && (
-              <a className="btn btn-outline" href="#admin-agent-properties">Ver mis propiedades</a>
-            )}
+            <a className="btn btn-primary" href="#plans"><I.star s={16}/> Cambiar de plan</a>
+            <a className="btn btn-outline" href="#admin-agent-properties">Ver mis propiedades</a>
           </div>
         </div>
       </div>
@@ -364,7 +378,7 @@ function PublishPage() {
           <h2 style={{ marginTop: 6, fontSize: 30 }}>
             {editingId
               ? (editLoading ? 'Cargando datos…' : 'Editá tu propiedad')
-              : 'Cargá tu propiedad en 5 pasos'}
+              : `Cargá tu propiedad en ${steps.length} paso${steps.length !== 1 ? 's' : ''}`}
           </h2>
           {ctxAgente && ctxAgente.plan_limite_activas != null && (
             <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
@@ -404,11 +418,12 @@ function PublishPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 28, marginTop: 28, alignItems: 'flex-start' }}>
         <div className="card" style={{ padding: 32 }}>
-          {step === 0 && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario} editingId={editingId}/>}
-          {step === 1 && <StepBasics form={form} setF={setF}/>}
-          {step === 2 && <StepLocation form={form} setF={setF}/>}
-          {step === 3 && <StepPhotos form={form} setF={setF} isAgent={!!ctxAgente}/>}
-          {step === 4 && <StepPreview form={form} setF={setF}/>}
+          {stepKinds[step] === 'plan' && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario} editingId={editingId}/>}
+          {stepKinds[step] === 'plan_request' && <StepRequestAgentPlan form={form} setF={setF} ctxAgente={ctxAgente}/>}
+          {stepKinds[step] === 'basics' && <StepBasics form={form} setF={setF}/>}
+          {stepKinds[step] === 'location' && <StepLocation form={form} setF={setF}/>}
+          {stepKinds[step] === 'photos' && <StepPhotos form={form} setF={setF} isAgent={!!ctxAgente}/>}
+          {stepKinds[step] === 'preview' && <StepPreview form={form} setF={setF}/>}
 
           {submitState.success && (
             <div style={{ marginTop: 16, padding: 16, background: '#eaf6f0', borderRadius: 12, border: '1px solid #b6dec6', color: '#1f5e3a', fontSize: 14 }}>
@@ -2515,4 +2530,160 @@ function AgentStars({ rating, count }) {
   );
 }
 
-Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal, AgentPickerModal, AgentStars });
+// Paso "Solicitar plan" para agentes que todavía no tienen plan asignado.
+// En vez de bloquearles el wizard con un mensaje, les ofrecemos elegir un
+// plan y mandar una solicitud de cambio_plan al admin. Mientras la solicitud
+// no esté enviada, el wizard no avanza (validateStep lo bloquea). Una vez
+// enviada, el agente sabe que tiene que esperar la aprobación.
+function StepRequestAgentPlan({ form, setF, ctxAgente }) {
+  const [apiPlans, setApiPlans] = React.useState(null);
+  const [sending, setSending] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/public/alquiloya/planes-publicacion', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+      .then(body => {
+        if (cancelled) return;
+        const arr = body && body.success && body.data && Array.isArray(body.data.planes) ? body.data.planes : null;
+        if (!arr || arr.length === 0) return;
+        setApiPlans(arr.map(p => ({
+          tier: p.tier,
+          target: p.target,
+          name: p.nombre,
+          price: Number(p.precio) || 0,
+          billing: p.billing,
+          badge: p.badge,
+          bullets: Array.isArray(p.bullets) ? p.bullets : [],
+          highlighted: !!p.highlighted,
+        })));
+      })
+      .catch(() => { /* fallback abajo */ });
+    return () => { cancelled = true; };
+  }, []);
+  const source = apiPlans || (typeof PLANS !== 'undefined' ? PLANS : []);
+  const list = source.filter(p => p.tier && String(p.tier).includes('agent'));
+  const picked = form.plan_request_tier || '';
+  const sent = !!form.plan_request_sent;
+
+  async function enviar() {
+    if (!picked) { setError('Elegí un plan.'); return; }
+    setError(null); setSending(true);
+    try {
+      const planRow = list.find(p => p.tier === picked);
+      const payload = {
+        kind: 'cambio_plan',
+        plan_tier: picked,
+        nombre: ctxAgente?.nombre || form.propietario_nombre || 'Agente',
+        email: ctxAgente?.email || form.propietario_email || null,
+        telefono: ctxAgente?.telefono || ctxAgente?.whatsapp || form.propietario_telefono || null,
+        mensaje: 'Solicitud generada desde el wizard de publicar inmueble. Plan elegido: ' + (planRow?.name || picked) + '.',
+      };
+      const res = await fetch('/api/public/alquiloya/solicitudes-servicio', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data.error || ('HTTP ' + res.status));
+      setF({ plan_request_sent: true, plan_request_tier: picked });
+      if (window.ayToast) window.ayToast('Solicitud de plan enviada.', { variant: 'success', duration: 5000 });
+    } catch (e) {
+      setError('No pudimos enviar tu solicitud. ' + (e && e.message ? e.message : ''));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div>
+        <div className="tag">Paso 1</div>
+        <h3 style={{ fontSize: 22, marginTop: 6 }}>Solicitud de plan enviada</h3>
+        <div className="card" style={{
+          marginTop: 16, padding: 22, background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#10b981', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <I.check s={20}/>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17, color: '#065f46' }}>Recibimos tu solicitud</div>
+              <div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5 }}>
+                Vamos a contactarte para coordinar la activación de tu plan. Una vez aprobado, vas a poder publicar inmuebles desde este mismo wizard.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+          Mientras tanto, podés volver al panel y seguir gestionando tus captaciones.
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <a className="btn btn-outline" href="#admin-agent">← Volver al panel</a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="tag">Paso 1</div>
+      <h3 style={{ fontSize: 22, marginTop: 6 }}>Solicitá tu plan para publicar</h3>
+      <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>
+        Como agente, necesitás un plan activo para publicar inmuebles. Elegí uno y nuestro equipo te contacta para activarlo.
+      </p>
+      <div className="col gap-12" style={{ marginTop: 20 }}>
+        {list.map(p => {
+          const sel = picked === p.tier;
+          return (
+            <button key={p.tier} type="button" onClick={() => setF({ plan_request_tier: p.tier })} className="card" style={{
+              padding: 18, textAlign: 'left',
+              border: '2px solid ' + (sel ? 'var(--blue)' : 'var(--line)'),
+              background: sel ? 'var(--blue-50)' : '#fff',
+              cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16
+            }}>
+              <div className="row gap-14">
+                <span style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  border: '2px solid ' + (sel ? 'var(--blue)' : 'var(--line)'),
+                  background: sel ? 'var(--blue)' : '#fff',
+                  display: 'grid', placeItems: 'center', color: '#fff'
+                }}>{sel && <I.check s={12}/>}</span>
+                <div>
+                  <div className="row gap-8">
+                    <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 17 }}>{p.name}</div>
+                    {p.badge && <span className="badge badge-featured" style={{ fontSize: 10 }}>{p.badge}</span>}
+                  </div>
+                  <div className="muted xs">{(p.bullets || [])[0]} {(p.bullets || [])[1] ? '· ' + p.bullets[1] : ''}</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18, color: 'var(--ink)' }}>
+                  {p.price > 0 ? formatGs(p.price) : 'Gratis'}
+                </div>
+                <div className="muted xs">{p.billing || ''}</div>
+              </div>
+            </button>
+          );
+        })}
+        {list.length === 0 && (
+          <div className="muted" style={{ fontSize: 13 }}>No hay planes disponibles. Contactanos por WhatsApp.</div>
+        )}
+      </div>
+      {error && (
+        <div style={{ marginTop: 14, padding: '10px 12px', background: '#fdecec', borderRadius: 10, border: '1px solid #f3c2c2', color: '#a8312f', fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      <div style={{ marginTop: 18 }}>
+        <button type="button" className="btn btn-primary" disabled={!picked || sending} onClick={enviar}
+          style={{ opacity: !picked || sending ? 0.6 : 1 }}>
+          {sending ? 'Enviando…' : <>Enviar solicitud <I.arrow s={14}/></>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { PublishPage, BrochurePreviewModal, ConfirmPublishModal, AgentPickerModal, AgentStars, StepRequestAgentPlan });
