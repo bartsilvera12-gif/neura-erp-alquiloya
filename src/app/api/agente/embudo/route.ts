@@ -15,13 +15,14 @@ function t(table: string): string {
   return `"${ALQUILOYA_SCHEMA}"."${table}"`;
 }
 
+// Debe coincidir con el CHECK de alquiloya.agente_captaciones.etapa
+// (migración 20260620120000) y con el selector de etapa del panel del agente.
 const ETAPAS_ORDER = [
-  "prospecto",
-  "contactado",
-  "visita_agendada",
-  "en_negociacion",
-  "cerrada",
-  "perdida",
+  "nuevo",
+  "contacto",
+  "negocio_activo",
+  "cerrado",
+  "rechazado",
 ] as const;
 
 export async function GET(request: Request) {

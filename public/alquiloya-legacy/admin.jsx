@@ -2094,20 +2094,18 @@ function EmbudoCaptaciones() {
   }, []);
   if (!data) return null;
   const labels = {
-    prospecto: 'Prospecto',
-    contactado: 'Contactado',
-    visita_agendada: 'Visita',
-    en_negociacion: 'Negociación',
-    cerrada: 'Cerrada',
-    perdida: 'Perdida',
+    nuevo: 'Nuevo',
+    contacto: 'Contactado',
+    negocio_activo: 'Negociación',
+    cerrado: 'Cerrado',
+    rechazado: 'Rechazado',
   };
   const colors = {
-    prospecto: ['var(--blue-50)', 'var(--blue)'],
-    contactado: ['#e6f4ff', '#0058A5'],
-    visita_agendada: ['#fff7e3', '#8a5e00'],
-    en_negociacion: ['#fce8f3', '#b81b72'],
-    cerrada: ['#dcfce7', '#15803d'],
-    perdida: ['#fee2e2', '#991b1b'],
+    nuevo: ['var(--blue-50)', 'var(--blue)'],
+    contacto: ['#e6f4ff', '#0058A5'],
+    negocio_activo: ['#fce8f3', '#b81b72'],
+    cerrado: ['#dcfce7', '#15803d'],
+    rechazado: ['#fee2e2', '#991b1b'],
   };
   const total = data.reduce((acc, r) => acc + (Number(r.count) || 0), 0);
   return (
@@ -2118,7 +2116,7 @@ function EmbudoCaptaciones() {
           <div className="muted xs">Captaciones del agente · total {total}</div>
         </div>
       </div>
-      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
         {data.map((row) => {
           const [bg, fg] = colors[row.etapa] || ['var(--bg-3)', 'var(--ink-3)'];
           return (
