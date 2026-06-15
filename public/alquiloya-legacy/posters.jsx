@@ -202,6 +202,21 @@ function PostersPage({ route, onNav }) {
       onNav={onNav}
       displayName={meInfo.nombre || 'Mi cuenta'}
       displayEmail={meInfo.email}
+      planInfo={(() => {
+        // Mismo lookup que AdminAgentPage: el plan viene anidado en
+        // `agente.plan` (con nombre/tier) desde /api/agente/me.
+        const src = isPropietario ? SNAP.meData?.propietario : SNAP.meData?.agente;
+        if (!src) return null;
+        const planName = (src.plan && src.plan.nombre) || src.plan_nombre || null;
+        if (!planName) return null;
+        let venc = null;
+        if (src.plan_vencimiento_at) {
+          try {
+            venc = new Date(src.plan_vencimiento_at).toLocaleDateString('es-PY', { day: 'numeric', month: 'long' });
+          } catch { /* ignore */ }
+        }
+        return { name: planName, vencimiento: venc };
+      })()}
       title="Carteles QR"
       subtitle="Cada propiedad genera su QR único automáticamente. Descargá o imprimí el cartel listo para la fachada."
       actions={
