@@ -244,7 +244,14 @@ function FilterPanel({ filters, setFilters }) {
           </div>
         </FilterGroup>
 
-        <button className="btn btn-blue" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>Aplicar filtros</button>
+        <button
+          type="button"
+          className="btn btn-blue"
+          style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+          onClick={() => {
+            try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { window.scrollTo(0, 0); }
+          }}
+        >Aplicar filtros</button>
       </div>
     </aside>
   );
