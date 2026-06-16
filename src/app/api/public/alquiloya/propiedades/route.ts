@@ -6,6 +6,7 @@ import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
 import { resolveUsuarioErpFromAuthUser } from "@/lib/auth/resolve-usuario-erp";
 import { extractPlanLimits } from "@/lib/alquiloya/plan-limits";
+import { notifyAdminNuevaPropiedadPendiente } from "@/lib/alquiloya/notify-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -589,6 +590,26 @@ export async function POST(request: Request) {
       }
 
       await client.query("COMMIT");
+      // Aviso al admin: nueva propiedad pendiente de aprobacion. Fire-and-forget,
+      // no bloquea la respuesta y no falla si SMTP no esta configurado.
+      void notifyAdminNuevaPropiedadPendiente({
+        propiedadId: propId,
+        codigo: ins.rows[0].codigo,
+        titulo,
+        tipo,
+        operacion,
+        ciudad,
+        precio,
+        moneda: s(body.moneda, 10) || "PYG",
+        propietario: {
+          nombre: propNombre || null,
+          email: propEmail || null,
+          telefono: propTelefonoContacto || propTelefono || null,
+        },
+        requestHeaders: request.headers,
+      }).catch((err) => {
+        console.warn("[notifyAdminNuevaPropiedadPendiente] error:", err instanceof Error ? err.message : err);
+      });
       return NextResponse.json({
         success: true,
         propiedad_id: propId,
