@@ -382,49 +382,60 @@ export default function SolicitudesServicioClient({
 
             {pending.row.kind === "impulsos" ? (() => {
               // Los impulsos pueden acreditarse al propietario O al agente
-              // segun quien hizo la compra. Mostramos los dos selectores:
-              // dejá uno vacio y el otro elegido. La aprobacion usa el que
-              // este seteado (prefiere propietario si hay ambos).
+              // segun quien hizo la compra. Si el email/telefono del solicitante
+              // matchea con un agente o un propietario, mostramos solo ese
+              // selector. Si no matchea ninguno, mostramos los dos para que el
+              // admin elija manualmente.
               const propSel = pending.propietarioId;
               const ageSel = pending.agenteId;
               const propMatched = propSel ? propietarios.find((p) => p.id === propSel) ?? null : null;
               const ageMatched = ageSel ? agentes.find((p) => p.id === ageSel) ?? null : null;
               const matchSide: "propietario" | "agente" | null = propMatched ? "propietario" : ageMatched ? "agente" : null;
+              const showProp = matchSide === "propietario" || matchSide === null;
+              const showAge = matchSide === "agente" || matchSide === null;
               return (
                 <div className="mt-4 space-y-3">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                    Elegí <strong>propietario</strong> o <strong>agente</strong> según quién compró los impulsos. El saldo se acredita al que selecciones.
+                    {matchSide === "agente"
+                      ? "El solicitante coincide con un agente — el saldo se acredita a su cuenta."
+                      : matchSide === "propietario"
+                        ? "El solicitante coincide con un propietario — el saldo se acredita a su cuenta."
+                        : "Elegí propietario o agente según quién compró los impulsos. El saldo se acredita al que selecciones."}
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
-                      Propietario
-                    </label>
-                    <select value={propSel}
-                      onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, propietarioId: e.target.value, agenteId: e.target.value ? "" : p.agenteId } : p)}
-                      className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "propietario" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
-                      <option value="">— sin asignar —</option>
-                      {propietarios.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
-                      Agente
-                    </label>
-                    <select value={ageSel}
-                      onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, agenteId: e.target.value, propietarioId: e.target.value ? "" : p.propietarioId } : p)}
-                      className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "agente" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
-                      <option value="">— sin asignar —</option>
-                      {agentes.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {showProp ? (
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                        Propietario
+                      </label>
+                      <select value={propSel}
+                        onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, propietarioId: e.target.value, agenteId: e.target.value ? "" : p.agenteId } : p)}
+                        className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "propietario" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
+                        <option value="">— sin asignar —</option>
+                        {propietarios.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+                  {showAge ? (
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                        Agente
+                      </label>
+                      <select value={ageSel}
+                        onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, agenteId: e.target.value, propietarioId: e.target.value ? "" : p.propietarioId } : p)}
+                        className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "agente" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
+                        <option value="">— sin asignar —</option>
+                        {agentes.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                   {!propSel && !ageSel ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
                       Tenés que elegir un propietario o un agente para acreditar los impulsos.
