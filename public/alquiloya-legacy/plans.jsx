@@ -2,6 +2,11 @@
 
 function PlansPage({ onNav }) {
   const [audience, setAudience] = React.useState('owner');
+  // Detectamos si el visitante esta logueado como agente para forzar la
+  // vista a planes 'agent' y ocultar el toggle propietario. Antes un agente
+  // podia ver (y pedir) los planes de propietario/gratuito, que no aplican
+  // a su rol.
+  const [isAgentUser, setIsAgentUser] = React.useState(false);
   const [verifyOpen, setVerifyOpen] = React.useState(false);
   const [picked, setPicked] = React.useState(null); // { tier, name }
   const [changeOpen, setChangeOpen] = React.useState(false);
@@ -32,6 +37,19 @@ function PlansPage({ onNav }) {
         setPlansData(mapped);
       })
       .catch(() => { /* fallback PLANS ya cargado */ });
+    // Detectar agente logueado. Si /api/agente/me devuelve un agente real,
+    // forzamos audience='agent' y ocultamos el toggle propietario.
+    fetch('/api/agente/me', { cache: 'no-store', credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(body => {
+        if (cancelled) return;
+        const ag = body && (body.agente || (body.data && body.data.agente));
+        if (ag && (ag.id || ag.nombre)) {
+          setIsAgentUser(true);
+          setAudience('agent');
+        }
+      })
+      .catch(() => { /* anonimo o propietario, dejar el toggle */ });
     return () => { cancelled = true; };
   }, []);
   const filtered = plansData.filter(p => p.tier.includes(audience === 'owner' ? 'owner' : 'agent'));
@@ -46,12 +64,19 @@ function PlansPage({ onNav }) {
           Empezá gratis. Si necesitás más visibilidad, fotos o estadísticas, cambiá de plan cuando quieras.
         </p>
       </div>
-      <div className="row" style={{ justifyContent: 'center', marginTop: 28 }}>
-        <Segment value={audience} onChange={setAudience} items={[
-          { id: 'owner', label: 'Dueños directos' },
-          { id: 'agent', label: 'Agentes e inmobiliarias' },
-        ]}/>
-      </div>
+      {!isAgentUser && (
+        <div className="row" style={{ justifyContent: 'center', marginTop: 28 }}>
+          <Segment value={audience} onChange={setAudience} items={[
+            { id: 'owner', label: 'Dueños directos' },
+            { id: 'agent', label: 'Agentes e inmobiliarias' },
+          ]}/>
+        </div>
+      )}
+      {isAgentUser && (
+        <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
+          <span className="badge badge-soft" style={{ fontSize: 12 }}>Mostrando planes para agentes e inmobiliarias</span>
+        </div>
+      )}
 
       <div className="plans-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 22, marginTop: 40, maxWidth: 960, margin: '40px auto 0' }}>
         {filtered.map(p => <PlanCard key={p.tier} plan={p} onPick={() => {
