@@ -38,6 +38,12 @@ export default function NuevoAgentePage() {
           idiomas: "",
           tiempo_respuesta: "",
           tasa_respuesta: "",
+          plan_publicacion_id: "",
+          plan_vencimiento_at: (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 30);
+            return d.toISOString().slice(0, 10);
+          })(),
         }}
       />
     </div>

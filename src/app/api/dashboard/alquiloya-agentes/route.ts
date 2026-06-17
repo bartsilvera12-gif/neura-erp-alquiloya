@@ -73,6 +73,31 @@ export async function POST(request: Request) {
     if (colSet.has("tasa_respuesta"))
       extras.push({ col: "tasa_respuesta", val: s((body as Record<string, unknown>).tasa_respuesta) });
 
+    // Plan de publicacion (opcional) y fecha de vencimiento. Permite asignar
+    // el plan al CREAR el agente, sin obligar a entrar despues al modal de
+    // "Cambiar plan". Si el body manda un uuid invalido, devolvemos 400 en
+    // vez de ignorarlo silenciosamente.
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (colSet.has("plan_publicacion_id")) {
+      const raw = (body as Record<string, unknown>).plan_publicacion_id;
+      if (typeof raw === "string" && raw.trim() !== "") {
+        if (!uuidRe.test(raw.trim())) {
+          return NextResponse.json({ error: "plan_publicacion_id invalido" }, { status: 400 });
+        }
+        extras.push({ col: "plan_publicacion_id", val: raw.trim() });
+      }
+    }
+    if (colSet.has("plan_vencimiento_at")) {
+      const raw = (body as Record<string, unknown>).plan_vencimiento_at;
+      if (typeof raw === "string" && raw.trim() !== "") {
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) {
+          return NextResponse.json({ error: "plan_vencimiento_at invalido" }, { status: 400 });
+        }
+        extras.push({ col: "plan_vencimiento_at", val: d.toISOString() });
+      }
+    }
+
     const baseCols = ["empresa_id", "nombre", "email", "telefono", "whatsapp",
                       "cargo", "bio", "foto_url", "orden", "activo"];
     const allCols = [...baseCols, ...extras.map((e) => e.col)];

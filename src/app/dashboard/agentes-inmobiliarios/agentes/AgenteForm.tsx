@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 
 export type AgenteFormData = {
@@ -22,6 +22,15 @@ export type AgenteFormData = {
   idiomas: string;
   tiempo_respuesta: string;
   tasa_respuesta: string;
+  plan_publicacion_id: string;
+  plan_vencimiento_at: string;
+};
+
+type PlanRow = {
+  id: string;
+  tier: string | null;
+  nombre: string | null;
+  billing: string | null;
 };
 
 const inputCls =
@@ -40,10 +49,30 @@ export function AgenteForm({
   const [form, setForm] = useState<AgenteFormData>(initial);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [planes, setPlanes] = useState<PlanRow[] | null>(null);
 
   function set<K extends keyof AgenteFormData>(k: K, v: AgenteFormData[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
+
+  // Lista de planes de publicacion (mismo endpoint que usa el modal "Cambiar
+  // plan" del listado). Permite asignar plan al crear o editar el agente sin
+  // tener que abrir el modal aparte.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetchWithSupabaseSession("/api/dashboard/alquiloya-planes-publicacion");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const body = (await r.json()) as { data?: { planes?: PlanRow[] }; planes?: PlanRow[] };
+        if (cancelled) return;
+        setPlanes(body?.data?.planes ?? body?.planes ?? []);
+      } catch {
+        if (!cancelled) setPlanes([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +96,10 @@ export function AgenteForm({
         idiomas: form.idiomas || null,
         tiempo_respuesta: form.tiempo_respuesta || null,
         tasa_respuesta: form.tasa_respuesta || null,
+        plan_publicacion_id: form.plan_publicacion_id || null,
+        plan_vencimiento_at: form.plan_publicacion_id && form.plan_vencimiento_at
+          ? new Date(form.plan_vencimiento_at + "T00:00:00").toISOString()
+          : null,
       };
       const url =
         mode === "create"
@@ -207,6 +240,43 @@ export function AgenteForm({
           Estos campos se muestran en la vista pública del agente. Si dejás <strong>nivel</strong> vacío, se calcula automáticamente
           (Top Pro ≥ 10 cierres, Pro ≥ 3, sino Junior).
         </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-slate-600">Plan asignado</h2>
+        <p className="mb-4 text-[11px] text-slate-500">
+          Plan al que se suscribe el agente. Si lo dejás sin plan, queda con capacidad limitada hasta que el admin (o el agente) active uno.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={fieldCls}>
+            <label className={labelCls}>Plan</label>
+            <select
+              className={inputCls}
+              value={form.plan_publicacion_id}
+              onChange={(e) => set("plan_publicacion_id", e.target.value)}
+              disabled={planes === null}
+            >
+              <option value="">Sin plan</option>
+              {(planes ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre ?? p.tier ?? p.id}
+                  {p.billing ? ` · ${p.billing}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={fieldCls}>
+            <label className={labelCls}>Vencimiento del plan</label>
+            <input
+              type="date"
+              className={inputCls}
+              value={form.plan_vencimiento_at}
+              onChange={(e) => set("plan_vencimiento_at", e.target.value)}
+              disabled={!form.plan_publicacion_id}
+            />
+            <p className="mt-1 text-[11px] text-slate-500">Solo se aplica si seleccionás un plan.</p>
+          </div>
+        </div>
       </section>
 
       <div className="flex items-center gap-3">

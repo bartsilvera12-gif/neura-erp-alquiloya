@@ -54,6 +54,17 @@ export default async function EditarAgentePage({ params }: Props) {
           idiomas: a.idiomas ?? "",
           tiempo_respuesta: a.tiempo_respuesta ?? "",
           tasa_respuesta: a.tasa_respuesta ?? "",
+          plan_publicacion_id:
+            (a as { plan_publicacion_id?: string | null }).plan_publicacion_id ?? "",
+          plan_vencimiento_at: (() => {
+            const v = (a as { plan_vencimiento_at?: string | null }).plan_vencimiento_at;
+            if (!v) return "";
+            try {
+              return new Date(v).toISOString().slice(0, 10);
+            } catch {
+              return "";
+            }
+          })(),
         }}
       />
     </div>
