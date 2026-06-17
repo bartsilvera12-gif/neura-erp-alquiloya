@@ -169,9 +169,16 @@ export default function SolicitudesServicioClient({
           body.propietario_id = pending.propietarioId;
         }
       } else if (row.kind === "impulsos") {
-        // Los impulsos siempre se acreditan al propietario (saldo).
-        if (!pending.propietarioId) throw new Error("Seleccioná un propietario");
-        body.propietario_id = pending.propietarioId;
+        // Los impulsos se acreditan al propietario O al agente segun quien hizo
+        // la compra. El admin elige uno (preferimos propietario si esta seteado
+        // — coincide con el comportamiento anterior, pero ahora soporta agente).
+        if (pending.propietarioId) {
+          body.propietario_id = pending.propietarioId;
+        } else if (pending.agenteId) {
+          body.agente_id = pending.agenteId;
+        } else {
+          throw new Error("Seleccioná un propietario o un agente para acreditar los impulsos");
+        }
       } else if (row.kind === "verificacion") {
         if (!pending.propiedadId) throw new Error("Pegá el UUID de la propiedad a verificar");
         body.propiedad_id = pending.propiedadId;
@@ -321,11 +328,8 @@ export default function SolicitudesServicioClient({
               </div>
             ) : null}
 
-            {(pending.row.kind === "cambio_plan" || pending.row.kind === "impulsos") ? (() => {
-              // cambio_plan: target depende del tier (agente/propietario).
-              // impulsos: siempre propietario (saldo de impulsos).
-              const isAgenteTarget =
-                pending.row.kind === "cambio_plan" && planTarget(pending.row.plan_tier) === "agente";
+            {pending.row.kind === "cambio_plan" ? (() => {
+              const isAgenteTarget = planTarget(pending.row.plan_tier) === "agente";
               const list = isAgenteTarget ? agentes : propietarios;
               const selectedId = isAgenteTarget ? pending.agenteId : pending.propietarioId;
               const matched = selectedId ? list.find((p) => p.id === selectedId) ?? null : null;
@@ -372,6 +376,60 @@ export default function SolicitudesServicioClient({
                       </select>
                     </>
                   )}
+                </div>
+              );
+            })() : null}
+
+            {pending.row.kind === "impulsos" ? (() => {
+              // Los impulsos pueden acreditarse al propietario O al agente
+              // segun quien hizo la compra. Mostramos los dos selectores:
+              // dejá uno vacio y el otro elegido. La aprobacion usa el que
+              // este seteado (prefiere propietario si hay ambos).
+              const propSel = pending.propietarioId;
+              const ageSel = pending.agenteId;
+              const propMatched = propSel ? propietarios.find((p) => p.id === propSel) ?? null : null;
+              const ageMatched = ageSel ? agentes.find((p) => p.id === ageSel) ?? null : null;
+              const matchSide: "propietario" | "agente" | null = propMatched ? "propietario" : ageMatched ? "agente" : null;
+              return (
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                    Elegí <strong>propietario</strong> o <strong>agente</strong> según quién compró los impulsos. El saldo se acredita al que selecciones.
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Propietario
+                    </label>
+                    <select value={propSel}
+                      onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, propietarioId: e.target.value, agenteId: e.target.value ? "" : p.agenteId } : p)}
+                      className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "propietario" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
+                      <option value="">— sin asignar —</option>
+                      {propietarios.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Agente
+                    </label>
+                    <select value={ageSel}
+                      onChange={(e) => setPending((p) => p?.kind === "aprobar" ? { ...p, agenteId: e.target.value, propietarioId: e.target.value ? "" : p.propietarioId } : p)}
+                      className={"mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30 " + (matchSide === "agente" ? "border-emerald-300 bg-emerald-50" : "border-slate-300")}>
+                      <option value="">— sin asignar —</option>
+                      {agentes.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre} {p.email ? `· ${p.email}` : p.telefono ? `· ${p.telefono}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {!propSel && !ageSel ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                      Tenés que elegir un propietario o un agente para acreditar los impulsos.
+                    </div>
+                  ) : null}
                 </div>
               );
             })() : null}

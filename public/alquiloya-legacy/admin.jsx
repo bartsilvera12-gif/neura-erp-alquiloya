@@ -335,7 +335,13 @@ function AdminAgentPage({ route, onNav }) {
           if (body2?.agente) {
             const next = { kind: 'agente', usuario: body2.usuario, agente: body2.agente };
             setMeData(next);
+            // Los agentes tambien acumulan impulsos_saldo desde que el admin
+            // los acredita al aprobar una solicitud de impulsos. Si la columna
+            // todavia no existia, el GET la devuelve undefined y caemos a 0.
+            const saldoAg = Number(body2.agente.impulsos_saldo) || 0;
+            setImpulsesPaid(saldoAg);
             SNAP.meData = next;
+            SNAP.impulsesPaid = saldoAg;
             return;
           }
         }

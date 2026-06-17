@@ -15,6 +15,27 @@ const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function t(table: string): string {
   return `"${ALQUILOYA_SCHEMA}"."${table}"`;
 }
+
+// Bootstrap idempotente: agregamos `impulsos_saldo` a alquiloya.agentes si
+// todavia no existe. Antes la columna solo vivia en `propietarios` (migration
+// 20260626120000), asi que cuando un agente compraba impulsos no habia donde
+// acreditarselos. ADD COLUMN IF NOT EXISTS es seguro de correr varias veces.
+let agentesImpulsosColumnReady = false;
+async function ensureAgentesImpulsosColumn(pool: import("pg").Pool): Promise<void> {
+  if (agentesImpulsosColumnReady) return;
+  try {
+    await pool.query(
+      `ALTER TABLE "alquiloya"."agentes"
+         ADD COLUMN IF NOT EXISTS impulsos_saldo int NOT NULL DEFAULT 0`
+    );
+    agentesImpulsosColumnReady = true;
+  } catch (e) {
+    console.warn(
+      "[ensureAgentesImpulsosColumn] no se pudo bootstrap:",
+      e instanceof Error ? e.message : e
+    );
+  }
+}
 function s(v: unknown, max = 500): string | null {
   if (typeof v !== "string") return null;
   const x = v.trim();
@@ -148,16 +169,30 @@ export async function PATCH(request: Request, ctx: Ctx) {
       if (sol.kind === "impulsos") {
         const qty = sol.pack_qty ?? 0;
         if (qty <= 0) throw new Error("pack_qty inválido");
-        if (!overridePropietario) {
-          throw new Error("Necesitás indicar propietario_id al aprobar la compra de impulsos");
+        // Los impulsos se pueden acreditar a un propietario O a un agente. Antes
+        // siempre iba al propietario y los agentes nunca recibian su saldo.
+        if (overridePropietario) {
+          await client.query(
+            `UPDATE ${t("propietarios")}
+                SET impulsos_saldo = COALESCE(impulsos_saldo, 0) + $3, updated_at=now()
+              WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+            [ALQUILOYA_EMPRESA_ID, overridePropietario, qty]
+          );
+          resultadoId = overridePropietario;
+        } else if (overrideAgente) {
+          await ensureAgentesImpulsosColumn(pool);
+          await client.query(
+            `UPDATE ${t("agentes")}
+                SET impulsos_saldo = COALESCE(impulsos_saldo, 0) + $3, updated_at=now()
+              WHERE empresa_id=$1::uuid AND id=$2::uuid`,
+            [ALQUILOYA_EMPRESA_ID, overrideAgente, qty]
+          );
+          resultadoId = overrideAgente;
+        } else {
+          throw new Error(
+            "Necesitás indicar propietario_id o agente_id al aprobar la compra de impulsos"
+          );
         }
-        await client.query(
-          `UPDATE ${t("propietarios")}
-              SET impulsos_saldo = COALESCE(impulsos_saldo, 0) + $3, updated_at=now()
-            WHERE empresa_id=$1::uuid AND id=$2::uuid`,
-          [ALQUILOYA_EMPRESA_ID, overridePropietario, qty]
-        );
-        resultadoId = overridePropietario;
       }
 
       if (sol.kind === "verificacion") {

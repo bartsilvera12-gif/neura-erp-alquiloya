@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       if (agenteId) {
         const { data: ag } = await supabase
           .from("agentes")
-          .select("id, nombre, email, telefono, whatsapp, foto_url, cargo, bio, orden, activo, plan_publicacion_id, plan_vencimiento_at")
+          .select("id, nombre, email, telefono, whatsapp, foto_url, cargo, bio, orden, activo, plan_publicacion_id, plan_vencimiento_at, impulsos_saldo")
           .eq("id", agenteId)
           .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
           .limit(1)
