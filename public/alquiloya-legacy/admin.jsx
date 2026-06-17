@@ -547,17 +547,16 @@ function AdminAgentPage({ route, onNav }) {
     // Antes habia un "fallback mock" que sumaba pack.qty al impulsesPaid si
     // meData no estaba cargado todavia, lo que hacia parecer que los impulsos
     // se cargaban automaticamente y la solicitud no llegaba al admin.
+    // No filtramos por meData en el cliente — mandamos el POST con lo que
+    // tengamos y dejamos que el server valide (nombre + email/telefono).
     const profile = isPropietario ? meData?.propietario : meData?.agente;
-    const nombre = profile?.nombre || meData?.usuario?.email || '';
+    const nombre =
+      profile?.nombre ||
+      meData?.usuario?.nombre ||
+      meData?.usuario?.email ||
+      'Compra desde el panel';
     const email = profile?.email || meData?.usuario?.email || '';
     const telefono = profile?.telefono || profile?.whatsapp || '';
-    if (!nombre || (!email && !telefono)) {
-      return {
-        ok: false,
-        error:
-          'No pudimos identificar tu contacto. Refrescá la página y volvé a intentar.',
-      };
-    }
     try {
       const res = await fetch('/api/public/alquiloya/solicitudes-servicio', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
