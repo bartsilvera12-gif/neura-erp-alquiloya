@@ -338,7 +338,7 @@ export function buildOfficialRdeFacturaElectronicaXml(
     cscParaCodSeg = String(csc).trim();
   }
 
-  const { cuerpo: rucEmCuerpo, dDV: dDVEmi } = splitRucParaXml(emisor.ruc);
+  const { cuerpo: rucEmCuerpo, dDV: dDVEmi } = splitRucParaXml(emisor.ruc, "emisor");
   const dRucEmCdc = padDigits(rucEmCuerpo, 8);
   const dNumTim = normalizarNumeroTimbrado(emisor.timbrado_numero);
   const dEst = normalizarCodigoTres(emisor.establecimiento);
@@ -449,7 +449,7 @@ export function buildOfficialRdeFacturaElectronicaXml(
     if (receptor.sifen_i_nat_rec === 1) {
       const rucL = receptor.ruc?.trim();
       if (!rucL) throw new Error("SIFEN receptor manual: falta RUC en el payload.");
-      const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(rucL);
+      const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(rucL, "receptor");
       const iTiContRec = iTipContCodigo(receptor.nombre);
       recParts.push(textEl("cPaisRec", "PRY"));
       recParts.push(textEl("dDesPaisRe", "Paraguay"));
@@ -511,7 +511,7 @@ export function buildOfficialRdeFacturaElectronicaXml(
     }
     if (receptor.email?.trim()) recParts.push(textEl("dEmailRec", receptor.email.trim()));
   } else if (receptor.ruc?.trim()) {
-    const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(receptor.ruc.trim());
+    const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(receptor.ruc.trim(), "receptor");
     const iTiContRec = iTipContCodigo(receptor.nombre);
     recParts.push(textEl("iNatRec", "1"));
     recParts.push(textEl("iTiOpe", "1"));

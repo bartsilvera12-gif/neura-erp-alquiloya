@@ -175,7 +175,7 @@ export function buildOfficialRdeNotaCreditoElectronicaXml(
     cscParaCodSeg = String(csc).trim();
   }
 
-  const { cuerpo: rucEmCuerpo, dDV: dDVEmi } = splitRucParaXml(emisor.ruc);
+  const { cuerpo: rucEmCuerpo, dDV: dDVEmi } = splitRucParaXml(emisor.ruc, "emisor");
   const dRucEmCdc = padDigits(rucEmCuerpo, 8);
   const dNumTim = normalizarNumeroTimbrado(emisor.timbrado_numero);
   const dEst = normalizarCodigoTres(emisor.establecimiento);
@@ -253,7 +253,7 @@ export function buildOfficialRdeNotaCreditoElectronicaXml(
 
   const recParts: string[] = ["<gDatRec>"];
   if (receptor.ruc?.trim()) {
-    const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(receptor.ruc.trim());
+    const { cuerpo: dRucRec, dDV: dDVRec } = splitRucParaXml(receptor.ruc.trim(), "receptor");
     const iTiContRec = sifenEmisorITipContCodigo(receptor.nombre);
     recParts.push(textEl("iNatRec", "1"));
     recParts.push(textEl("iTiOpe", "1"));

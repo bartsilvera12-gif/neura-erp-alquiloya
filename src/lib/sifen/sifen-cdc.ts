@@ -48,16 +48,25 @@ export function fechaEmisionCdc(fechaIso: string): string {
 
 /**
  * Separa cuerpo del RUC (sin DV) y dígito verificador, para nodos XML (sin relleno forzado).
+ *
+ * @param context "emisor" | "receptor" — para mensaje de error mas claro.
  */
-export function splitRucParaXml(rucRaw: string): { cuerpo: string; dDV: string } {
+export function splitRucParaXml(
+  rucRaw: string,
+  context: "emisor" | "receptor" = "emisor",
+): { cuerpo: string; dDV: string } {
   const d = rucRaw.replace(/\D/g, "");
   if (d.length < 2) {
-    throw new Error("RUC demasiado corto");
+    throw new Error(
+      `RUC ${context} demasiado corto: "${rucRaw}". Formato valido Paraguay: 7-9 digitos (cuerpo 1-8 + 1 digito verificador). Ej: 80012345-6.`,
+    );
   }
   const dDV = d.slice(-1);
   const cuerpo = d.slice(0, -1);
   if (cuerpo.length < 1 || cuerpo.length > 8) {
-    throw new Error("Longitud de RUC incompatible con SIFEN");
+    throw new Error(
+      `Longitud de RUC ${context} incompatible con SIFEN. Se recibieron ${d.length} digitos (cuerpo: ${cuerpo.length}, dv: 1). SIFEN exige cuerpo entre 1 y 8 digitos. Valor: "${rucRaw}".`,
+    );
   }
   return { cuerpo, dDV };
 }

@@ -321,7 +321,7 @@ function validateReceptor(
 
   if (ruc) {
     try {
-      splitRucParaXml(ruc);
+      splitRucParaXml(ruc, "receptor");
     } catch {
       return {
         ok: false,
