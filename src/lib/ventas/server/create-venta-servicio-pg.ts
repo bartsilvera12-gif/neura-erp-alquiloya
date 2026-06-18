@@ -38,9 +38,101 @@ async function ensureVentasServicioColumns(
        ADD COLUMN IF NOT EXISTS cliente_ruc          text,
        ADD COLUMN IF NOT EXISTS tipo_iva_cabecera    text,
        ADD COLUMN IF NOT EXISTS descripcion_servicios jsonb,
-       ADD COLUMN IF NOT EXISTS observaciones       text`,
+       ADD COLUMN IF NOT EXISTS observaciones       text,
+       ADD COLUMN IF NOT EXISTS factura_id           uuid`,
   );
   ventasServicioColumnsReady = true;
+}
+
+let facturasBridgeColumnsReady = false;
+
+/**
+ * Bootstrap idempotente para el bridge Venta -> Factura ERP.
+ *
+ * La tabla `<schema>.facturas` puede venir clonada por la suite multi-tenant
+ * (Zentra `neura_provision_empresa_data_schema`) con el shape viejo de
+ * `public.facturas` (`cliente_id NOT NULL`, sin razon social / ruc /
+ * observaciones / origen_venta_id). Aca le aplicamos los ALTERs aditivos
+ * minimos para que el bridge de venta de servicios pueda insertar sin
+ * romper el shape existente:
+ *
+ *   - `cliente_id`: pasa a NULL-able. Facturas de servicios no usan
+ *     `<schema>.clientes` (los datos fiscales viven en razon_social/ruc).
+ *   - `cliente_razon_social`, `cliente_ruc`, `observaciones`,
+ *     `origen_venta_id`: columnas que el bridge popula.
+ *   - `factura_items.tipo_iva`: discriminacion por linea (5% / 10% / EXENTA).
+ *
+ * Si las tablas todavia NO existen (instalacion fresca sin tenant clone),
+ * las creamos con el shape minimo viable. Mantenemos sincronia con la
+ * migration `20260628120000_alquiloya_facturacion_sifen.sql`.
+ */
+async function ensureFacturasBridgeColumns(
+  pool: NonNullable<ReturnType<typeof getChatPostgresPool>>,
+  schema: string,
+): Promise<void> {
+  if (facturasBridgeColumnsReady) return;
+  const tF = quoteSchemaTable(schema, "facturas");
+  const tFI = quoteSchemaTable(schema, "factura_items");
+
+  // 1. Crear tablas minimas si no existen (entorno fresco, sin clone).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tF} (
+      id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      empresa_id        uuid NOT NULL,
+      cliente_id        uuid,
+      numero_factura    text NOT NULL,
+      fecha             date NOT NULL DEFAULT current_date,
+      fecha_vencimiento date NOT NULL DEFAULT current_date,
+      monto             numeric NOT NULL DEFAULT 0,
+      saldo             numeric NOT NULL DEFAULT 0,
+      estado            text NOT NULL DEFAULT 'Pendiente',
+      tipo              text NOT NULL DEFAULT 'contado',
+      moneda            text NOT NULL DEFAULT 'GS',
+      created_at        timestamptz NOT NULL DEFAULT now(),
+      updated_at        timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
+  // 2. Aditivos sobre facturas — soportan tabla preexistente del clone Zentra.
+  await pool.query(`
+    ALTER TABLE ${tF}
+      ADD COLUMN IF NOT EXISTS cliente_razon_social text,
+      ADD COLUMN IF NOT EXISTS cliente_ruc          text,
+      ADD COLUMN IF NOT EXISTS observaciones        text,
+      ADD COLUMN IF NOT EXISTS origen_venta_id      uuid
+  `);
+
+  // 3. cliente_id puede venir NOT NULL del clone — para servicios va NULL.
+  //    ALTER COLUMN DROP NOT NULL es idempotente (no rompe si ya es null-able).
+  try {
+    await pool.query(`ALTER TABLE ${tF} ALTER COLUMN cliente_id DROP NOT NULL`);
+  } catch {
+    // Si el clone tiene la columna como NOT NULL pero con default razonable,
+    // o si no podemos modificarla, dejamos seguir — el INSERT explicitamente
+    // setea NULL y rompera con error claro si la columna no lo acepta.
+  }
+
+  // 4. factura_items: crear si no existe + asegurar columnas extra.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${tFI} (
+      id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      empresa_id      uuid NOT NULL,
+      factura_id      uuid NOT NULL,
+      descripcion     text NOT NULL,
+      cantidad        numeric NOT NULL DEFAULT 1,
+      precio_unitario numeric NOT NULL DEFAULT 0,
+      subtotal        numeric NOT NULL DEFAULT 0,
+      iva             numeric NOT NULL DEFAULT 0,
+      total           numeric NOT NULL DEFAULT 0,
+      created_at      timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE ${tFI}
+      ADD COLUMN IF NOT EXISTS tipo_iva text DEFAULT '10%'
+  `);
+
+  facturasBridgeColumnsReady = true;
 }
 
 function ivaRate(tipo: TipoIvaVenta): number {
@@ -102,6 +194,7 @@ export async function createVentaServicioPg(
   }
 
   await ensureVentasServicioColumns(pool, params.schema);
+  await ensureFacturasBridgeColumns(pool, params.schema);
 
   const tV = quoteSchemaTable(params.schema, "ventas");
   const tF = quoteSchemaTable(params.schema, "facturas");
