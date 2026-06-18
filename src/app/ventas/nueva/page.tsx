@@ -138,7 +138,14 @@ export default function NuevaVentaPage() {
         setSaving(false);
         return;
       }
-      router.push("/ventas");
+      // Si el server creó la factura ERP asociada (puente Venta -> Factura para
+      // SIFEN), entramos al detalle de factura: ahí vive el panel SIFEN
+      // (FacturaElectronicaPanel) y el usuario puede emitir el DE.
+      if (res.factura?.id) {
+        router.push(`/facturas/${res.factura.id}`);
+      } else {
+        router.push("/ventas");
+      }
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error al guardar");

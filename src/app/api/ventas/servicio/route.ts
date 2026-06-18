@@ -105,7 +105,17 @@ export async function POST(request: NextRequest) {
       tipo_venta: "CONTADO",
       fecha: result.fechaIso,
     };
-    return NextResponse.json(successResponse({ venta }));
+    return NextResponse.json(
+      successResponse({
+        venta,
+        // Factura ERP generada en paralelo — el front la usa para redirigir
+        // al detalle donde vive el panel SIFEN.
+        factura: {
+          id: result.facturaId,
+          numero_factura: result.numeroFactura,
+        },
+      }),
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "No se pudo crear la venta.";
     console.error("[/api/ventas/servicio POST]", msg);

@@ -2,7 +2,7 @@ import type { LineaServicio, MonedaVenta, TipoIvaVenta, Venta } from "./types";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
 
 export type ResultadoGuardarVenta =
-  | { success: true; venta: Venta }
+  | { success: true; venta: Venta; factura?: { id: string; numero_factura: string } | null }
   | { success: false; error: string };
 
 export interface SaveVentaServicioInput {
@@ -35,13 +35,13 @@ export async function saveVentaServicio(
     });
     const json = (await res.json()) as {
       success?: boolean;
-      data?: { venta?: Venta };
+      data?: { venta?: Venta; factura?: { id: string; numero_factura: string } | null };
       error?: string;
     };
     if (!res.ok || !json.success || !json.data?.venta) {
       return { success: false, error: json.error ?? `No se pudo registrar la venta (${res.status}).` };
     }
-    return { success: true, venta: json.data.venta };
+    return { success: true, venta: json.data.venta, factura: json.data.factura ?? null };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Error de red." };
   }

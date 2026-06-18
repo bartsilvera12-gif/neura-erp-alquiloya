@@ -68,7 +68,13 @@ function recalcServicios(servicios: LineaServicio[], tipoIva: TipoIvaVenta) {
  */
 export async function createVentaServicioPg(
   params: CreateVentaServicioParams,
-): Promise<{ ventaId: string; numeroControl: string; fechaIso: string }> {
+): Promise<{
+  ventaId: string;
+  numeroControl: string;
+  fechaIso: string;
+  facturaId: string;
+  numeroFactura: string;
+}> {
   const pool = getChatPostgresPool();
   if (!pool) throw new Error("Sin conexión directa a Postgres (configura SUPABASE_DB_URL).");
 
@@ -98,10 +104,15 @@ export async function createVentaServicioPg(
   await ensureVentasServicioColumns(pool, params.schema);
 
   const tV = quoteSchemaTable(params.schema, "ventas");
+  const tF = quoteSchemaTable(params.schema, "facturas");
+  const tFI = quoteSchemaTable(params.schema, "factura_items");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
+    // Numero correlativo de venta (VTA-XXXXXX) y de factura (FAC-XXXXXX).
+    // Ambos avanzan de forma independiente — la factura es la fuente de verdad
+    // para SIFEN, mientras VTA queda como referencia operativa de la venta.
     const maxRow = await client.query<{ mx: string | null }>(
       `SELECT COALESCE(MAX(
          CASE
@@ -117,6 +128,7 @@ export async function createVentaServicioPg(
     const nextNum = BigInt(maxRow.rows[0]?.mx ?? "0") + BigInt(1);
     const numeroControl = `VTA-${String(nextNum).padStart(6, "0")}`;
     const fechaIso = new Date().toISOString();
+    const fechaDate = fechaIso.slice(0, 10); // YYYY-MM-DD
 
     const ins = await client.query<{ id: string }>(
       `INSERT INTO ${tV} (
@@ -147,9 +159,89 @@ export async function createVentaServicioPg(
         JSON.stringify(validServicios),
       ],
     );
+    const ventaId = ins.rows[0].id;
+
+    // -------------------------------------------------------------------------
+    // Puente Venta -> Factura ERP (fuente de verdad SIFEN).
+    // Idempotente: si la venta ya tiene factura_id linkeado, no creamos una
+    // nueva (esto solo aplica si esta función se reinvoca con el mismo venta
+    // existente, hoy no ocurre porque acabamos de hacer INSERT — pero queda
+    // como guardarraíl para los futuros retries).
+    // -------------------------------------------------------------------------
+    const facMaxRow = await client.query<{ mx: string | null }>(
+      `SELECT COALESCE(MAX(
+         CASE
+           WHEN numero_factura ~ '^FAC-[0-9]+$'
+           THEN substring(numero_factura from '[0-9]+$')::bigint
+           ELSE NULL::bigint
+         END
+       ), 0)::text AS mx
+       FROM ${tF}
+       WHERE empresa_id = $1`,
+      [params.empresaId],
+    );
+    const nextFac = BigInt(facMaxRow.rows[0]?.mx ?? "0") + BigInt(1);
+    const numeroFactura = `FAC-${String(nextFac).padStart(6, "0")}`;
+
+    const facIns = await client.query<{ id: string }>(
+      `INSERT INTO ${tF} (
+         empresa_id, cliente_id, numero_factura, fecha, fecha_vencimiento,
+         monto, saldo, estado, tipo, moneda,
+         cliente_razon_social, cliente_ruc, observaciones, origen_venta_id
+       ) VALUES (
+         $1, NULL, $2, $3::date, $3::date,
+         $4, $4, 'Pagado', 'contado', $5,
+         $6, $7, $8, $9::uuid
+       )
+       RETURNING id`,
+      [
+        params.empresaId,
+        numeroFactura,
+        fechaDate,
+        calc.total,
+        params.moneda,
+        params.clienteRazonSocial.trim(),
+        params.clienteRuc?.trim() || null,
+        params.observaciones,
+        ventaId,
+      ],
+    );
+    const facturaId = facIns.rows[0].id;
+
+    // Items: una linea por servicio. Mantenemos el iva como porcion informativa
+    // (subtotal * rate) consistente con el front. precio_unitario = monto.
+    const rate = ivaRate(params.tipoIvaCabecera);
+    for (const srv of validServicios) {
+      const sub = Number(srv.monto) || 0;
+      const ivaLinea = sub * rate;
+      await client.query(
+        `INSERT INTO ${tFI} (
+           empresa_id, factura_id, descripcion, cantidad, precio_unitario,
+           subtotal, iva, tipo_iva, total
+         ) VALUES (
+           $1, $2::uuid, $3, 1, $4, $4, $5, $6, $4
+         )`,
+        [
+          params.empresaId,
+          facturaId,
+          srv.descripcion,
+          sub,
+          ivaLinea,
+          params.tipoIvaCabecera,
+        ],
+      );
+    }
+
+    // Linkeamos la venta a la factura para que el flujo siguiente sepa cual
+    // abrir. La columna factura_id se crea idempotentemente en la migración
+    // 20260628120000_alquiloya_facturacion_sifen.sql.
+    await client.query(
+      `UPDATE ${tV} SET factura_id = $1::uuid WHERE id = $2::uuid AND empresa_id = $3`,
+      [facturaId, ventaId, params.empresaId],
+    );
 
     await client.query("COMMIT");
-    return { ventaId: ins.rows[0].id, numeroControl, fechaIso };
+    return { ventaId, numeroControl, fechaIso, facturaId, numeroFactura };
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;
