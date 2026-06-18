@@ -7,7 +7,7 @@ import {
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
-import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { SUPABASE_APP_SCHEMA, type AppSupabaseClient } from "@/lib/supabase/schema";
 
 const LOG = "[sifen-config-service-client]";
 
@@ -27,11 +27,23 @@ export async function getSifenConfigServiceClientForEmpresa(
   const schema = await fetchDataSchemaForEmpresaId(empresaId);
   const pool = getChatPostgresPool();
 
-  if (pool && isLikelyUnexposedTenantChatSchema(schema)) {
+  // Forzamos PG-shim para CUALQUIER tenant con pool disponible (no solo los
+  // unexposed clasicos `erp_*`). Motivo: PostgREST en self-hosted mantiene
+  // un cache del schema que tarda en refrescarse despues de ALTER TABLE
+  // ADD COLUMN. El sintoma reportado fue: el PATCH guardaba la contraseña
+  // del certificado sin error, pero al recargar la pagina o intentar firmar
+  // la fila volvia "sin columna" (PostgREST descartaba en silencio el
+  // campo certificado_password_encrypted que no estaba en su cache).
+  // Bypaseando PostgREST en el modulo SIFEN aseguramos consistencia
+  // independiente del estado del cache.
+  if (pool && schema !== SUPABASE_APP_SCHEMA) {
     const catalog = createServiceRoleClient();
     console.info(LOG, "modo", "postgres_shim", {
       empresa_id: empresaId,
       data_schema: schema,
+      motivo: isLikelyUnexposedTenantChatSchema(schema)
+        ? "unexposed_tenant"
+        : "force_bypass_postgrest_cache",
     });
     return createTenantPgChatSupabaseShim({
       pool,

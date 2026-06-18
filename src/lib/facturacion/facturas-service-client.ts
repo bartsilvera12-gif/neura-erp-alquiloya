@@ -10,7 +10,7 @@ import {
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { isLikelyUnexposedTenantChatSchema } from "@/lib/supabase/chat-data-schema";
 import { createServiceRoleClient } from "@/lib/supabase/service-admin";
-import type { AppSupabaseClient } from "@/lib/supabase/schema";
+import { SUPABASE_APP_SCHEMA, type AppSupabaseClient } from "@/lib/supabase/schema";
 
 const LOG = "[facturas-service-client]";
 
@@ -36,9 +36,22 @@ export async function getFacturasServiceClientForEmpresa(
   const schema = await fetchDataSchemaForEmpresaId(empresaId);
   const pool = getChatPostgresPool();
 
-  if (pool && isLikelyUnexposedTenantChatSchema(schema)) {
+  // Forzamos PG-shim para CUALQUIER tenant con pool disponible: PostgREST en
+  // self-hosted mantiene cache del schema que tarda en refrescarse despues
+  // de ALTER TABLE. El endpoint firmar lee certificado_password_encrypted via
+  // empresa_sifen_config — si PostgREST cachea el schema viejo, devuelve la
+  // fila sin esa columna y el firmar tira "No hay contraseña del certificado".
+  // Bypaseando PostgREST en todo el modulo facturas + SIFEN aseguramos
+  // consistencia ante ALTER TABLE recientes.
+  if (pool && schema !== SUPABASE_APP_SCHEMA) {
     const catalog = createServiceRoleClient();
-    console.info(LOG, "modo", "postgres_shim", { empresa_id: empresaId, data_schema: schema });
+    console.info(LOG, "modo", "postgres_shim", {
+      empresa_id: empresaId,
+      data_schema: schema,
+      motivo: isLikelyUnexposedTenantChatSchema(schema)
+        ? "unexposed_tenant"
+        : "force_bypass_postgrest_cache",
+    });
     return createTenantPgChatSupabaseShim({
       pool,
       schema,
