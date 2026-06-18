@@ -70,7 +70,9 @@ export default function NuevaVentaPage() {
   const [razonSocial, setRazonSocial] = useState("");
   const [ruc, setRuc] = useState("");
   const [moneda, setMoneda] = useState<MonedaVenta>("GS");
-  const [tipoCambio, setTipoCambio] = useState(1);
+  // tipoCambio: number cuando el usuario ya cargo un valor; "" mientras esta
+  // vacio. Asi el placeholder "7.300" se ve y no aparece un "1" hardcodeado.
+  const [tipoCambio, setTipoCambio] = useState<number | "">("");
   const [tipoIva, setTipoIva] = useState<TipoIvaVenta>("10%");
   const [servicios, setServicios] = useState<LineaServicio[]>([
     { descripcion: "", monto: 0 },
@@ -113,13 +115,17 @@ export default function NuevaVentaPage() {
       setErr("Cargá al menos una línea de servicio con descripción y monto > 0.");
       return;
     }
+    if (moneda === "USD" && (typeof tipoCambio !== "number" || tipoCambio <= 0)) {
+      setErr("Ingresá la cotización del día (Gs. por USD).");
+      return;
+    }
     setSaving(true);
     try {
       const res = await saveVentaServicio({
         cliente_razon_social: razonSocial.trim(),
         cliente_ruc: ruc.trim() || null,
         moneda,
-        tipo_cambio: moneda === "USD" ? tipoCambio : 1,
+        tipo_cambio: moneda === "USD" ? (tipoCambio as number) : 1,
         tipo_iva_cabecera: tipoIva,
         servicios: valid,
         subtotal,
@@ -180,9 +186,17 @@ export default function NuevaVentaPage() {
           </div>
           {moneda === "USD" ? (
             <div>
-              <GroupHeader>Tipo de cambio (Gs. por USD)</GroupHeader>
+              <GroupHeader>Cotización del día</GroupHeader>
+              <p className="mt-1 text-[11px] text-slate-400">
+                ¿Cuántos guaraníes vale 1 USD hoy? Ej: 7.300.
+              </p>
               <div className="mt-2">
-                <MontoInput value={tipoCambio} onChange={setTipoCambio} className={inputClass} />
+                <MontoInput
+                  value={tipoCambio}
+                  onChange={(v) => setTipoCambio(v > 0 ? v : "")}
+                  placeholder="Ej: 7.300"
+                  className={inputClass}
+                />
               </div>
             </div>
           ) : (
