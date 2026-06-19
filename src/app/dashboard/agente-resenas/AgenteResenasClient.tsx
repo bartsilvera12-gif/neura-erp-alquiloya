@@ -64,7 +64,7 @@ export default function AgenteResenasClient({ initial }: { initial: ErpAgenteRes
     [rows, filter]
   );
 
-  async function doAction(row: ErpAgenteResena, action: "aprobar" | "rechazar", motivo?: string) {
+  async function doAction(row: ErpAgenteResena, action: "aprobar" | "rechazar" | "destacar" | "no_destacar", motivo?: string) {
     setErr(null);
     setBusyId(row.id);
     try {
@@ -76,13 +76,26 @@ export default function AgenteResenasClient({ initial }: { initial: ErpAgenteRes
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean;
         estado?: ErpAgenteResena["estado"];
+        destacada_home?: boolean;
         error?: string;
       };
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
       setRows((prev) =>
         prev.map((r) =>
           r.id === row.id
-            ? { ...r, estado: data.estado ?? r.estado, motivo_rechazo: action === "rechazar" ? motivo ?? null : r.motivo_rechazo, revisado_at: new Date().toISOString() }
+            ? {
+                ...r,
+                estado: data.estado ?? r.estado,
+                motivo_rechazo: action === "rechazar" ? motivo ?? null : r.motivo_rechazo,
+                revisado_at:
+                  action === "aprobar" || action === "rechazar"
+                    ? new Date().toISOString()
+                    : r.revisado_at,
+                destacada_home:
+                  typeof data.destacada_home === "boolean"
+                    ? data.destacada_home
+                    : r.destacada_home,
+              }
             : r
         )
       );
@@ -166,6 +179,19 @@ export default function AgenteResenasClient({ initial }: { initial: ErpAgenteRes
                       Rechazar
                     </button>
                   </div>
+                ) : r.estado === "aprobada" ? (
+                  <button
+                    type="button"
+                    disabled={busyId === r.id}
+                    onClick={() => doAction(r, r.destacada_home ? "no_destacar" : "destacar")}
+                    className={r.destacada_home
+                      ? "rounded-md bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                      : "rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 disabled:opacity-50"
+                    }
+                    title={r.destacada_home ? "Quitar del home" : "Destacar en el home publico"}
+                  >
+                    {r.destacada_home ? "★ Destacada en home" : "☆ Destacar en home"}
+                  </button>
                 ) : (
                   <span className="text-[11px] text-slate-400">{fmtDate(r.revisado_at)}</span>
                 )}

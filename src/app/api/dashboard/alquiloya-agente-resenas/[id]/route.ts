@@ -25,12 +25,41 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const action = s(body.action, 20);
-  if (action !== "aprobar" && action !== "rechazar") {
-    return NextResponse.json({ error: "action invalida (aprobar|rechazar)" }, { status: 400 });
+  if (
+    action !== "aprobar" &&
+    action !== "rechazar" &&
+    action !== "destacar" &&
+    action !== "no_destacar"
+  ) {
+    return NextResponse.json(
+      { error: "action invalida (aprobar|rechazar|destacar|no_destacar)" },
+      { status: 400 }
+    );
   }
 
   const pool = getChatPostgresPool();
   if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+
+  // Toggle destacada_home — solo aplica a reseñas ya aprobadas.
+  if (action === "destacar" || action === "no_destacar") {
+    const nextValue = action === "destacar";
+    const { rows: destRows } = await queryWithRetry<{ id: string; destacada_home: boolean }>(
+      pool,
+      `UPDATE "alquiloya"."agente_resenas"
+          SET destacada_home=$3
+        WHERE empresa_id=$1::uuid AND id=$2::uuid AND estado='aprobada'
+        RETURNING id, destacada_home`,
+      [ALQUILOYA_EMPRESA_ID, id, nextValue]
+    );
+    if (destRows.length === 0) {
+      return NextResponse.json({ error: "no encontrada o no esta aprobada" }, { status: 404 });
+    }
+    return NextResponse.json({
+      success: true,
+      id: destRows[0].id,
+      destacada_home: destRows[0].destacada_home,
+    });
+  }
 
   const motivo = s(body.motivo_rechazo, 500);
   const nextEstado = action === "aprobar" ? "aprobada" : "rechazada";
