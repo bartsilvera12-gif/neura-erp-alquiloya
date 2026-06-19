@@ -172,9 +172,7 @@ function FacturaDetalleInner() {
           <h1 className="text-2xl font-bold text-slate-900 mt-1">Factura {factura.numero_factura}</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Cliente:{" "}
-            <Link href={`/clientes/${factura.cliente_id}`} className="text-[#0EA5E9] font-medium hover:underline">
-              {factura.cliente_display ?? "Ver cliente"}
-            </Link>
+            <span className="text-slate-700 font-medium">{factura.cliente_display ?? "—"}</span>
           </p>
         </div>
         <div className="flex gap-2 print:hidden">
