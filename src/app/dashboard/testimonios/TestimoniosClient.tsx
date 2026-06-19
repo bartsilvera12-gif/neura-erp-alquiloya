@@ -201,10 +201,6 @@ export default function TestimoniosClient({ initial }: { initial: TestimonioRow[
                 <label className={labelCls}>Contenido *</label>
                 <textarea rows={4} className={inputCls} value={editing.contenido ?? ""} onChange={(e) => setEditing((x) => ({ ...x!, contenido: e.target.value }))} />
               </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Foto URL</label>
-                <input className={inputCls} placeholder="https://…" value={editing.foto_url ?? ""} onChange={(e) => setEditing((x) => ({ ...x!, foto_url: e.target.value }))} />
-              </div>
               <div>
                 <label className={labelCls}>Calificación (1-5)</label>
                 <input type="number" min="1" max="5" className={inputCls} value={editing.calificacion ?? 5} onChange={(e) => setEditing((x) => ({ ...x!, calificacion: Number(e.target.value) || 5 }))} />
