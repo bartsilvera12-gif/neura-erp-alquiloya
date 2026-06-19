@@ -9,6 +9,10 @@ function PlansPage({ onNav }) {
   const [isAgentUser, setIsAgentUser] = React.useState(false);
   const [verifyOpen, setVerifyOpen] = React.useState(false);
   const [picked, setPicked] = React.useState(null); // { tier, name }
+  // Cuando un anonimo clickea un plan de agente, mostramos un dialogo que le
+  // pide iniciar sesion o solicitar acceso primero, en lugar de abrir el
+  // modal de suscripcion directamente.
+  const [needsLogin, setNeedsLogin] = React.useState(null); // { tier, name }
   const [changeOpen, setChangeOpen] = React.useState(false);
   // Fuente real desde API; fallback a PLANS de data.jsx si la API falla.
   const [plansData, setPlansData] = React.useState(PLANS);
@@ -87,6 +91,14 @@ function PlansPage({ onNav }) {
             try { window.location.hash = '#publish'; } catch {}
             return;
           }
+          // Planes de agente: solo se pueden suscribir si ya estas logueada/o
+          // como agente. Si no, mostramos una pantalla pidiendo iniciar sesion
+          // o solicitar acceso primero — no dejamos que un anonimo se suscriba
+          // directo a un plan que no le aplica.
+          if (audience === 'agent' && !isAgentUser) {
+            setNeedsLogin({ tier: p.tier, name: p.name });
+            return;
+          }
           setPicked({ tier: p.tier, name: p.name, audience });
         }}/>)}
       </div>
@@ -114,7 +126,93 @@ function PlansPage({ onNav }) {
         />
       )}
       {changeOpen && <CambioPlanModal planes={filtered} onClose={() => setChangeOpen(false)}/>}
+      {needsLogin && (
+        <NeedsAgentLoginModal
+          planLabel={needsLogin.name}
+          onClose={() => setNeedsLogin(null)}
+          onSolicitarAcceso={() => {
+            // Encadenamos al modal de "Solicitar acceso" con el plan elegido
+            // para que el equipo sepa a qué plan quiere acceder.
+            const tier = needsLogin.tier;
+            const name = needsLogin.name;
+            setNeedsLogin(null);
+            setPicked({ tier, name, audience: 'agent' });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function NeedsAgentLoginModal({ planLabel, onClose, onSolicitarAcceso }) {
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(11,22,34,.55)', zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px, 2vw, 16px)', overflowY: 'auto',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{
+        width: '100%', maxWidth: 460, padding: 0, position: 'relative',
+        maxHeight: 'calc(100svh - 16px)', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <button type="button" onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14, background: 'var(--bg-2)',
+          border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer',
+          display: 'grid', placeItems: 'center', zIndex: 2,
+        }} aria-label="Cerrar">
+          <I.x s={14}/>
+        </button>
+        <div style={{ padding: '24px 24px 14px', borderBottom: '1px solid var(--line-2)' }}>
+          <div className="tag" style={{ color: 'var(--blue)' }}>Plan {planLabel}</div>
+          <h3 style={{ fontSize: 20, marginTop: 8, paddingRight: 36, lineHeight: 1.25 }}>
+            Necesitás una cuenta de agente para suscribirte
+          </h3>
+          <p className="muted" style={{ fontSize: 13.5, marginTop: 8, lineHeight: 1.5 }}>
+            Los planes <strong>Starter</strong> y <strong>Premium</strong> son exclusivos para agentes e inmobiliarias verificados. Iniciá sesión con tu cuenta de agente o pedí acceso si todavía no tenés una.
+          </p>
+        </div>
+        <div style={{ padding: '14px 24px', overflowY: 'auto' }}>
+          <div className="card-soft" style={{ padding: 14, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+            <div className="row gap-8" style={{ alignItems: 'flex-start' }}>
+              <I.shield s={14}/>
+              <span>
+                ¿Sos propietario directo? Podés publicar tu inmueble <strong>sin crear cuenta</strong> desde
+                "Publicar inmueble" o eligiendo el plan Gratuito / Básico.
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style={{
+          padding: '14px 24px calc(14px + env(safe-area-inset-bottom, 0px))',
+          borderTop: '1px solid var(--line-2)', background: '#fff',
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10,
+          justifyContent: 'flex-end',
+        }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onSolicitarAcceso}
+            style={{ flex: '1 1 180px', justifyContent: 'center' }}
+          >
+            Solicitar acceso
+          </button>
+          <a
+            href="/portal-agentes/login"
+            className="btn btn-blue"
+            style={{ flex: '1 1 180px', justifyContent: 'center', textDecoration: 'none' }}
+          >
+            Iniciar sesión
+          </a>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
