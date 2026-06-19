@@ -19,6 +19,34 @@ export default function PortalAgentesLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recoverOpen, setRecoverOpen] = useState(false);
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverLoading, setRecoverLoading] = useState(false);
+  const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+
+  async function handleRecoverSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setRecoverMsg(null);
+    setRecoverLoading(true);
+    try {
+      const res = await fetch("/api/public/alquiloya/portal-agentes/recuperar-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoverEmail.trim().toLowerCase() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      setRecoverMsg(
+        data.message ??
+          "Si el email esta registrado, te enviamos una nueva contrasena. Revisa tu bandeja (y spam)."
+      );
+    } catch {
+      setRecoverMsg(
+        "Si el email esta registrado, te enviamos una nueva contrasena. Revisa tu bandeja (y spam)."
+      );
+    } finally {
+      setRecoverLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -150,6 +178,16 @@ export default function PortalAgentesLoginPage() {
               {loading ? "Ingresando…" : "Ingresar"}
             </button>
           </form>
+
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => { setRecoverEmail(email); setRecoverMsg(null); setRecoverOpen(true); }}
+                className="text-xs font-medium text-[#0058A5] underline-offset-4 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
         </div>
 
         <Link
@@ -159,6 +197,49 @@ export default function PortalAgentesLoginPage() {
           ← Volver
         </Link>
       </div>
+      {recoverOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !recoverLoading && setRecoverOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <h2 className="text-lg font-bold text-[#0F172A]">Recuperar contraseña</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Ingresá tu email. Si está registrado como agente o publicador, te enviamos una nueva contraseña temporal por correo.
+            </p>
+            <form onSubmit={handleRecoverSubmit} className="mt-4 space-y-3">
+              <input
+                type="email"
+                required
+                value={recoverEmail}
+                onChange={(e) => setRecoverEmail(e.target.value)}
+                placeholder="tu@email.com"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-[#0F172A] shadow-sm focus:border-[#0058A5] focus:outline-none focus:ring-2 focus:ring-[#0058A5]/30"
+              />
+              {recoverMsg ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700">
+                  {recoverMsg}
+                </div>
+              ) : null}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={recoverLoading}
+                  onClick={() => setRecoverOpen(false)}
+                  className="rounded-lg bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="submit"
+                  disabled={recoverLoading}
+                  className="rounded-lg bg-[#0058A5] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#004B8F] disabled:opacity-60"
+                >
+                  {recoverLoading ? "Enviando…" : "Enviar nueva contraseña"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
