@@ -276,15 +276,15 @@ const MENU_STRUCTURE: MenuItem[] = [
   //   href: "/dashboard/impulsos-packs",
   //   icon: Rocket,
   // },
-  // Reseñas: moderacion de reseñas que dejan inquilinos/propietarios sobre
-  // los agentes, con seleccion de cuales se muestran en el home publico.
-  {
-    key: "agente-resenas",
-    slug: "agentes-inmobiliarios",
-    label: "Reseñas",
-    href: "/dashboard/agente-resenas",
-    icon: MessageSquareQuote,
-  },
+  // "Reseñas de agentes" oculta del sidebar — el acceso es desde el editor
+  // del agente. Ruta /dashboard/agente-resenas sigue activa.
+  // {
+  //   key: "agente-resenas",
+  //   slug: "agentes-inmobiliarios",
+  //   label: "Reseñas de agentes",
+  //   href: "/dashboard/agente-resenas",
+  //   icon: MessageSquareQuote,
+  // },
   {
     key: "referidos",
     slug: "referidos",
