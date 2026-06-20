@@ -36,7 +36,7 @@ async function findAuthUserByEmail(admin: any, email: string): Promise<{ id: str
     }
     const users = data?.users ?? [];
     if (users.length === 0) return null;
-    const hit = users.find((u) => (u.email ?? "").toLowerCase() === lower);
+    const hit = users.find((u: { id: string; email?: string | null }) => (u.email ?? "").toLowerCase() === lower);
     if (hit) return { id: hit.id, email: hit.email ?? null };
     if (users.length < 1000) return null;
   }
