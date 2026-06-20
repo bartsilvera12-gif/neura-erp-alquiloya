@@ -26,12 +26,17 @@ type UsuarioRow = {
 };
 
 async function findAuthUserByEmail(
-  admin: ReturnType<typeof createClient>,
+  admin: {
+    listUsers: (opts: { page: number; perPage: number }) => Promise<{
+      data: { users: Array<{ id: string; email: string | null }> } | null;
+      error: { message: string } | null;
+    }>;
+  },
   email: string
 ): Promise<{ id: string; email: string | null } | null> {
   const lower = email.toLowerCase();
   for (let page = 1; page <= 50; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    const { data, error } = await admin.listUsers({ page, perPage: 1000 });
     if (error) {
       console.error("[recuperar-password] listUsers:", error.message);
       return null;
@@ -100,8 +105,8 @@ export async function POST(request: Request) {
   // 2) Resolver auth user. Preferimos auth_user_id; si no, fallback por email.
   let authUserId = usuario.auth_user_id;
   if (!authUserId) {
-    const adminApi = supabaseAdmin.auth.admin as unknown as Parameters<typeof findAuthUserByEmail>[0];
-    const found = await findAuthUserByEmail(adminApi, emailRaw);
+    
+    const found = await findAuthUserByEmail(supabaseAdmin.auth.admin, emailRaw);
     if (!found) return successResponse;
     authUserId = found.id;
   }
