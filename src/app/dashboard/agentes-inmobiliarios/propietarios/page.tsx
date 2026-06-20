@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DeletePropietarioButton from "./DeletePropietarioButton";
 import {
   listErpPropietarios,
   type ErpPropietarioRow,
@@ -153,6 +154,7 @@ export default async function PropietariosPage() {
                       >
                         Editar
                       </Link>
+                      <DeletePropietarioButton id={p.id} nombre={p.nombre} />
                     </div>
                   </td>
                 </tr>
