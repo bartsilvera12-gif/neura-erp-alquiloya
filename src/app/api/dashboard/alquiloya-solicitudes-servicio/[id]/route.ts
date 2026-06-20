@@ -160,17 +160,29 @@ async function provisionPortalAccountForPropietario(params: {
   }
   const authUserId = created.user?.id;
   if (!authUserId) return null;
-
-  // Vinculo en alquiloya.usuarios. Si la fila ya existe (por algun otro flujo),
-  // ON CONFLICT NOTHING y seguimos.
+  // Vinculo en alquiloya.usuarios. Si la fila ya existe (por algun otro
+  // flujo, ej. solicitudes-acceso), no la duplicamos.
   try {
-    await params.pool.query(
-      `INSERT INTO "alquiloya"."usuarios"
-         (empresa_id, auth_user_id, email, nombre, rol, propietario_id)
-       VALUES ($1::uuid, $2::uuid, $3, $4, 'publicador-propietario', $5::uuid)
-       ON CONFLICT (auth_user_id) DO NOTHING`,
-      [ALQUILOYA_EMPRESA_ID, authUserId, params.email, params.nombre, params.propietarioId]
+    const { rows: existing } = await params.pool.query<{ id: string }>(
+      `SELECT id FROM "alquiloya"."usuarios"
+        WHERE empresa_id=$1::uuid AND auth_user_id=$2::uuid LIMIT 1`,
+      [ALQUILOYA_EMPRESA_ID, authUserId]
     );
+    if (existing.length === 0) {
+      await params.pool.query(
+        `INSERT INTO "alquiloya"."usuarios"
+           (empresa_id, auth_user_id, email, nombre, rol, propietario_id)
+         VALUES ($1::uuid, $2::uuid, $3, $4, 'publicador-propietario', $5::uuid)`,
+        [ALQUILOYA_EMPRESA_ID, authUserId, params.email, params.nombre, params.propietarioId]
+      );
+    } else {
+      // Si ya existia, nos aseguramos que apunte al propietario nuevo.
+      await params.pool.query(
+        `UPDATE "alquiloya"."usuarios" SET propietario_id=$2::uuid, updated_at=now()
+          WHERE empresa_id=$1::uuid AND id=$3::uuid`,
+        [ALQUILOYA_EMPRESA_ID, params.propietarioId, existing[0].id]
+      );
+    }
     await params.pool.query(
       `UPDATE "alquiloya"."propietarios"
           SET usuario_id = (
