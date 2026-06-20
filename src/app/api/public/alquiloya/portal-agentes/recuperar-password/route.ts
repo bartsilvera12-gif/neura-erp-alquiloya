@@ -25,15 +25,8 @@ type UsuarioRow = {
   auth_user_id: string;
 };
 
-async function findAuthUserByEmail(
-  admin: {
-    listUsers: (opts: { page: number; perPage: number }) => Promise<{
-      data: { users: Array<{ id: string; email: string | null }> } | null;
-      error: { message: string } | null;
-    }>;
-  },
-  email: string
-): Promise<{ id: string; email: string | null } | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findAuthUserByEmail(admin: any, email: string): Promise<{ id: string; email: string | null } | null> {
   const lower = email.toLowerCase();
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await admin.listUsers({ page, perPage: 1000 });
