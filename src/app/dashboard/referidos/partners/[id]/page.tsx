@@ -5,6 +5,7 @@ import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { CopySlugButton } from "../../_components/CopySlugButton";
 import { PartnerActions } from "./_components/PartnerActions";
+import { EditarPartnerButton } from "./_components/EditarPartnerButton";
 import { EditarReglaButton } from "./_components/EditarReglaButton";
 
 export const dynamic = "force-dynamic";
@@ -221,12 +222,15 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{partner.nombre}</h1>
           <p className="mt-1 text-sm text-slate-500">{(partner.tipo ?? "—").replace("_", " ")}</p>
         </div>
-        <PartnerActions
-          partnerId={partner.id}
-          activo={partner.activo}
-          hasUsuario={!!partner.usuario_id}
-          defaultEmail={partner.email}
-        />
+        <div className="flex flex-wrap items-start gap-2">
+          <EditarPartnerButton partner={partner} />
+          <PartnerActions
+            partnerId={partner.id}
+            activo={partner.activo}
+            hasUsuario={!!partner.usuario_id}
+            defaultEmail={partner.email}
+          />
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
