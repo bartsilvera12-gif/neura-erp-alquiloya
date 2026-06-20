@@ -146,20 +146,46 @@ async function provisionPortalAccountForPropietario(params: {
       },
     });
 
+  let authUserId: string | null = null;
   if (createErr) {
     const msg = (createErr.message ?? "").toLowerCase();
     if (msg.includes("already") || msg.includes("exists") || msg.includes("registered")) {
-      console.info(
-        "[provisionPortalAccount] email ya existia en auth, sin nueva password:",
-        params.email
-      );
+      // El email ya estaba en Supabase Auth (probablemente de pruebas previas).
+      // Buscamos el auth user y le reseteamos la password para que llegue una
+      // nueva valida al solicitante.
+      const lower = params.email.toLowerCase();
+      for (let page = 1; page <= 50 && !authUserId; page++) {
+        const { data: lr, error: le } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (le) { console.warn("[provisionPortalAccount] listUsers:", le.message); break; }
+        const users = lr?.users ?? [];
+        if (users.length === 0) break;
+        const hit = users.find((u: { id?: string; email?: string | null }) => (u.email ?? "").toLowerCase() === lower);
+        if (hit && hit.id) { authUserId = hit.id; break; }
+        if (users.length < 1000) break;
+      }
+      if (!authUserId) {
+        console.warn("[provisionPortalAccount] no encontre el auth user existente para reset:", params.email);
+        return null;
+      }
+      const { error: upErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { nombre: params.nombre, fuente: "solicitud_servicio_aprobada_reset", tipo: "propietario" },
+      });
+      if (upErr) {
+        console.warn("[provisionPortalAccount] updateUserById:", upErr.message);
+        return null;
+      }
+      console.info("[provisionPortalAccount] password reseteada para auth user existente:", params.email);
+    } else {
+      console.warn("[provisionPortalAccount] createUser:", createErr.message);
       return null;
     }
-    console.warn("[provisionPortalAccount] createUser:", createErr.message);
-    return null;
+  } else {
+    authUserId = created.user?.id ?? null;
+    if (!authUserId) return null;
   }
-  const authUserId = created.user?.id;
-  if (!authUserId) return null;
+
   // Vinculo en alquiloya.usuarios. Si la fila ya existe (por algun otro
   // flujo, ej. solicitudes-acceso), no la duplicamos.
   try {
