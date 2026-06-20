@@ -72,11 +72,14 @@ function PublishPage() {
   //   que antes. Los propietarios publican sin cuenta.
   const agenteConPlan = !!(ctxAgente && ctxAgente.plan_publicacion_id);
   const agenteSinPlan = !!(ctxAgente && !ctxAgente.plan_publicacion_id);
+  // Mismo comportamiento que para agentes: si el propietario tiene un plan
+  // vigente, saltamos el paso "Plan" (ya pago, no tiene sentido elegir).
+  const propietarioConPlan = !!(ctxPropietario && ctxPropietario.plan_publicacion_id);
   const stepKinds = agenteSinPlan
-    ? ['plan_request', 'basics', 'location', 'photos', 'preview']
-    : agenteConPlan
-      ? ['basics', 'location', 'photos', 'preview']
-      : ['plan', 'basics', 'location', 'photos', 'preview'];
+    ? ["plan_request", "basics", "location", "photos", "preview"]
+    : (agenteConPlan || propietarioConPlan)
+      ? ["basics", "location", "photos", "preview"]
+      : ["plan", "basics", "location", "photos", "preview"];
   const STEP_DEFS = {
     plan: { title: 'Plan', icon: 'star' },
     plan_request: { title: 'Solicitar plan', icon: 'star' },
