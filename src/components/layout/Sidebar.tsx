@@ -240,6 +240,7 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Users,
     children: [
       { label: "Listado de agentes", href: "/dashboard/agentes-inmobiliarios", exactMatch: true },
+      { label: "Listado de propietarios", href: "/dashboard/agentes-inmobiliarios/propietarios" },
       { label: "Solicitudes de acceso", href: "/dashboard/solicitudes-acceso" },
     ],
   },
