@@ -428,6 +428,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
       }
     }
 
+    if (!shouldNotify || !sol.email) {
+      console.log("[solicitudes-servicio PATCH] mail NO disparado - shouldNotify:", shouldNotify, "sol.email:", sol.email);
+    }
     if (shouldNotify && sol.email) {
       try {
         const origin = new URL(request.url).origin;
@@ -442,14 +445,20 @@ export async function PATCH(request: Request, ctx: Ctx) {
             ? { ...credentialsCreated, portalUrl }
             : undefined,
         });
+        console.log("[solicitudes-servicio PATCH] enviando mail a:", sol.email, "subject:", tpl.subject);
         const r = await sendMail({
           to: sol.email,
           subject: tpl.subject,
           html: tpl.html,
           text: tpl.text,
         });
-        if (r.sent) mailSent = true;
-        else mailError = r.reason;
+        if (r.sent) {
+          mailSent = true;
+          console.log("[solicitudes-servicio PATCH] sendMail OK messageId:", r.messageId);
+        } else {
+          mailError = r.reason;
+          console.warn("[solicitudes-servicio PATCH] sendMail NO ENVIADO:", r.reason);
+        }
       } catch (e) {
         mailError = e instanceof Error ? e.message : "Error enviando mail";
         console.warn("[solicitudes-servicio PATCH] sendMail:", mailError);
