@@ -308,7 +308,6 @@ function Footer({ onNav }) {
             <a href="https://www.instagram.com/alquiloyapy/" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>Instagram</a>
             <a href="https://www.facebook.com/alquiloya.com.py/" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>Facebook</a>
             <a href={'https://wa.me/' + ((typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.telefonoWa) || '595983000292')} target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>WhatsApp</a>
-            <a href="https://tiktok.com/@alquiloya" target="_blank" rel="noopener noreferrer" style={{ color: '#9aa4b1', textDecoration: 'none' }}>TikTok</a>
           </div>
         </div>
       </div>
