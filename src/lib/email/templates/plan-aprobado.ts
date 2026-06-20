@@ -84,7 +84,7 @@ export function renderPlanAprobadoEmail({
               </tr>
               <tr>
                 <td style="padding:0 18px 16px">
-                  <div style="font-size:11px;font-weight:700;color:#5b6573;letter-spacing:.05em;text-transform:uppercase">Contraseña temporal</div>
+                  <div style="font-size:11px;font-weight:700;color:#5b6573;letter-spacing:.05em;text-transform:uppercase">Contraseña</div>
                   <div style="font-family:'Courier New',monospace;font-size:18px;font-weight:700;margin-top:6px;padding:10px 14px;background:#fff;border:1px solid #d4e6f7;border-radius:8px;color:#0058A5;letter-spacing:.04em;word-break:break-all">${escapeHtml(credentials.password)}</div>
                 </td>
               </tr>
@@ -102,7 +102,7 @@ export function renderPlanAprobadoEmail({
         <tr>
           <td style="padding:8px 28px 0">
             <p style="margin:0;font-size:13px;line-height:1.55;color:#5b6573">
-              Por seguridad, cambiá esta contraseña la primera vez que ingreses.
+              Guardala en un lugar seguro — la vas a usar cada vez que entres al portal.
             </p>
           </td>
         </tr>`
@@ -178,9 +178,9 @@ export function renderPlanAprobadoEmail({
     (credentials
       ? `\nAcceso al portal:\n` +
         `Email: ${credentials.email}\n` +
-        `Contraseña temporal: ${credentials.password}\n` +
+        `Contraseña: ${credentials.password}\n` +
         `Ingresá en: ${credentials.portalUrl}\n\n` +
-        `Por seguridad, cambiá esta contraseña la primera vez que ingreses.\n`
+        `Guardala en un lugar seguro — la vas a usar cada vez que entres al portal.\n`
       : "") +
     `\n${appName} · ¡Donde encontrás más rápido!`;
 

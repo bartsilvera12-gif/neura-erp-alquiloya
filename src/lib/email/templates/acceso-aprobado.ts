@@ -62,7 +62,7 @@ export function renderAccesoAprobadoEmail({
                 </tr>
                 <tr>
                   <td style="padding:0 18px 16px">
-                    <div style="font-size:11px;font-weight:700;color:#5b6573;letter-spacing:.05em;text-transform:uppercase">Contraseña temporal</div>
+                    <div style="font-size:11px;font-weight:700;color:#5b6573;letter-spacing:.05em;text-transform:uppercase">Contraseña</div>
                     <div style="font-family:'Courier New',monospace;font-size:18px;font-weight:700;margin-top:6px;padding:10px 14px;background:#fff;border:1px solid #d4e6f7;border-radius:8px;color:#0058A5;letter-spacing:.04em;word-break:break-all">${safePassword}</div>
                   </td>
                 </tr>
@@ -80,7 +80,7 @@ export function renderAccesoAprobadoEmail({
           <tr>
             <td style="padding:8px 28px 28px">
               <p style="margin:0;font-size:13px;line-height:1.55;color:#5b6573">
-                Por seguridad, cambiá esta contraseña la primera vez que ingreses. Si no esperabas este correo, ignoralo o respondé para avisarnos.
+                Guardala en un lugar seguro: la vas a usar cada vez que entres al portal. Si no esperabas este correo, ignoralo o respondé para avisarnos.
               </p>
             </td>
           </tr>
@@ -101,9 +101,9 @@ export function renderAccesoAprobadoEmail({
   const text =
     `¡${nombre}, tu acceso a ${appName} fue aprobado!\n\n` +
     `Email: ${email}\n` +
-    `Contraseña temporal: ${password}\n\n` +
+    `Contraseña: ${password}\n\n` +
     `Ingresá en: ${portalUrl}\n\n` +
-    `Por seguridad, cambiá esta contraseña la primera vez que ingreses.\n\n` +
+    `Guardala en un lugar seguro — la vas a usar cada vez que entres al portal.\n\n` +
     `${appName} · ¡Donde encontrás más rápido!`;
 
   return { subject, html, text };
