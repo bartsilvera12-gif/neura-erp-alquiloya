@@ -18,7 +18,7 @@ export default async function PropietarioDetailPage({ params }: Props) {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link
-            href="/dashboard/agentes-inmobiliarios"
+            href="/dashboard/agentes-inmobiliarios/propietarios"
             className="mb-2 inline-flex text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
           >
             ← Volver al listado

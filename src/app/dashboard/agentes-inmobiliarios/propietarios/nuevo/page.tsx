@@ -9,7 +9,7 @@ export default function NuevoPropietarioPage() {
     <div className="px-6 py-6">
       <header className="mb-6">
         <Link
-          href="/dashboard/agentes-inmobiliarios"
+          href="/dashboard/agentes-inmobiliarios/propietarios"
           className="mb-2 inline-flex text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
         >
           ← Volver al listado

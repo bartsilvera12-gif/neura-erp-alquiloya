@@ -86,7 +86,7 @@ export function PropietarioForm({
 
   const cancelHref = mode === "edit" && form.id
     ? `/dashboard/agentes-inmobiliarios/propietarios/${form.id}`
-    : "/dashboard/agentes-inmobiliarios";
+    : "/dashboard/agentes-inmobiliarios/propietarios";
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">

@@ -65,12 +65,6 @@ export default async function PropietariosPage() {
   return (
     <div className="px-6 py-6">
       <header className="mb-6">
-        <Link
-          href="/dashboard/agentes-inmobiliarios"
-          className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#3F8E91]"
-        >
-          ← Agentes inmobiliarios
-        </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Propietarios</h1>
