@@ -67,7 +67,13 @@ function _toggleSaved(id) {
   return next.includes(sid);
 }
 async function _sharePropiedad(property) {
-  const url = window.location.href;
+  // Construye un deep-link con ?prop=<id> al sitio publico, de modo que
+  // al pegar el link el receptor abra la ficha directamente (en lugar
+  // del home — el detalle no esta en la URL real porque el routing es
+  // state-based de React).
+  const propId = property && (property.apiId || property.id);
+  const origin = (typeof window !== "undefined" && window.location && window.location.origin) || "https://alquiloya.com.py";
+  const url = propId ? `${origin}/?prop=${encodeURIComponent(propId)}` : window.location.href;
   const title = (property && property.title) || 'Propiedad en AlquiloYa';
   const text = title + (property && property.address ? ' — ' + property.address : '');
   // Web Share API (mobile y navegadores modernos). Fallback: copiar al portapapeles.
