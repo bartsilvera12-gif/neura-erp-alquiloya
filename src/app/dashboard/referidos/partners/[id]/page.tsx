@@ -5,6 +5,7 @@ import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { CopySlugButton } from "../../_components/CopySlugButton";
 import { PartnerActions } from "./_components/PartnerActions";
+import { EditarReglaButton } from "./_components/EditarReglaButton";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -237,7 +238,7 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
             <Field label="Tipo" value={(partner.tipo ?? "—").replace("_", " ")} />
             <Field label="Activo" value={partner.activo ? "Sí" : "No"} />
             <Field label="Alta" value={partner.created_at?.slice(0, 19)?.replace("T", " ") ?? "—"} />
-            <Field label="Comisión" value={fmtRule(rule)} />
+            <Field label="Comisión" value={<><span>{fmtRule(rule)}</span><EditarReglaButton partnerId={partner.id} currentRule={rule} /></>} />
             <div className="sm:col-span-2">
               <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notas</dt>
               <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
