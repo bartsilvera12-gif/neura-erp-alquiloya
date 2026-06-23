@@ -134,6 +134,7 @@ export type ErpPropiedadPendienteRow = ErpPropiedadListRow & {
   propietario_nombre: string | null;
   propietario_email: string | null;
   propietario_telefono: string | null;
+  aprobada_at: string | null;
   descripcion: string | null;
   precio_formateado?: string | null;
 };
@@ -155,6 +156,7 @@ export async function listErpPropiedadesPendientes(): Promise<ErpPropiedadPendie
         NULL::text AS destacada_hasta, p.destacada AS destacada_efectiva,
         p.visible_web, p.activo,
         p.created_at::text AS created_at,
+        p.aprobada_at::text AS aprobada_at,
         p.agente_id,
         a.nombre AS agente_nombre,
         cover.url AS cover_url,

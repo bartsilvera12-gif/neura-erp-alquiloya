@@ -54,6 +54,7 @@ export async function POST(
         `UPDATE ${t("propiedades")} SET
             activo = true,
             visible_web = true,
+            aprobada_at = now(),
             estado = CASE
               WHEN estado IS NULL OR estado IN ('inactiva','rechazada','pausada') THEN 'disponible'
               ELSE estado

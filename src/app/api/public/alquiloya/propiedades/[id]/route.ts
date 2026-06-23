@@ -302,6 +302,29 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       }
     }
 
+    // ─── Re-moderacion automatica ─────────────────────────────────────
+    // Si el dueno edita cualquier campo de CONTENIDO (titulo, fotos,
+    // precio, etc.) la propiedad sale de publicacion y vuelve a la cola
+    // del admin. Las propiedades ya aprobadas tienen aprobada_at != null.
+    const tieneContentEdit = Object.keys(body ?? {}).some(
+      (k) => k !== "estado" && k !== "activo" && k !== "visible_web"
+    );
+    if (tieneContentEdit) {
+      // Quitamos pushes previos a estado/activo/visible_web y forzamos pendiente.
+      for (let i = sets.length - 1; i >= 0; i--) {
+        const m = sets[i].match(/^([a-z_]+) = /);
+        if (m && (m[1] === "estado" || m[1] === "activo" || m[1] === "visible_web")) {
+          sets.splice(i, 1);
+          vals.splice(i, 1);
+        }
+      }
+      // Re-numeramos placeholders $1, $2, ... tras los splice.
+      sets.forEach((_, i) => { sets[i] = sets[i].replace(/\$\d+/, `$${i + 1}`); });
+      push("estado", "inactiva");
+      push("activo", false);
+      push("visible_web", false);
+    }
+
     // Si el PATCH toca estado, aseguramos que el CHECK constraint acepte el
     // nuevo valor antes de intentar el UPDATE. Antes el panel del dueño
     // veia "no se pudo cambiar el estado" porque la DB rechazaba "activa".

@@ -89,6 +89,11 @@ export default function PropiedadesPendientesClient({
               <span className="absolute left-3 top-3 inline-flex items-center rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow">
                 Pendiente
               </span>
+              {p.aprobada_at ? (
+                <span className="absolute right-3 top-3 inline-flex items-center rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow">
+                  Modificada
+                </span>
+              ) : null}
             </div>
             <div className="space-y-3 p-4">
               <div>
