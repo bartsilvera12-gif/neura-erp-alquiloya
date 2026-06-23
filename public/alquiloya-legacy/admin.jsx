@@ -715,18 +715,19 @@ function AdminAgentPage({ route, onNav }) {
               <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16 }}>Mis propiedades</div>
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>{propsLoading ? 'Cargando…' : `${propsForRender.length} publicada${propsForRender.length !== 1 ? 's' : ''} · ${destacadasCount} destacada${destacadasCount !== 1 ? 's' : ''}`}</div>
             </div>
-            <div style={{ display: 'inline-flex', gap: 4 }}>
+            <div style={{ display: "inline-flex", gap: 2, background: "#f1f5f9", padding: 3, borderRadius: 10, border: "1px solid var(--line-2)" }}>
               {[
                 { id: 'all',    label: 'Todas' },
                 { id: 'active', label: 'Activas' },
                 { id: 'paused', label: 'Pausadas' },
               ].map(it => (
                 <button key={it.id} onClick={() => setPropFilter(it.id)} style={{
-                  padding: '6px 12px', borderRadius: 8, border: 'none',
-                  background: propFilter === it.id ? 'var(--ink)' : 'transparent',
-                  color: propFilter === it.id ? '#fff' : 'var(--ink-3)',
-                  fontWeight: 600, cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit',
-                  transition: 'all .12s',
+                  padding: "6px 14px", borderRadius: 7, border: "none",
+                  background: propFilter === it.id ? "#fff" : "transparent",
+                  color: propFilter === it.id ? "var(--ink)" : "var(--ink-3)",
+                  fontWeight: 600, cursor: "pointer", fontSize: 12, fontFamily: "inherit",
+                  boxShadow: propFilter === it.id ? "0 1px 3px rgba(15,23,42,0.12)" : "none",
+                  transition: "all .15s ease",
                 }}>{it.label}</button>
               ))}
             </div>
@@ -897,10 +898,14 @@ function AdminAgentPage({ route, onNav }) {
                         }}
                         title="Cambiar estado"
                         style={{
-                          height: 28, borderRadius: 8, padding: '0 8px',
+                          height: 28, borderRadius: 8, padding: '0 24px 0 8px',
                           border: '1px solid var(--line)', background: '#fff',
                           color: 'var(--ink-2)', fontSize: 12, fontWeight: 600,
                           fontFamily: 'inherit', cursor: 'pointer',
+                          appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                          backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27 fill=%27none%27><path d=%27M1 1l4 4 4-4%27 stroke=%27%23475569%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/></svg>")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
                         }}
                         className="ay-state-select">
                         <option value="activa">Activa</option>
