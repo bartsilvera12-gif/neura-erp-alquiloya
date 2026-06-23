@@ -8,7 +8,7 @@
 // en hosts donde la raíz no se reescribe al sitio público.
 function qrPublicUrl(p) {
   const origin = (typeof window !== 'undefined' && window.location && window.location.origin) || 'https://alquiloya.com.py';
-  return origin + '/publico?prop=' + encodeURIComponent(p.id || p.apiId || '');
+  return origin + '/publico?prop=' + encodeURIComponent(p.apiId || p.id || '');
 }
 // QR REAL y escaneable via api.qrserver.com (sin API key). Reemplaza al QRMock
 // decorativo, que no se podia escanear.
