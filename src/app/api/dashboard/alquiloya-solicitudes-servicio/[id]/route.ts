@@ -66,6 +66,9 @@ type Sol = {
   plan_tier: string | null;
   pack_qty: number | null;
   estado: "pendiente" | "aprobada" | "rechazada";
+  referral_link_id: string | null;
+  referral_partner_id: string | null;
+  monto: number | null;| "aprobada" | "rechazada";
 };
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -258,7 +261,10 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const { rows: srows } = await queryWithRetry<Sol>(
       pool,
       `SELECT id, kind, nombre, email, telefono, propiedad_id, propietario_id, agente_id,
-              plan_tier, pack_qty, estado
+              plan_tier, pack_qty, estado,
+              referral_link_id::text AS referral_link_id,
+              referral_partner_id::text AS referral_partner_id,
+              monto::float8 AS monto
          FROM ${t("solicitudes_servicio")}
         WHERE empresa_id=$1::uuid AND id=$2::uuid LIMIT 1`,
       [ALQUILOYA_EMPRESA_ID, id]
@@ -418,6 +424,40 @@ export async function PATCH(request: Request, ctx: Ctx) {
           user.id,
         ]
       );
+      // Atribucion de referido: si la solicitud trae referral_link_id
+      // (capturado al recibir el POST publico desde la cookie aly_ref),
+      // registramos la conversion. Idempotente por (empresa, target_tipo,
+      // target_id) — si el admin re-aprueba una solicitud rechazada y reabierta
+      // (caso raro), no se duplica.
+      if (sol.referral_link_id && sol.referral_partner_id && resultadoId) {
+        const targetTipo = sol.kind === "cambio_plan" ? "plan_publicacion" : "otro";
+        try {
+          await client.query(
+            `INSERT INTO "alquiloya"."referral_conversions"
+               (empresa_id, link_id, partner_id, target_tipo, target_id,
+                plan_publicacion_id, monto_base, moneda, converted_at)
+             VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
+                     NULLIF($6, '')::uuid, $7, $8, now())
+             ON CONFLICT (empresa_id, target_tipo, target_id) DO NOTHING`,
+            [
+              ALQUILOYA_EMPRESA_ID,
+              sol.referral_link_id,
+              sol.referral_partner_id,
+              targetTipo,
+              resultadoId,
+              "",
+              sol.monto,
+              "PYG",
+            ]
+          );
+        } catch (e) {
+          console.warn(
+            "[solicitudes-servicio PATCH] insert referral_conversions:",
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
+
       await client.query("COMMIT");
     } catch (e) {
       await client.query("ROLLBACK").catch(() => {});

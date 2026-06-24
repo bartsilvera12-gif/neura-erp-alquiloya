@@ -213,20 +213,56 @@ export async function POST(request: Request) {
       solicitudesServicioReady = true;
     }
 
+    // Bootstrap idempotente de columnas referral_link_id / referral_partner_id.
+    try {
+      await queryWithRetry(pool, `ALTER TABLE "alquiloya"."solicitudes_servicio" ADD COLUMN IF NOT EXISTS referral_link_id uuid`, []);
+      await queryWithRetry(pool, `ALTER TABLE "alquiloya"."solicitudes_servicio" ADD COLUMN IF NOT EXISTS referral_partner_id uuid`, []);
+    } catch (e) {
+      console.warn("[solicitudes-servicio] bootstrap referral cols:", e instanceof Error ? e.message : e);
+    }
+
+    // Atribucion de referido: si el visitante tiene cookie aly_ref
+    // (seteada por /r/{slug}), buscamos el ultimo click suyo para sacar
+    // link_id + partner_id y dejarlos en la solicitud para que al
+    // aprobarla se registre la conversion.
+    let referralLinkId: string | null = null;
+    let referralPartnerId: string | null = null;
+    try {
+      const cookieHdr = request.headers.get("cookie") ?? "";
+      const aly = /(?:^|;\s*)aly_ref=([A-Za-z0-9_-]{16,64})/.exec(cookieHdr);
+      if (aly?.[1]) {
+        const { rows: clk } = await queryWithRetry<{ link_id: string; partner_id: string }>(
+          pool,
+          `SELECT c.link_id, l.partner_id
+             FROM "alquiloya"."referral_clicks" c
+             JOIN "alquiloya"."referral_links" l ON l.id = c.link_id
+            WHERE c.empresa_id = $1::uuid AND c.visitor_cookie = $2
+            ORDER BY c.created_at DESC LIMIT 1`,
+          [ALQUILOYA_EMPRESA_ID, aly[1]]
+        );
+        if (clk[0]) { referralLinkId = clk[0].link_id; referralPartnerId = clk[0].partner_id; }
+      }
+    } catch (e) {
+      console.warn("[solicitudes-servicio] resolver aly_ref:", e instanceof Error ? e.message : e);
+    }
+
     const { rows } = await queryWithRetry<{ id: string }>(
       pool,
       `INSERT INTO "alquiloya"."solicitudes_servicio"
          (empresa_id, kind, nombre, email, telefono,
           propiedad_id, propietario_id, agente_id,
-          plan_tier, pack_id, pack_qty, monto, mensaje, estado)
+          plan_tier, pack_id, pack_qty, monto, mensaje, estado,
+          referral_link_id, referral_partner_id)
        VALUES ($1::uuid, $2, $3, $4, $5,
                $6, $7, $8,
-               $9, $10, $11, $12, $13, 'pendiente')
+               $9, $10, $11, $12, $13, 'pendiente',
+               $14::uuid, $15::uuid)
        RETURNING id`,
       [
         ALQUILOYA_EMPRESA_ID, kind, nombre, email, telefono,
         propiedadId, resolvedPropietarioId, resolvedAgenteId,
         planTier, packId, packQty, monto, mensaje,
+        referralLinkId, referralPartnerId,
       ]
     );
     return NextResponse.json(successResponse({ id: rows[0].id }));
