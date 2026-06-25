@@ -499,8 +499,19 @@ export async function PATCH(request: Request, ctx: Ctx) {
     }
     if (shouldNotify && sol.email) {
       try {
-        const origin = new URL(request.url).origin;
-        const portalUrl = `${origin}/portal-agentes/login`;
+        const fwdProto =
+          request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+          new URL(request.url).protocol.replace(":", "") ||
+          "https";
+        const fwdHost =
+          request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+          request.headers.get("host") ||
+          new URL(request.url).host;
+        const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(fwdHost);
+        const publicHost = isLocal
+          ? (process.env.NEURA_PUBLIC_PORTAL_URL?.trim() || "https://alquiloya.com.py")
+          : `${fwdProto}://${fwdHost}`;
+        const portalUrl = `${publicHost.replace(/\/+$/, "")}/portal-agentes/login`;
         const tpl = renderPlanAprobadoEmail({
           nombre: sol.nombre,
           planNombre: appliedPlan?.nombre ?? null,
