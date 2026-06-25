@@ -57,14 +57,18 @@ function PlansPage({ onNav }) {
     return () => { cancelled = true; };
   }, []);
   const filtered = plansData.filter(p => {
-    // Preferimos p.target (campo semantico en planes_publicacion: 'owner'
-    // o 'agent'). Si el plan no lo tiene seteado, caemos al heuristico
-    // tier.includes() — asi un plan editado y guardado sin target sigue
-    // apareciendo si su tier es 'basico-agent', 'gratuito-owner', etc.
+    // Estrategia robusta: si p.target o el tier indican explicitamente
+    // que el plan es del OTRO audience, lo excluimos. Si no hay pista,
+    // mostramos en AMBAS pestanias (mejor que ocultar todo cuando el
+    // admin guarda planes sin target/tier convencional).
     const t = String(p.target || '').toLowerCase();
     const tier = String(p.tier || '').toLowerCase();
-    if (audience === 'owner') return t === 'owner' || t === 'propietario' || (t === '' && tier.includes('owner'));
-    return t === 'agent' || t === 'agente' || (t === '' && tier.includes('agent'));
+    const isOwnerPlan =
+      t === 'owner' || t === 'propietario' || tier.includes('owner');
+    const isAgentPlan =
+      t === 'agent' || t === 'agente' || tier.includes('agent');
+    if (audience === 'owner') return isOwnerPlan || !isAgentPlan;
+    return isAgentPlan || !isOwnerPlan;
   });
   return (
     <div className="fade-in container" style={{ padding: '48px 32px' }}>
