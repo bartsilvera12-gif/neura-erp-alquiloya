@@ -101,7 +101,11 @@ export type ErpPropiedadListRow = {
   cover_url: string | null;
   fotos_count: number;
   caracteristicas_count: number;
+  propietario_nombre: string | null;
+  plan_nombre: string | null;
+  plan_tier: string | null;
 };
+// extended below to inject plan fields without breaking existing call sites
 
 export type ErpPropiedadDetail = ErpPropiedadListRow & {
   descripcion: string | null;
@@ -182,13 +186,19 @@ export async function listErpPropiedadesPendientes(): Promise<ErpPropiedadPendie
         cover.url AS cover_url,
         COALESCE(fcnt.n, 0)::int AS fotos_count,
         COALESCE(ccnt.n, 0)::int AS caracteristicas_count,
-        p.propietario_id,
         pr.nombre AS propietario_nombre,
+        COALESCE(pp_pr.nombre, pp_ag.nombre) AS plan_nombre,
+        COALESCE(pp_pr.tier, pp_ag.tier) AS plan_tier,
+        p.propietario_id,
         pr.email AS propietario_email,
         pr.telefono AS propietario_telefono
       FROM ${q("propiedades")} p
       LEFT JOIN ${q("agentes")} a
         ON a.id = p.agente_id AND a.empresa_id = p.empresa_id
+      LEFT JOIN ${q("planes_publicacion")} pp_pr
+        ON pp_pr.id = (SELECT plan_publicacion_id FROM ${q("propietarios")} WHERE id = p.propietario_id AND empresa_id = p.empresa_id)
+      LEFT JOIN ${q("planes_publicacion")} pp_ag
+        ON pp_ag.id = (SELECT plan_publicacion_id FROM ${q("agentes")} WHERE id = p.agente_id AND empresa_id = p.empresa_id)
       LEFT JOIN ${q("propietarios")} pr
         ON pr.id = p.propietario_id AND pr.empresa_id = p.empresa_id
       LEFT JOIN LATERAL (
@@ -271,10 +281,17 @@ export async function listErpPropiedades(): Promise<ErpPropiedadListRow[]> {
         a.nombre AS agente_nombre,
         cover.url AS cover_url,
         COALESCE(fcnt.n, 0)::int AS fotos_count,
-        COALESCE(ccnt.n, 0)::int AS caracteristicas_count
+        COALESCE(ccnt.n, 0)::int AS caracteristicas_count,
+        pr.nombre AS propietario_nombre,
+        COALESCE(pp_pr.nombre, pp_ag.nombre) AS plan_nombre,
+        COALESCE(pp_pr.tier, pp_ag.tier) AS plan_tier
       FROM ${q("propiedades")} p
       LEFT JOIN ${q("agentes")} a
         ON a.id = p.agente_id AND a.empresa_id = p.empresa_id
+      LEFT JOIN ${q("planes_publicacion")} pp_pr
+        ON pp_pr.id = (SELECT plan_publicacion_id FROM ${q("propietarios")} WHERE id = p.propietario_id AND empresa_id = p.empresa_id)
+      LEFT JOIN ${q("planes_publicacion")} pp_ag
+        ON pp_ag.id = (SELECT plan_publicacion_id FROM ${q("agentes")} WHERE id = p.agente_id AND empresa_id = p.empresa_id)
       LEFT JOIN ${q("propietarios")} pr
         ON pr.id = p.propietario_id AND pr.empresa_id = p.empresa_id
       LEFT JOIN LATERAL (
@@ -352,6 +369,9 @@ export async function getErpPropiedad(id: string): Promise<ErpPropiedadDetail | 
         cover.url AS cover_url,
         COALESCE(fcnt.n, 0)::int AS fotos_count,
         COALESCE(ccnt.n, 0)::int AS caracteristicas_count,
+        pr.nombre AS propietario_nombre,
+        COALESCE(pp_pr.nombre, pp_ag.nombre) AS plan_nombre,
+        COALESCE(pp_pr.tier, pp_ag.tier) AS plan_tier,
         CASE WHEN a.id IS NULL THEN NULL ELSE json_build_object(
           'id', a.id, 'nombre', a.nombre, 'email', a.email,
           'telefono', a.telefono, 'whatsapp', a.whatsapp,
@@ -385,6 +405,10 @@ export async function getErpPropiedad(id: string): Promise<ErpPropiedadDetail | 
       FROM ${q("propiedades")} p
       LEFT JOIN ${q("agentes")} a
         ON a.id = p.agente_id AND a.empresa_id = p.empresa_id
+      LEFT JOIN ${q("planes_publicacion")} pp_pr
+        ON pp_pr.id = (SELECT plan_publicacion_id FROM ${q("propietarios")} WHERE id = p.propietario_id AND empresa_id = p.empresa_id)
+      LEFT JOIN ${q("planes_publicacion")} pp_ag
+        ON pp_ag.id = (SELECT plan_publicacion_id FROM ${q("agentes")} WHERE id = p.agente_id AND empresa_id = p.empresa_id)
       LEFT JOIN ${q("propietarios")} pr
         ON pr.id = p.propietario_id AND pr.empresa_id = p.empresa_id
       LEFT JOIN LATERAL (

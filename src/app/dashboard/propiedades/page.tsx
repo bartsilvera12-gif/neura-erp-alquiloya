@@ -108,6 +108,7 @@ export default async function PropiedadesPage() {
                     <div className="mt-1 flex flex-wrap gap-1 md:hidden">
                       {p.tipo ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{p.tipo}</span> : null}
                       {p.estado ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{p.estado}</span> : null}
+                      {p.plan_nombre ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Plan: {p.plan_nombre}</span> : <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500 ring-1 ring-slate-200">Sin plan</span>}
                     </div>
                   </td>
                   <td className="hidden px-3 py-2 text-slate-700 md:table-cell">{p.tipo ?? "—"}</td>

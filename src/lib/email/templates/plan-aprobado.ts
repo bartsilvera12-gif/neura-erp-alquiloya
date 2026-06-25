@@ -16,6 +16,7 @@ export function renderPlanAprobadoEmail({
   vencimientoTexto,
   impulsosCantidad,
   credentials,
+  portalUrl,
   appName = "AlquiloYa",
 }: {
   nombre: string;
@@ -24,6 +25,7 @@ export function renderPlanAprobadoEmail({
   vencimientoTexto?: string | null;
   impulsosCantidad?: number | null;
   credentials?: { email: string; password: string; portalUrl: string };
+  portalUrl?: string;
   appName?: string;
 }): { subject: string; html: string; text: string } {
   const safeNombre = escapeHtml(nombre || "Hola");
@@ -108,6 +110,32 @@ export function renderPlanAprobadoEmail({
         </tr>`
     : "";
 
+  // CTA cuando no hay credenciales nuevas (propietario pre-existente o cuenta
+  // ya creada): boton de login + link a "olvidaste tu contrasena" por las
+  // dudas. Asi el solicitante igual sabe a donde ir.
+  const accessBlock = !credentials && portalUrl
+    ? `
+        <tr>
+          <td style="padding:0 28px 8px">
+            <div style="margin-top:18px;font-size:14px;font-weight:700;color:#0b1622">Ya podés publicar tu propiedad</div>
+            <p style="margin:4px 0 12px;font-size:13.5px;color:#5b6573">Ingresá al portal con la cuenta que ya tenés y cargá tu inmueble en minutos.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 28px 4px" align="center">
+            <a href="${escapeAttr(portalUrl)}"
+               style="display:inline-block;background:#0058A5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:700;font-size:15px;letter-spacing:.01em">
+              Ingresar al portal
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 28px 0" align="center">
+            <a href="${escapeAttr(portalUrl)}" style="font-size:12.5px;color:#5b6573;text-decoration:underline">¿No recordás tu contraseña? Recuperala desde el portal</a>
+          </td>
+        </tr>`
+    : "";
+
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -150,6 +178,7 @@ export function renderPlanAprobadoEmail({
               : ""
           }
           ${credentialsBlock}
+          ${accessBlock}
           <tr>
             <td style="padding:24px 28px 28px">
               <p style="margin:0;font-size:13px;line-height:1.55;color:#5b6573">
@@ -181,6 +210,11 @@ export function renderPlanAprobadoEmail({
         `Contraseña: ${credentials.password}\n` +
         `Ingresá en: ${credentials.portalUrl}\n\n` +
         `Guardala en un lugar seguro — la vas a usar cada vez que entres al portal.\n`
+      : "") +
+    (!credentials && portalUrl
+      ? `
+Ingresá al portal y publicá tu propiedad: ${portalUrl}
+`
       : "") +
     `\n${appName} · ¡Donde encontrás más rápido!`;
 

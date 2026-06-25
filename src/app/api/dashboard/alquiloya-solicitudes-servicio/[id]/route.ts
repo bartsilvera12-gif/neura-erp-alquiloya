@@ -306,7 +306,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     try {
       await client.query("BEGIN");
 
-      if (!effectivePropietarioId && !overrideAgente && crearPropietario) {
+      if (!effectivePropietarioId && !overrideAgente && (crearPropietario || (sol.kind === "cambio_plan" && sol.email))) {
         const r = await resolveOrCreatePropietario(client, sol, true);
         if (r) {
           effectivePropietarioId = r.id;
@@ -477,7 +477,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const shouldNotify =
       !!sol.email && (propietarioWasJustCreated || sol.kind !== "verificacion");
 
-    if (effectivePropietarioId && propietarioWasJustCreated && sol.email) {
+    if (effectivePropietarioId && sol.email) {
       try {
         const acc = await provisionPortalAccountForPropietario({
           pool,
@@ -507,6 +507,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
           planTier: appliedPlan?.tier ?? null,
           vencimientoTexto: appliedPlan?.vencimientoTexto ?? null,
           impulsosCantidad: appliedImpulsos,
+          portalUrl,
           credentials: credentialsCreated
             ? { ...credentialsCreated, portalUrl }
             : undefined,
