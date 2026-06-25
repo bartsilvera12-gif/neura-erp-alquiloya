@@ -299,7 +299,7 @@ function PlanCard({ plan, onPick }) {
       )}
       <div className="row gap-8">
         <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.08em', color: 'var(--ink-3)' }}>
-          PARA {plan.target.toUpperCase()}
+          PARA {String(plan.target || (String(plan.tier || "").includes("owner") ? "Dueño directo" : String(plan.tier || "").includes("agent") ? "Agente" : "Publicador")).toUpperCase()}
         </span>
       </div>
       <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 26, marginTop: 6 }}>{plan.name}</div>
