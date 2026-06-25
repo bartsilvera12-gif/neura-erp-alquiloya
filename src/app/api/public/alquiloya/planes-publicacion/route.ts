@@ -5,7 +5,8 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 // Cache 60s — los planes cambian con baja frecuencia, no necesitan tiempo real.
-export const revalidate = 60;
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
 
 const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 
