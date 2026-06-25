@@ -38,7 +38,7 @@ function PlansPage({ onNav }) {
           highlighted: !!p.highlighted,
           freeBoosts: p.free_boosts != null ? Number(p.free_boosts) : undefined,
         }));
-        setPlansData(mapped); console.log("[plans] API devolvio:", arr); console.log("[plans] mapeado:", mapped);
+        setPlansData(mapped);
       })
       .catch(() => { /* fallback PLANS ya cargado */ });
     // Detectar agente logueado. Si /api/agente/me devuelve un agente real,
@@ -56,19 +56,22 @@ function PlansPage({ onNav }) {
       .catch(() => { /* anonimo o propietario, dejar el toggle */ });
     return () => { cancelled = true; };
   }, []);
-  const filtered = plansData.filter(p => { if (typeof window !== "undefined") console.log("[plans] filter check:", { tier: p.tier, target: p.target, name: p.name, audience });
-    // Estrategia robusta: si p.target o el tier indican explicitamente
-    // que el plan es del OTRO audience, lo excluimos. Si no hay pista,
-    // mostramos en AMBAS pestanias (mejor que ocultar todo cuando el
-    // admin guarda planes sin target/tier convencional).
-    const t = String(p.target || '').toLowerCase();
+  const filtered = plansData.filter(p => {
+    // Matches contra los textos reales que usa el ERP en la columna target:
+    //   - Owner: 'Dueño Directo', 'Propietario', 'owner', 'propietario'
+    //   - Agent: 'Agente Independiente', 'Inmobiliaria / Top Pro', 'agent', etc
+    // Si target esta vacio, caemos a tier.includes().
+    const t = String(p.target || '').toLowerCase().trim();
     const tier = String(p.tier || '').toLowerCase();
     const isOwnerPlan =
-      t === 'owner' || t === 'propietario' || tier.includes('owner');
+      t.includes('dueño') || t.includes('propietario') ||
+      t.includes('owner') || (t === '' && tier.includes('owner'));
     const isAgentPlan =
-      t === 'agent' || t === 'agente' || tier.includes('agent');
-    if (audience === 'owner') return isOwnerPlan || !isAgentPlan;
-    return isAgentPlan || !isOwnerPlan;
+      t.includes('agente') || t.includes('inmobiliaria') ||
+      t.includes('top pro') || t.includes('agent') ||
+      (t === '' && tier.includes('agent'));
+    if (audience === 'owner') return isOwnerPlan;
+    return isAgentPlan;
   });
   return (
     <div className="fade-in container" style={{ padding: '48px 32px' }}>
