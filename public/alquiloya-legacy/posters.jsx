@@ -53,47 +53,81 @@ function escapeXml(s) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+// Helper: levanta un asset local del legacy site y lo devuelve como data:URL
+// para embebirlo en el SVG (sino se rompe el conversion a PNG por CORS).
+async function assetAsDataUrl(path) {
+  try {
+    const res = await fetch(path);
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
-// Arma el cartel completo como SVG con el QR ya embebido como data URL. Mismo
-// layout visual que printPosters (header azul + banner amarillo "SE ALQUILA"
-// + QR + codigo/direccion + footer azul). Es independiente del DOM, asi se
-// usa tanto para descargar PNG como para la vista previa.
+// Arma el cartel completo como SVG con el QR + logo ya embebidos como data URL.
+// Layout matchea el PDF de referencia "logo de para qr.pdf":
+//   - Header azul angosto con logo AlquiloYA arriba a la izquierda
+//   - Banner amarillo grande con "SE ALQUILA" + subtitulo
+//   - Area blanca con el QR centrado vertical/horizontal + codigo + direccion
+//   - Footer azul angosto con "ALQUILOYA.COM.PY • ¡DONDE ENCONTRÁS MÁS RÁPIDO!"
 function buildPosterSvg(p, qrDataUrl, opts = {}) {
   const W = opts.width || 720;
-  const H = opts.height || 980;
+  const H = opts.height || 1020;
   const codigo = escapeXml(p.codigo || '');
   const addr = escapeXml(p.address || '');
+  const logoDataUrl = opts.logoDataUrl || null;
+  // Bandas: header 13%, amarillo 19%, footer 7%
+  const headerH = 130;
+  const bannerY = headerH;
+  const bannerH = 195;
+  const bodyY = bannerY + bannerH;
+  const footerH = 70;
+  const footerY = H - footerH;
+  const bodyH = footerY - bodyY;
+  // QR cuadrado, ocupa ~50% del ancho, centrado horizontal y vertical
+  // dentro del area blanca.
+  const qrSize = Math.min(420, Math.floor(W * 0.58));
+  const qrX = (W - qrSize) / 2;
+  const qrY = bodyY + Math.floor((bodyH - qrSize) / 2) - 50;
+  // Texto codigo + direccion debajo del QR
+  const codeY = qrY + qrSize + 38;
+  const addrY = codeY + 32;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Arial, Helvetica, sans-serif">
   <rect width="${W}" height="${H}" fill="#ffffff"/>
-  <!-- Header azul -->
-  <rect x="0" y="0" width="${W}" height="78" fill="#0058A5"/>
-  <text x="32" y="50" font-size="30" font-weight="900" fill="#ffffff" letter-spacing="2">ALQUILOYA</text>
+  <!-- Header azul con logo -->
+  <rect x="0" y="0" width="${W}" height="${headerH}" fill="#0058A5"/>
+  ${logoDataUrl
+    ? `<image href="${logoDataUrl}" x="34" y="22" height="${headerH - 44}" preserveAspectRatio="xMinYMid meet"/>`
+    : `<text x="36" y="${headerH / 2 + 12}" font-size="38" font-weight="900" fill="#ffffff" letter-spacing="2">Alquilo<tspan fill="#F9B000">YA</tspan></text>`}
   <!-- Banner amarillo -->
-  <rect x="0" y="78" width="${W}" height="170" fill="#F9B000"/>
-  <text x="${W / 2}" y="170" font-size="68" font-weight="900" font-style="italic" fill="#0b1622" text-anchor="middle">SE ALQUILA</text>
-  <text x="${W / 2}" y="210" font-size="16" font-weight="700" font-style="italic" fill="#0b1622" text-anchor="middle" letter-spacing="2">ESCANEÁ Y MIRÁ FOTOS, PRECIO Y DETALLES</text>
-  <!-- QR centrado -->
-  <rect x="${(W - 400) / 2}" y="290" width="400" height="400" fill="#0b1622" rx="10"/>
-  <image href="${qrDataUrl}" x="${(W - 380) / 2}" y="300" width="380" height="380"/>
+  <rect x="0" y="${bannerY}" width="${W}" height="${bannerH}" fill="#F9B000"/>
+  <text x="${W / 2}" y="${bannerY + 110}" font-size="84" font-weight="900" font-style="italic" fill="#0b1622" text-anchor="middle" letter-spacing="2">SE ALQUILA</text>
+  <text x="${W / 2}" y="${bannerY + 158}" font-size="20" font-weight="700" font-style="italic" fill="#0b1622" text-anchor="middle" letter-spacing="3">ESCANEÁ Y MIRÁ FOTOS, PRECIO Y DETALLES</text>
+  <!-- QR centrado en area blanca -->
+  <image href="${qrDataUrl}" x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}"/>
   <!-- Codigo + direccion -->
-  <text x="${W / 2}" y="740" font-size="20" font-family="monospace" fill="#5b6573" text-anchor="middle">${codigo}</text>
-  <text x="${W / 2}" y="775" font-size="22" font-weight="700" fill="#2a3543" text-anchor="middle">${addr}</text>
+  <text x="${W / 2}" y="${codeY}" font-size="20" font-family="monospace" fill="#5b6573" text-anchor="middle">${codigo}</text>
+  <text x="${W / 2}" y="${addrY}" font-size="24" font-weight="700" fill="#2a3543" text-anchor="middle">${addr}</text>
   <!-- Footer azul -->
-  <rect x="0" y="${H - 70}" width="${W}" height="70" fill="#0058A5"/>
-  <text x="${W / 2}" y="${H - 27}" font-size="18" font-weight="800" font-style="italic" fill="#ffffff" text-anchor="middle">ALQUILOYA.COM.PY · ¡DONDE ENCONTRÁS MÁS RÁPIDO!</text>
+  <rect x="0" y="${footerY}" width="${W}" height="${footerH}" fill="#0058A5"/>
+  <text x="${W / 2}" y="${footerY + 44}" font-size="20" font-weight="800" font-style="italic" fill="#ffffff" text-anchor="middle" letter-spacing="2">ALQUILOYA.COM.PY • ¡DONDE ENCONTRÁS MÁS RÁPIDO!</text>
 </svg>`;
 }
-
-// Descarga el cartel COMPLETO (no solo el QR) como PNG. Convierte el SVG a
-// PNG via <canvas> para que el cliente reciba un archivo listo para imprimir
 // o pegar en una publicacion.
 async function downloadPoster(p) {
   try {
     const qrDataUrl = await qrAsDataUrl(p, 600);
-    const svg = buildPosterSvg(p, qrDataUrl);
+    const logoDataUrl = await assetAsDataUrl("/alquiloya-legacy/assets/logo.png");
     const W = 720;
-    const H = 980;
+    const H = 1020;
+    const svg = buildPosterSvg(p, qrDataUrl, { width: W, height: H, logoDataUrl });
     const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
     const svgUrl = URL.createObjectURL(svgBlob);
     await new Promise((resolve, reject) => {
@@ -170,13 +204,13 @@ function printPosters(list) {
       .cartel{width:100%;max-width:560px;margin:0 auto 24px;border:1px solid #e7ebf0;border-radius:12px;overflow:hidden;page-break-after:always}
       .hd{background:#0058A5;color:#fff;font-weight:900;letter-spacing:.04em;padding:16px 22px;font-size:20px}
       .yellow{background:#F9B000;text-align:center;padding:22px 16px}
-      .big{font-weight:900;font-style:italic;font-size:46px;color:#0b1622;line-height:1}
+      .big{font-weight:900;font-style:italic;font-size:56px;color:#0b1622;line-height:1;letter-spacing:1px}
       .sub{font-weight:700;font-style:italic;font-size:12px;color:#0b1622;margin-top:8px;letter-spacing:.04em}
       .body{padding:28px;text-align:center}
-      .qr{width:260px;height:260px;border:4px solid #0b1622;border-radius:8px;padding:8px}
+      .qr{width:300px;height:300px;border-radius:6px}
       .code{font-family:monospace;font-size:14px;font-weight:600;color:#5b6573;margin-top:14px}
       .addr{font-size:15px;font-weight:600;color:#2a3543;margin-top:4px}
-      .ft{background:#0058A5;color:#fff;text-align:center;padding:12px;font-weight:800;font-style:italic;font-size:12px}
+      .ft{background:#0058A5;color:#fff;text-align:center;padding:14px;font-weight:800;font-style:italic;font-size:14px;letter-spacing:1px}
       @media print{.cartel{border:none;page-break-after:always}}
       @page { margin: 12mm }
     </style></head><body>${carteles}</body></html>`;
