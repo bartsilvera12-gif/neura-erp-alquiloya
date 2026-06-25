@@ -38,7 +38,7 @@ function PlansPage({ onNav }) {
           highlighted: !!p.highlighted,
           freeBoosts: p.free_boosts != null ? Number(p.free_boosts) : undefined,
         }));
-        setPlansData(mapped);
+        setPlansData(mapped); console.log("[plans] API devolvio:", arr); console.log("[plans] mapeado:", mapped);
       })
       .catch(() => { /* fallback PLANS ya cargado */ });
     // Detectar agente logueado. Si /api/agente/me devuelve un agente real,
@@ -56,7 +56,7 @@ function PlansPage({ onNav }) {
       .catch(() => { /* anonimo o propietario, dejar el toggle */ });
     return () => { cancelled = true; };
   }, []);
-  const filtered = plansData.filter(p => {
+  const filtered = plansData.filter(p => { if (typeof window !== "undefined") console.log("[plans] filter check:", { tier: p.tier, target: p.target, name: p.name, audience });
     // Estrategia robusta: si p.target o el tier indican explicitamente
     // que el plan es del OTRO audience, lo excluimos. Si no hay pista,
     // mostramos en AMBAS pestanias (mejor que ocultar todo cuando el
