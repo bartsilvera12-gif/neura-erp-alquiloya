@@ -54,47 +54,6 @@ function generateTempPassword(): string {
   );
 }
 
-/**
- * Genera un magic link de Supabase para que el solicitante entre al portal
- * sin tipear contraseña. El link tiene un token de un solo uso que Supabase
- * canjea por una sesion al hacer click. Si falla (por ejemplo la
- * `redirectTo` no esta en la allowlist del proyecto), devuelve null y el
- * caller cae al login normal con email prefilled.
- *
- * IMPORTANTE: la `redirectTo` URL tiene que estar agregada en Supabase
- * Dashboard -> Authentication -> URL Configuration -> Redirect URLs.
- */
-async function generateMagicLinkForEmail(
-  email: string,
-  redirectTo: string
-): Promise<string | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!supabaseUrl || !serviceRole) return null;
-  try {
-    const supabaseAdmin = createClient(supabaseUrl, serviceRole, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-      options: { redirectTo },
-    });
-    if (error) {
-      console.warn("[generateMagicLink] error:", error.message);
-      return null;
-    }
-    const actionLink = (data as { properties?: { action_link?: string } } | null)
-      ?.properties?.action_link;
-    return actionLink ?? null;
-  } catch (e) {
-    console.warn(
-      "[generateMagicLink] excepcion:",
-      e instanceof Error ? e.message : e
-    );
-    return null;
-  }
-}
 
 type Sol = {
   id: string;
@@ -553,13 +512,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         const publicHost = isLocal
           ? (process.env.NEURA_PUBLIC_PORTAL_URL?.trim() || "https://alquiloya.com.py")
           : `${fwdProto}://${fwdHost}`;
-        const loginFallbackUrl = `${publicHost.replace(/\/+$/, "")}/portal-agentes/login?email=${encodeURIComponent(sol.email)}`;
-        // Magic link: si esta disponible (env + redirectTo en allowlist),
-        // entra al usuario directamente al portal sin tipear contrasena.
-        // Si falla, caemos al login con email prefilled.
-        const redirectTo = `${publicHost.replace(/\/+$/, "")}/publico#admin-propietario`;
-        const magicLink = await generateMagicLinkForEmail(sol.email, redirectTo);
-        const portalUrl = magicLink || loginFallbackUrl;
+        const portalUrl = `${publicHost.replace(/\/+$/, "")}/portal-agentes/login?email=${encodeURIComponent(sol.email)}`;
         const tpl = renderPlanAprobadoEmail({
           nombre: sol.nombre,
           planNombre: appliedPlan?.nombre ?? null,
