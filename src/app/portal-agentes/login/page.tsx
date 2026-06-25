@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "@/lib/auth";
 import PasswordInput from "@/components/ui/PasswordInput";
 
@@ -16,6 +16,13 @@ import PasswordInput from "@/components/ui/PasswordInput";
  */
 export default function PortalAgentesLoginPage() {
   const [email, setEmail] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const pref = sp.get("email");
+      if (pref) setEmail(pref);
+    }
+  }, []);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
