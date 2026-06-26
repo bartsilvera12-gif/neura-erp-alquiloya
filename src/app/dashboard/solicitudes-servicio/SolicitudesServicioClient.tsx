@@ -316,7 +316,7 @@ export default function SolicitudesServicioClient({
                     {r.estado === "pendiente" ? (
                       <div className="inline-flex items-center gap-1">
                         <button type="button" disabled={busyId === r.id}
-                          onClick={() => setPending({ kind: "aprobar", row: r, propietarioId: suggestPropietario(r), agenteId: suggestAgente(r), propiedadId: r.propiedad_id ?? "", crearPropietario: false })}
+                          onClick={() => { const pid = suggestPropietario(r); const aid = suggestAgente(r); setPending({ kind: "aprobar", row: r, propietarioId: pid, agenteId: aid, propiedadId: r.propiedad_id ?? "", crearPropietario: !pid && !aid && (!!r.email || !!r.telefono) }); }}
                           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Aprobar</button>
                         <button type="button" disabled={busyId === r.id}
                           onClick={() => setPending({ kind: "rechazar", row: r, motivo: "" })}
@@ -386,7 +386,7 @@ export default function SolicitudesServicioClient({
                   ) : (
                     <>
                       <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-                        No pudimos identificar al {targetLabel} por email/teléfono. Elegilo manualmente o creálo primero.
+                        No pudimos identificar al {targetLabel} entre los registrados. Podés elegir uno del listado o, mejor, dejar tildada la opción de abajo para crear uno nuevo automáticamente con los datos de la solicitud al aprobar.
                       </div>
                       <select value={selectedId}
                         onChange={(e) => updateSelected(e.target.value)}
