@@ -201,7 +201,7 @@ function printPosters(list) {
     <style>
       *{box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif}
       body{padding:0}
-      .cartel{width:100%;max-width:560px;margin:0 auto 24px;border:1px solid #e7ebf0;border-radius:12px;overflow:hidden;page-break-after:always}
+      .cartel{width:100%;max-width:560px;margin:0 auto 24px;border:1px solid #e7ebf0;border-radius:12px;overflow:hidden;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .hd{background:#0058A5;color:#fff;padding:14px 22px;display:flex;align-items:center;min-height:60px}
       .yellow{background:#F9B000;text-align:center;padding:22px 16px}
       .big{font-weight:900;font-style:italic;font-size:56px;color:#0b1622;line-height:1;letter-spacing:1px}
@@ -211,7 +211,7 @@ function printPosters(list) {
       .code{font-family:monospace;font-size:14px;font-weight:600;color:#5b6573;margin-top:14px}
       .addr{font-size:15px;font-weight:600;color:#2a3543;margin-top:4px}
       .ft{background:#0058A5;color:#fff;text-align:center;padding:14px;font-weight:800;font-style:italic;font-size:14px;letter-spacing:1px}
-      @media print{.cartel{border:none;page-break-after:always}}
+      *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}@media print{.cartel{border:none;page-break-after:always}html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}
       @page { margin: 12mm }
     </style></head><body>${carteles}</body></html>`;
   iframe.onload = () => {
