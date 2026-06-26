@@ -124,7 +124,7 @@ function buildPosterSvg(p, qrDataUrl, opts = {}) {
 async function downloadPoster(p) {
   try {
     const qrDataUrl = await qrAsDataUrl(p, 600);
-    const logoDataUrl = await assetAsDataUrl("/alquiloya-legacy/assets/logo.png");
+    const logoDataUrl = await assetAsDataUrl("/alquiloya-legacy/assets/logo-dark.png");
     const W = 720;
     const H = 1020;
     const svg = buildPosterSvg(p, qrDataUrl, { width: W, height: H, logoDataUrl });
@@ -185,7 +185,7 @@ function printPosters(list) {
   };
   const carteles = arr.map(p => `
     <div class="cartel">
-      <div class="hd"><img src="/alquiloya-legacy/assets/logo.png" alt="AlquiloYA" style="height:44px;display:block"/></div>
+      <div class="hd"><img src="/alquiloya-legacy/assets/logo-dark.png" alt="AlquiloYA" style="height:44px;display:block"/></div>
       <div class="yellow"><div class="big">SE ALQUILA</div><div class="sub">ESCANEÁ Y MIRÁ FOTOS, PRECIO Y DETALLES</div></div>
       <div class="body">
         <img src="${qrImgSrc(p, 600)}" alt="QR" class="qr"/>
