@@ -104,7 +104,7 @@ function buildPosterSvg(p, qrDataUrl, opts = {}) {
   <!-- Header azul con logo -->
   <rect x="0" y="0" width="${W}" height="${headerH}" fill="#0058A5"/>
   ${logoDataUrl
-    ? `<image href="${logoDataUrl}" x="34" y="22" height="${headerH - 44}" preserveAspectRatio="xMinYMid meet"/>`
+    ? `<image href="${logoDataUrl}" x="34" y="20" width="260" height="${headerH - 40}" preserveAspectRatio="xMinYMid meet"/>`
     : `<text x="36" y="${headerH / 2 + 12}" font-size="38" font-weight="900" fill="#ffffff" letter-spacing="2">Alquilo<tspan fill="#F9B000">YA</tspan></text>`}
   <!-- Banner amarillo -->
   <rect x="0" y="${bannerY}" width="${W}" height="${bannerH}" fill="#F9B000"/>
@@ -185,7 +185,7 @@ function printPosters(list) {
   };
   const carteles = arr.map(p => `
     <div class="cartel">
-      <div class="hd">ALQUILOYA</div>
+      <div class="hd"><img src="/alquiloya-legacy/assets/logo.png" alt="AlquiloYA" style="height:44px;display:block"/></div>
       <div class="yellow"><div class="big">SE ALQUILA</div><div class="sub">ESCANEÁ Y MIRÁ FOTOS, PRECIO Y DETALLES</div></div>
       <div class="body">
         <img src="${qrImgSrc(p, 600)}" alt="QR" class="qr"/>
@@ -202,7 +202,7 @@ function printPosters(list) {
       *{box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif}
       body{padding:0}
       .cartel{width:100%;max-width:560px;margin:0 auto 24px;border:1px solid #e7ebf0;border-radius:12px;overflow:hidden;page-break-after:always}
-      .hd{background:#0058A5;color:#fff;font-weight:900;letter-spacing:.04em;padding:16px 22px;font-size:20px}
+      .hd{background:#0058A5;color:#fff;padding:14px 22px;display:flex;align-items:center;min-height:60px}
       .yellow{background:#F9B000;text-align:center;padding:22px 16px}
       .big{font-weight:900;font-style:italic;font-size:56px;color:#0b1622;line-height:1;letter-spacing:1px}
       .sub{font-weight:700;font-style:italic;font-size:12px;color:#0b1622;margin-top:8px;letter-spacing:.04em}
