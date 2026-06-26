@@ -84,7 +84,7 @@ function PlansPage({ onNav }) {
           Empezá gratis. Si necesitás más visibilidad, fotos o estadísticas, cambiá de plan cuando quieras.
         </p>
       </div>
-      {!isAgentUser && (
+      {
         <div className="row" style={{ justifyContent: 'center', marginTop: 28 }}>
           <Segment value={audience} onChange={setAudience} items={[
             { id: 'owner', label: 'Dueños directos' },
@@ -99,7 +99,7 @@ function PlansPage({ onNav }) {
       )}
 
       <div className="plans-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 22, marginTop: 40, maxWidth: 960, margin: '40px auto 0' }}>
-        {filtered.map(p => <PlanCard key={p.tier} plan={p} onPick={() => {
+        {filtered.map(p => <PlanCard key={p.tier} plan={p} onPick={) => {
           // Planes de propietario: no requieren cuenta. Mandamos al wizard
           // directo, asi no abren el modal "Solicitar acceso" (que es solo
           // para agentes).
@@ -123,7 +123,7 @@ function PlansPage({ onNav }) {
         <button
           type="button"
           className="btn btn-ghost"
-          onClick={() => setChangeOpen(true)}
+          onClick={) => setChangeOpen(true)}
           style={{ color: 'var(--blue)', fontWeight: 600 }}
         >
           Ya tengo cuenta — quiero cambiar de plan →
@@ -133,20 +133,20 @@ function PlansPage({ onNav }) {
       <CompareTable/>
       {/* PlansFaq quedo como stub vacio (return null). El bloque FAQ vive en
           /help. Removemos el render para no dejar un componente fantasma. */}
-      {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
+      {verifyOpen && <VerificationModal onClose={) => setVerifyOpen(false)}/>}
       {picked && (
         <RequestAccessModal
-          onClose={() => setPicked(null)}
+          onClose={) => setPicked(null)}
           planTier={picked.tier}
           planLabel={picked.name}
         />
       )}
-      {changeOpen && <CambioPlanModal planes={filtered} onClose={() => setChangeOpen(false)}/>}
+      {changeOpen && <CambioPlanModal planes={filtered} onClose={) => setChangeOpen(false)}/>}
       {needsLogin && (
         <NeedsAgentLoginModal
           planLabel={needsLogin.name}
-          onClose={() => setNeedsLogin(null)}
-          onSolicitarAcceso={() => {
+          onClose={) => setNeedsLogin(null)}
+          onSolicitarAcceso={) => {
             // Encadenamos al modal de "Solicitar acceso" con el plan elegido
             // para que el equipo sepa a qué plan quiere acceder.
             const tier = needsLogin.tier;
@@ -172,7 +172,7 @@ function NeedsAgentLoginModal({ planLabel, onClose, onSolicitarAcceso }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 'clamp(8px, 2vw, 16px)', overflowY: 'auto',
     }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{
+      <div onClick={e) => e.stopPropagation()} className="card" style={{
         width: '100%', maxWidth: 460, padding: 0, position: 'relative',
         maxHeight: 'calc(100svh - 16px)', overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
@@ -255,7 +255,7 @@ function BoostPage({ onNav }) {
             Pedí la verificación de tu inmueble: nuestro equipo confirma documentación, ubicación real y fotos. Obtené el badge azul, prioridad en resultados y mayor confianza para los interesados.
           </p>
           <div className="row gap-12" style={{ marginTop: 18 }}>
-            <button className="btn btn-blue" onClick={() => setVerifyOpen(true)}>Solicitar verificación <I.check s={14}/></button>
+            <button className="btn btn-blue" onClick={) => setVerifyOpen(true)}>Solicitar verificación <I.check s={14}/></button>
             <span className="muted xs">Desde Gs. 45.000 por inmueble</span>
           </div>
         </div>
@@ -277,9 +277,9 @@ function BoostPage({ onNav }) {
         </div>
       </div>
 
-      <ImpulseSection onBuy={(pack) => setPackToBuy(pack)}/>
-      {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
-      {packToBuy && <ImpulsoCompraModal pack={packToBuy} onClose={() => setPackToBuy(null)}/>}
+      <ImpulseSection onBuy={pack) => setPackToBuy(pack)}/>
+      {verifyOpen && <VerificationModal onClose={) => setVerifyOpen(false)}/>}
+      {packToBuy && <ImpulsoCompraModal pack={packToBuy} onClose={) => setPackToBuy(null)}/>}
     </div>
   );
 }
@@ -331,7 +331,7 @@ function PlanCard({ plan, onPick }) {
       <button
         className={"btn " + (highlight ? 'btn-primary' : 'btn-blue')}
         style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}
-        onClick={() => onPick && onPick()}
+        onClick={) => onPick && onPick()}
       >
         {plan.cta}
       </button>
@@ -535,7 +535,7 @@ function ImpulseSection({ onBuy }) {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18, color: 'var(--blue)' }}>{formatGs(pack.price)}</div>
-                    <button className="btn btn-blue btn-sm" style={{ marginTop: 4 }} onClick={() => onBuy && onBuy(pack)}>Comprar</button>
+                    <button className="btn btn-blue btn-sm" style={{ marginTop: 4 }} onClick={) => onBuy && onBuy(pack)}>Comprar</button>
                   </div>
                 </div>
               </div>
@@ -633,7 +633,7 @@ function CambioPlanModal({ planes, onClose }) {
 
   return ReactDOM.createPortal(
     <div {..._modalOverlay(onClose, busy)}>
-      <form onSubmit={submit} style={_modalCard} onClick={(e) => e.stopPropagation()}>
+      <form onSubmit={submit} style={_modalCard} onClick={e) => e.stopPropagation()}>
         <div style={_modalHead}>
           <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>Cambiar de plan</h2>
           <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)' }}>Decinos a qué plan querés moverte. Te contactamos para coordinar el pago y aplicar el cambio.</p>
@@ -711,7 +711,7 @@ function ImpulsoCompraModal({ pack, onClose }) {
 
   return ReactDOM.createPortal(
     <div {..._modalOverlay(onClose, busy)}>
-      <form onSubmit={submit} style={_modalCard} onClick={(e) => e.stopPropagation()}>
+      <form onSubmit={submit} style={_modalCard} onClick={e) => e.stopPropagation()}>
         <div style={_modalHead}>
           <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>Comprar impulsos</h2>
           <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--yellow-50)', border: '1px solid var(--yellow)' }}>
@@ -725,7 +725,7 @@ function ImpulsoCompraModal({ pack, onClose }) {
             El pago se coordina por WhatsApp. Una vez confirmado, el equipo activa los impulsos en tu cuenta.
           </div>
           {/* CTA principal: WhatsApp directo */}
-          {(() => {
+          {() => {
             const wa = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595981227400';
             const msg = encodeURIComponent(`Hola AlquiloYa, quiero comprar un pack de ${pack.qty} impulso${pack.qty > 1 ? 's' : ''} por Gs. ${Number(pack.price || 0).toLocaleString('es-PY')}.`);
             const wHref = `https://wa.me/${wa}?text=${msg}`;
