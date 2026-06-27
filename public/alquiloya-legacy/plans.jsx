@@ -172,7 +172,7 @@ function NeedsAgentLoginModal({ planLabel, onClose, onSolicitarAcceso }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 'clamp(8px, 2vw, 16px)', overflowY: 'auto',
     }}>
-      <div onClick={e) => e.stopPropagation()} className="card" style={{
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{
         width: '100%', maxWidth: 460, padding: 0, position: 'relative',
         maxHeight: 'calc(100svh - 16px)', overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
@@ -277,7 +277,7 @@ function BoostPage({ onNav }) {
         </div>
       </div>
 
-      <ImpulseSection onBuy={pack) => setPackToBuy(pack)}/>
+      <ImpulseSection onBuy={(pack) => setPackToBuy(pack)}/>
       {verifyOpen && <VerificationModal onClose={() => setVerifyOpen(false)}/>}
       {packToBuy && <ImpulsoCompraModal pack={packToBuy} onClose={() => setPackToBuy(null)}/>}
     </div>
@@ -633,7 +633,7 @@ function CambioPlanModal({ planes, onClose }) {
 
   return ReactDOM.createPortal(
     <div {..._modalOverlay(onClose, busy)}>
-      <form onSubmit={submit} style={_modalCard} onClick={e) => e.stopPropagation()}>
+      <form onSubmit={submit} style={_modalCard} onClick={(e) => e.stopPropagation()}>
         <div style={_modalHead}>
           <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>Cambiar de plan</h2>
           <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)' }}>Decinos a qué plan querés moverte. Te contactamos para coordinar el pago y aplicar el cambio.</p>
@@ -711,7 +711,7 @@ function ImpulsoCompraModal({ pack, onClose }) {
 
   return ReactDOM.createPortal(
     <div {..._modalOverlay(onClose, busy)}>
-      <form onSubmit={submit} style={_modalCard} onClick={e) => e.stopPropagation()}>
+      <form onSubmit={submit} style={_modalCard} onClick={(e) => e.stopPropagation()}>
         <div style={_modalHead}>
           <h2 style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 20, margin: 0 }}>Comprar impulsos</h2>
           <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--yellow-50)', border: '1px solid var(--yellow)' }}>
