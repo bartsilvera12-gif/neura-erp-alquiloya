@@ -234,7 +234,17 @@ function EditModal({
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Precio</label>
-              <input className={inputCls} type="number" min="0" value={form.precio} onChange={(e) => set("precio", Number(e.target.value) || 0)} />
+              <input
+                className={inputCls}
+                type="number"
+                min="0"
+                value={form.precio === 0 ? "" : form.precio}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set("precio", v === "" ? 0 : Number(v) || 0);
+                }}
+                placeholder="0"
+              />
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Moneda</label>
@@ -254,7 +264,16 @@ function EditModal({
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Orden</label>
-              <input className={inputCls} type="number" value={form.orden} onChange={(e) => set("orden", Number(e.target.value) || 0)} />
+              <input
+                className={inputCls}
+                type="number"
+                value={form.orden === 0 ? "" : form.orden}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set("orden", v === "" ? 0 : Number(v) || 0);
+                }}
+                placeholder="0"
+              />
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Free boosts (opcional)</label>
