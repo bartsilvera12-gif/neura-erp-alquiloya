@@ -725,7 +725,7 @@ function ImpulsoCompraModal({ pack, onClose }) {
             El pago se coordina por WhatsApp. Una vez confirmado, el equipo activa los impulsos en tu cuenta.
           </div>
           {/* CTA principal: WhatsApp directo */}
-          {() => {
+          {(() => {
             const wa = (typeof window !== 'undefined' && window.CONTACTO_ALQUILOYA && window.CONTACTO_ALQUILOYA.whatsapp) || '595981227400';
             const msg = encodeURIComponent(`Hola AlquiloYa, quiero comprar un pack de ${pack.qty} impulso${pack.qty > 1 ? 's' : ''} por Gs. ${Number(pack.price || 0).toLocaleString('es-PY')}.`);
             const wHref = `https://wa.me/${wa}?text=${msg}`;
