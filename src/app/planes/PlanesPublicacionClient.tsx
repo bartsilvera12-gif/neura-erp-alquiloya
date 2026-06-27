@@ -18,6 +18,7 @@ type Plan = {
   highlighted: boolean;
   free_boosts: number | null;
   orden: number;
+  billing_note?: string | null;
   activo?: boolean;
 };
 
@@ -244,15 +245,15 @@ function EditModal({
               <input className={inputCls} value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Tier *</label>
+              <label className={labelCls}>Identificador interno *</label>
               <input className={inputCls} value={form.tier} onChange={(e) => set("tier", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Target</label>
+              <label className={labelCls}>Dirigido a</label>
               <input className={inputCls} value={form.target ?? ""} onChange={(e) => set("target", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Badge</label>
+              <label className={labelCls}>Etiqueta destacada</label>
               <input className={inputCls} value={form.badge ?? ""} onChange={(e) => set("badge", e.target.value)} placeholder="opcional" />
             </div>
             <div className="space-y-1">
@@ -276,13 +277,17 @@ function EditModal({
               </select>
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Billing</label>
+              <label className={labelCls}>Facturación</label>
               <select className={inputCls} value={form.billing} onChange={(e) => set("billing", e.target.value)}>
-                {BILLINGS.map((b) => <option key={b} value={b}>{b}</option>)}
+                {BILLINGS.map((b) => <option key={b} value={b}>{({gratis:"Gratis",unico:"Pago único",mensual:"Mensual",anual:"Anual"})[b] ?? b}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>CTA</label>
+              <label className={labelCls}>Nota debajo del precio</label>
+              <input className={inputCls} value={form.billing_note ?? ""} onChange={(e) => set("billing_note", e.target.value)} placeholder="Ej. Sin renovación automática" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelCls}>Texto del botón</label>
               <input className={inputCls} value={form.cta ?? ""} onChange={(e) => set("cta", e.target.value)} />
             </div>
             <div className="space-y-1">
@@ -299,7 +304,7 @@ function EditModal({
               />
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Free boosts (opcional)</label>
+              <label className={labelCls}>Impulsos gratis (opcional)</label>
               <input className={inputCls} type="number" min="0" value={form.free_boosts ?? ""} onChange={(e) => set("free_boosts", e.target.value === "" ? null : Number(e.target.value))} />
             </div>
           </div>
@@ -315,8 +320,8 @@ function EditModal({
             </label>
           </div>
 
-          <ListEditor label="Bullets (qué incluye)" items={bullets} onChange={setBullets} placeholder="Ej. 1 propiedad activa" />
-          <ListEditor label="Excluidos (qué no incluye)" items={excluded} onChange={setExcluded} placeholder="Ej. CRM integrado" />
+          <ListEditor label="Características (qué incluye)" items={bullets} onChange={setBullets} placeholder="Ej. 1 propiedad activa" />
+          <ListEditor label="No incluye (qué deja afuera)" items={excluded} onChange={setExcluded} placeholder="Ej. CRM integrado" />
         </div>
         <footer className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
           <div>
@@ -480,6 +485,7 @@ export default function PlanesPublicacionClient({ hideHeader = false }: { hideHe
                 highlighted: false,
                 free_boosts: null,
                 orden: maxOrden + 10,
+                billing_note: null,
                 activo: true,
               });
             }}

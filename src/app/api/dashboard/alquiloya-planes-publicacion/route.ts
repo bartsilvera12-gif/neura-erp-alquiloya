@@ -5,6 +5,22 @@ import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+let bootstrapped = false;
+async function ensureBillingNoteColumn(pool: ReturnType<typeof getChatPostgresPool>) {
+  if (bootstrapped || !pool) return;
+  try {
+    await queryWithRetry(
+      pool,
+      `ALTER TABLE "alquiloya"."planes_publicacion"
+         ADD COLUMN IF NOT EXISTS billing_note text`,
+      []
+    );
+    bootstrapped = true;
+  } catch (e) {
+    console.warn("[planes-publicacion bootstrap]", e instanceof Error ? e.message : e);
+  }
+}
+
 
 const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 
@@ -42,6 +58,7 @@ export async function GET(request: Request) {
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+    await ensureBillingNoteColumn(pool);
 
     const { rows } = await queryWithRetry(
       pool,
@@ -49,7 +66,7 @@ export async function GET(request: Request) {
               precio::float8 AS precio, moneda, billing, badge,
               COALESCE(bullets, '[]'::jsonb)  AS bullets,
               COALESCE(excluded, '[]'::jsonb) AS excluded,
-              cta, highlighted, free_boosts, orden, activo
+              cta, highlighted, free_boosts, orden, activo, billing_note
          FROM "alquiloya"."planes_publicacion"
          WHERE empresa_id = $1::uuid
          ORDER BY orden ASC, nombre ASC`,
@@ -75,6 +92,7 @@ type PostBody = {
   cta?: string | null;
   highlighted?: boolean;
   free_boosts?: number | string | null;
+  billing_note?: string | null;
   orden?: number | string;
   activo?: boolean;
 };
@@ -86,6 +104,7 @@ export async function POST(request: Request) {
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+    await ensureBillingNoteColumn(pool);
 
     const body = (await request.json().catch(() => ({}))) as PostBody;
     const nombre = s(body.nombre);
@@ -97,16 +116,16 @@ export async function POST(request: Request) {
       pool,
       `INSERT INTO "alquiloya"."planes_publicacion"
          (empresa_id, tier, target, nombre, precio, moneda, billing, badge,
-          bullets, excluded, cta, highlighted, free_boosts, orden, activo)
+          bullets, excluded, cta, highlighted, free_boosts, orden, activo, billing_note)
        VALUES
          ($1::uuid, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 'PYG'), COALESCE($7, 'unico'),
           $8, COALESCE($9::jsonb, '[]'::jsonb), COALESCE($10::jsonb, '[]'::jsonb),
-          $11, $12, $13, COALESCE($14, 0), $15)
+          $11, $12, $13, COALESCE($14, 0), $15, $16)
        RETURNING id, tier, target, nombre,
                  precio::float8 AS precio, moneda, billing, badge,
                  COALESCE(bullets, '[]'::jsonb)  AS bullets,
                  COALESCE(excluded, '[]'::jsonb) AS excluded,
-                 cta, highlighted, free_boosts, orden, activo`,
+                 cta, highlighted, free_boosts, orden, activo, billing_note`,
       [
         ALQUILOYA_EMPRESA_ID,
         tier,
@@ -123,6 +142,7 @@ export async function POST(request: Request) {
         i(body.free_boosts),
         i(body.orden),
         bo(body.activo, true),
+        s(body.billing_note),
       ]
     );
 

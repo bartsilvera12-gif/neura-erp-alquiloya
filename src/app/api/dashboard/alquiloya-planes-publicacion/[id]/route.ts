@@ -5,6 +5,22 @@ import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+let bootstrapped = false;
+async function ensureBillingNoteColumn(pool: ReturnType<typeof getChatPostgresPool>) {
+  if (bootstrapped || !pool) return;
+  try {
+    await queryWithRetry(
+      pool,
+      `ALTER TABLE "alquiloya"."planes_publicacion"
+         ADD COLUMN IF NOT EXISTS billing_note text`,
+      []
+    );
+    bootstrapped = true;
+  } catch (e) {
+    console.warn("[planes-publicacion bootstrap]", e instanceof Error ? e.message : e);
+  }
+}
+
 
 const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,6 +65,7 @@ type PatchBody = {
   cta?: string | null;
   highlighted?: boolean;
   free_boosts?: number | string | null;
+  billing_note?: string | null;
   orden?: number | string;
   activo?: boolean;
 };
@@ -66,6 +83,7 @@ export async function PATCH(
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+    await ensureBillingNoteColumn(pool);
 
     const body = (await request.json().catch(() => ({}))) as PatchBody;
     const nombre = s(body.nombre);
@@ -90,13 +108,14 @@ export async function PATCH(
          free_boosts = $12,
          orden = COALESCE($13, orden),
          activo = $14,
+         billing_note = $15,
          updated_at = now()
-       WHERE id = $15::uuid AND empresa_id = $16::uuid
+       WHERE id = $16::uuid AND empresa_id = $17::uuid
        RETURNING id, tier, target, nombre,
                  precio::float8 AS precio, moneda, billing, badge,
                  COALESCE(bullets, '[]'::jsonb)  AS bullets,
                  COALESCE(excluded, '[]'::jsonb) AS excluded,
-                 cta, highlighted, free_boosts, orden, activo`,
+                 cta, highlighted, free_boosts, orden, activo, billing_note`,
       [
         tier,
         s(body.target),
@@ -112,6 +131,7 @@ export async function PATCH(
         i(body.free_boosts),
         i(body.orden),
         b(body.activo, true),
+        s(body.billing_note),
         id,
         ALQUILOYA_EMPRESA_ID,
       ]
@@ -143,6 +163,7 @@ export async function DELETE(
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+    await ensureBillingNoteColumn(pool);
 
     const r = await queryWithRetry(
       pool,

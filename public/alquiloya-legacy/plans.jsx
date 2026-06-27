@@ -318,16 +318,21 @@ function PlanCard({ plan, onPick }) {
           </>
         )}
       </div>
-      {plan.billing === 'unico' && (
-        <div style={{ marginTop: 4 }}>
-          <span className="badge badge-soft-yellow" style={{ fontSize: 11 }}>Sin renovación automática</span>
-        </div>
-      )}
-      {plan.billing === 'mensual' && (
-        <div style={{ marginTop: 4 }}>
-          <span className="badge badge-soft" style={{ fontSize: 11 }}>Suscripción recurrente</span>
-        </div>
-      )}
+      {(() => {
+        const customNote = (plan.billing_note || '').trim();
+        if (customNote === '-') return null;
+        const text = customNote
+          || (plan.billing === 'unico' ? 'Sin renovación automática'
+            : plan.billing === 'mensual' ? 'Suscripción recurrente'
+            : '');
+        if (!text) return null;
+        const cls = plan.billing === 'mensual' ? 'badge badge-soft' : 'badge badge-soft-yellow';
+        return (
+          <div style={{ marginTop: 4 }}>
+            <span className={cls} style={{ fontSize: 11 }}>{text}</span>
+          </div>
+        );
+      })()}
       <button
         className={"btn " + (highlight ? 'btn-primary' : 'btn-blue')}
         style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}
