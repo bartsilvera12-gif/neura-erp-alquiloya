@@ -84,14 +84,14 @@ function PlansPage({ onNav }) {
           Empezá gratis. Si necesitás más visibilidad, fotos o estadísticas, cambiá de plan cuando quieras.
         </p>
       </div>
-      {
+
         <div className="row" style={{ justifyContent: 'center', marginTop: 28 }}>
           <Segment value={audience} onChange={setAudience} items={[
             { id: 'owner', label: 'Dueños directos' },
             { id: 'agent', label: 'Agentes e inmobiliarias' },
           ]}/>
         </div>
-      )}
+
       {isAgentUser && (
         <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
           <span className="badge badge-soft" style={{ fontSize: 12 }}>Mostrando planes para agentes e inmobiliarias</span>
