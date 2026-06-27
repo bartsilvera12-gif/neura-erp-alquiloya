@@ -282,7 +282,7 @@ function AgentBlogPanel({ posts }) {
           <p style={{ fontSize: 15.5, color: 'var(--ink-2)', marginTop: 14, lineHeight: 1.55, fontWeight: 500 }}>{active.resumen}</p>
         )}
         {active.contenido && (
-          /^<(h\d|p|ul|ol|blockquote|pre|div)/i.test(String(active.contenido).trim()) ? (
+          /<[a-z][^>]*>/i.test(String(active.contenido)) ? (
             <div
               className="post-html"
               style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 16, lineHeight: 1.7 }}

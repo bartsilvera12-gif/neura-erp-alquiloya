@@ -2444,8 +2444,6 @@ function BlogContentEditor({ value, onChange }) {
         <Btn onClick={() => exec('insertUnorderedList')} isActive={active.ul} title="Lista con viñetas">• Lista</Btn>
         <Btn onClick={() => exec('insertOrderedList')} isActive={active.ol} title="Lista numerada">1. Num</Btn>
         <Btn onClick={() => toggleBlock('BLOCKQUOTE', 'quote')} isActive={active.quote} title="Cita">❝ Cita</Btn>
-        <span style={sepStyle} />
-        <Btn onClick={linkPrompt} isActive={active.link} title="Insertar / editar link">🔗 Link</Btn>
       </div>
       <div
         ref={ref}
