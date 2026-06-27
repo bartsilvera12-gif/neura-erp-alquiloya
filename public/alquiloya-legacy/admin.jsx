@@ -2446,7 +2446,6 @@ function BlogContentEditor({ value, onChange }) {
         <Btn onClick={() => toggleBlock('BLOCKQUOTE', 'quote')} isActive={active.quote} title="Cita">❝ Cita</Btn>
         <span style={sepStyle} />
         <Btn onClick={linkPrompt} isActive={active.link} title="Insertar / editar link">🔗 Link</Btn>
-        <Btn onClick={() => exec('removeFormat')} title="Quitar formato del texto seleccionado">⌫ Limpiar</Btn>
       </div>
       <div
         ref={ref}
