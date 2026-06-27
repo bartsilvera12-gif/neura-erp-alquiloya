@@ -2624,7 +2624,7 @@ function BlogSection() {
               <input className="input" placeholder="se-genera-solo-si-lo-dejas-vacio" value={editing.slug || ''} onChange={(e) => setEditing(x => ({ ...x, slug: e.target.value }))}/>
             </div>
             <div className="field" style={{ marginTop: 12 }}>
-              <label>Cover URL</label>
+              <label>Imagen de portada</label>
               <input className="input" placeholder="https://..." value={editing.cover_url || ''} onChange={(e) => setEditing(x => ({ ...x, cover_url: e.target.value }))}/>
             </div>
             <div className="field" style={{ marginTop: 12 }}>
