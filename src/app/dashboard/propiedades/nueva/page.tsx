@@ -188,7 +188,7 @@ export default function NuevaPropiedadPage() {
             </div>
             <div className={`${fieldCls} sm:col-span-2`}>
               <label className={labelCls}>Descripción</label>
-              <textarea className={`${inputCls} min-h-[100px]`} value={form.descripcion} onChange={(e) => set("descripcion", e.target.value)} />
+              <textarea rows={12} className={`${inputCls} min-h-[260px] leading-relaxed`} value={form.descripcion} onChange={(e) => set("descripcion", e.target.value)} />
             </div>
           </div>
         </section>

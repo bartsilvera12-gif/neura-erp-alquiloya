@@ -489,8 +489,13 @@ function DetailDescription({ p }) {
   return (
     <div className="card" style={{ padding: 24, marginTop: 16 }}>
       <h3 style={{ fontSize: 18 }}>Descripción</h3>
+      {p.desc ? (
+        <p style={{ marginTop: 12, fontSize: 14.5, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-line' }}>
+          {p.desc}
+        </p>
+      ) : null}
       <p style={{ marginTop: 12, fontSize: 14.5, lineHeight: 1.7, color: 'var(--ink-2)' }}>
-        {p.desc} La propiedad cuenta con {p.beds} dormitorios, {p.baths} baños, {p.m2} m² cubiertos
+        La propiedad cuenta con {p.beds} dormitorios, {p.baths} baños, {p.m2} m² cubiertos
         {p.cochera ? ', cochera privada' : ''} y todos los servicios básicos. Disponible desde el 1 de junio.
       </p>
       <div style={{ marginTop: 18 }}>
