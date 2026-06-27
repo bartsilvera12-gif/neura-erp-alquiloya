@@ -2309,6 +2309,7 @@ function ConsultasRecientes({ onNav }) {
 function BlogContentEditor({ value, onChange }) {
   const ref = React.useRef(null);
   const isInternalChange = React.useRef(false);
+  const [active, setActive] = React.useState({});
 
   // Sincroniza value externo -> innerHTML cuando cambia desde afuera
   // (ej. abrir el modal con otro post). NO escribe mientras el usuario
@@ -2325,23 +2326,72 @@ function BlogContentEditor({ value, onChange }) {
     }
   }, [value]);
 
+  // Lee el estado del cursor (negrita activa, lista activa, encabezado, etc.)
+  // para prender / apagar los botones segun donde esta parado el cursor.
+  const refreshActive = React.useCallback(() => {
+    const el = ref.current;
+    if (!el || document.activeElement !== el) return;
+    try {
+      const block = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+      setActive({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        ul: document.queryCommandState('insertUnorderedList'),
+        ol: document.queryCommandState('insertOrderedList'),
+        h2: block === 'h2',
+        h3: block === 'h3',
+        p: block === 'p' || block === 'div' || block === '',
+        quote: block === 'blockquote',
+        link: !!getCurrentLink(),
+      });
+    } catch { /* ignore */ }
+  }, []);
+
+  const getCurrentLink = () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.anchorNode) return null;
+    let node = sel.anchorNode;
+    while (node && node !== ref.current) {
+      if (node.nodeName === 'A') return node;
+      node = node.parentNode;
+    }
+    return null;
+  };
+
+  React.useEffect(() => {
+    document.addEventListener('selectionchange', refreshActive);
+    return () => document.removeEventListener('selectionchange', refreshActive);
+  }, [refreshActive]);
+
   const exec = (cmd, arg) => {
     const el = ref.current;
     if (!el) return;
     el.focus();
     try { document.execCommand(cmd, false, arg); } catch { /* ignore */ }
-    // Disparar onChange manualmente porque execCommand no siempre dispara input.
     isInternalChange.current = true;
     onChange(el.innerHTML);
+    refreshActive();
   };
 
   const format = (tag) => exec('formatBlock', tag);
 
+  const toggleBlock = (tag, key) => {
+    // Si ya esta activo el bloque, volvemos a parrafo.
+    if (active[key]) format('P');
+    else format(tag);
+  };
+
   const linkPrompt = () => {
-    const url = window.prompt('URL del link (https://...)', 'https://');
-    if (!url) return;
+    const existing = getCurrentLink();
+    const prev = existing ? existing.getAttribute('href') || '' : '';
+    const url = window.prompt('URL del link (vacío para quitar):', prev || 'https://');
+    if (url === null) return;
+    if (url === '') {
+      exec('unlink');
+      return;
+    }
     exec('createLink', url);
-    // Forzar target=_blank en el ultimo link insertado.
     setTimeout(() => {
       const el = ref.current;
       if (!el) return;
@@ -2354,61 +2404,76 @@ function BlogContentEditor({ value, onChange }) {
     }, 0);
   };
 
-  const Btn = ({ onClick, children, title }) => (
-    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={title}
+  const Btn = ({ onClick, children, title, isActive, style }) => (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      title={title}
+      aria-pressed={!!isActive}
       style={{
-        padding: '4px 9px', borderRadius: 6, border: '1px solid var(--line)',
-        background: '#fff', color: 'var(--ink-2)', cursor: 'pointer',
-        fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
-        minWidth: 30,
+        padding: '6px 10px', borderRadius: 6,
+        border: '1px solid ' + (isActive ? 'var(--blue)' : 'transparent'),
+        background: isActive ? 'rgba(0,88,165,0.10)' : 'transparent',
+        color: isActive ? 'var(--blue)' : 'var(--ink-1)',
+        cursor: 'pointer', fontSize: 13.5, fontWeight: 700,
+        fontFamily: 'inherit', minWidth: 32,
+        transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+        ...style,
       }}>
       {children}
     </button>
   );
 
+  const sepStyle = { width: 1, height: 22, background: 'var(--line)', margin: '0 4px', alignSelf: 'center' };
+
   return (
-    <div>
-      <div className="row gap-4" style={{
-        flexWrap: 'wrap', marginBottom: 6, padding: 6, background: 'var(--bg-2)',
-        border: '1px solid var(--line)', borderBottom: 'none',
-        borderRadius: '8px 8px 0 0',
+    <div style={{ borderRadius: 10, border: '1px solid var(--line)', background: '#fff', overflow: 'hidden' }}>
+      <div className="row" style={{
+        gap: 2, flexWrap: 'wrap', padding: 6,
+        background: '#f7f8fb', borderBottom: '1px solid var(--line)',
       }}>
-        <Btn onClick={() => exec('bold')} title="Negrita (Ctrl+B)"><strong>B</strong></Btn>
-        <Btn onClick={() => exec('italic')} title="Cursiva (Ctrl+I)"><em>I</em></Btn>
-        <Btn onClick={() => format('H2')} title="Título grande">H2</Btn>
-        <Btn onClick={() => format('H3')} title="Subtítulo">H3</Btn>
-        <Btn onClick={() => format('P')} title="Párrafo">P</Btn>
-        <Btn onClick={() => exec('insertUnorderedList')} title="Lista">• Lista</Btn>
-        <Btn onClick={() => exec('insertOrderedList')} title="Lista numerada">1. Num</Btn>
-        <Btn onClick={() => format('BLOCKQUOTE')} title="Cita">❝ Cita</Btn>
-        <Btn onClick={linkPrompt} title="Insertar link">🔗 Link</Btn>
-        <Btn onClick={() => exec('removeFormat')} title="Quitar formato">⌫ Limpiar</Btn>
+        <Btn onClick={() => exec('bold')} isActive={active.bold} title="Negrita (Ctrl+B)" style={{ fontFamily: 'Times New Roman, serif', fontSize: 16 }}>N</Btn>
+        <Btn onClick={() => exec('italic')} isActive={active.italic} title="Cursiva (Ctrl+I)" style={{ fontFamily: 'Times New Roman, serif', fontSize: 16, fontStyle: 'italic' }}>K</Btn>
+        <Btn onClick={() => exec('underline')} isActive={active.underline} title="Subrayado (Ctrl+U)" style={{ fontFamily: 'Times New Roman, serif', fontSize: 16, textDecoration: 'underline' }}>S</Btn>
+        <span style={sepStyle} />
+        <Btn onClick={() => toggleBlock('H2', 'h2')} isActive={active.h2} title="Título">H2</Btn>
+        <Btn onClick={() => toggleBlock('H3', 'h3')} isActive={active.h3} title="Subtítulo">H3</Btn>
+        <Btn onClick={() => format('P')} isActive={active.p && !active.h2 && !active.h3 && !active.quote} title="Texto normal">¶</Btn>
+        <span style={sepStyle} />
+        <Btn onClick={() => exec('insertUnorderedList')} isActive={active.ul} title="Lista con viñetas">• Lista</Btn>
+        <Btn onClick={() => exec('insertOrderedList')} isActive={active.ol} title="Lista numerada">1. Num</Btn>
+        <Btn onClick={() => toggleBlock('BLOCKQUOTE', 'quote')} isActive={active.quote} title="Cita">❝ Cita</Btn>
+        <span style={sepStyle} />
+        <Btn onClick={linkPrompt} isActive={active.link} title="Insertar / editar link">🔗 Link</Btn>
+        <Btn onClick={() => exec('removeFormat')} title="Quitar formato del texto seleccionado">⌫ Limpiar</Btn>
       </div>
       <div
         ref={ref}
         contentEditable
         suppressContentEditableWarning
-        className="input"
         style={{
           minHeight: 280,
           maxHeight: 600,
           overflowY: 'auto',
-          padding: 14,
+          padding: '14px 16px',
           fontFamily: 'inherit',
-          fontSize: 14.5,
-          lineHeight: 1.6,
-          borderRadius: '0 0 8px 8px',
-          borderTop: 'none',
+          fontSize: 15,
+          lineHeight: 1.65,
+          color: 'var(--ink-1)',
           outline: 'none',
+          background: '#fff',
         }}
-        data-placeholder="Escribí tu post acá. Usá la barra de arriba para dar formato."
+        data-placeholder="Escribí tu post acá. Usá la barra de arriba para dar formato (igual que en Word)."
+        onKeyUp={refreshActive}
+        onMouseUp={refreshActive}
+        onFocus={refreshActive}
         onInput={(e) => {
           isInternalChange.current = true;
           const html = e.currentTarget.innerHTML.slice(0, 60000);
           onChange(html);
         }}
         onPaste={(e) => {
-          // Pegar como texto plano: evita estilos basura de Word/Docs.
           e.preventDefault();
           const text = (e.clipboardData || window.clipboardData).getData('text/plain');
           try { document.execCommand('insertText', false, text); } catch { /* ignore */ }
