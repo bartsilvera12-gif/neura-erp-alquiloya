@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import { confirmDialog } from "@/lib/ui/dialogs";
 
 type Plan = {
   id: string;
@@ -202,7 +203,13 @@ function EditModal({
 
   async function destroy() {
     if (!plan.id) return;
-    const ok = window.confirm(`¿Borrar el plan "${plan.nombre}"? Esta acción no se puede deshacer.`);
+    const ok = await confirmDialog({
+      title: "Borrar plan",
+      message: `¿Borrar el plan "${plan.nombre}"? Esta acción no se puede deshacer.`,
+      confirmText: "Borrar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    });
     if (!ok) return;
     setSaving(true);
     setErr(null);
