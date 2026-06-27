@@ -1005,6 +1005,19 @@
     background-position: right 8px center;
     padding-right: 24px !important;
   }
+/* Blog WYSIWYG editor: placeholder + estilos del area editable */
+[contenteditable][data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+[contenteditable] h2 { font-size: 22px; font-weight: 800; margin: 14px 0 8px; }
+[contenteditable] h3 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; }
+[contenteditable] p { margin: 8px 0; }
+[contenteditable] ul, [contenteditable] ol { margin: 8px 0 8px 22px; }
+[contenteditable] blockquote { border-left: 4px solid var(--line); padding-left: 12px; color: var(--ink-2); font-style: italic; margin: 10px 0; }
+[contenteditable] a { color: var(--blue); text-decoration: underline; }
+
 </style>
 </head>
 <body>
@@ -1037,7 +1050,7 @@
 <script defer src="build/plans.js?v=plans-billing-note-v1"></script>
 <script defer src="build/publish.js?v=plans-toggle-always-v7"></script>
 <script defer src="build/posters.js?v=plans-toggle-always-v7"></script>
-<script defer src="build/admin.js?v=plans-toggle-always-v7"></script>
+<script defer src="build/admin.js?v=blog-wysiwyg-v1"></script>
 <script defer src="build/agent.js?v=plans-toggle-always-v7"></script>
 <script defer src="build/help.js?v=plans-toggle-always-v7"></script>
 <script defer src="build/app.js?v=plans-toggle-always-v7"></script>

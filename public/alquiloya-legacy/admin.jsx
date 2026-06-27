@@ -2308,47 +2308,54 @@ function ConsultasRecientes({ onNav }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function BlogContentEditor({ value, onChange }) {
   const ref = React.useRef(null);
-  const apply = (action) => {
-    const ta = ref.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const before = value.slice(0, start);
-    const sel = value.slice(start, end);
-    const after = value.slice(end);
-    let snippet = sel;
-    let cursorOffset = 0;
-    switch (action) {
-      case 'bold':       snippet = `<strong>${sel || 'texto'}</strong>`; break;
-      case 'italic':     snippet = `<em>${sel || 'texto'}</em>`; break;
-      case 'h2':         snippet = `<h2>${sel || 'Subtítulo'}</h2>`; break;
-      case 'h3':         snippet = `<h3>${sel || 'Sub-subtítulo'}</h3>`; break;
-      case 'ul':         snippet = `<ul>\n  <li>${sel || 'Item'}</li>\n</ul>`; break;
-      case 'ol':         snippet = `<ol>\n  <li>${sel || 'Item'}</li>\n</ol>`; break;
-      case 'quote':      snippet = `<blockquote>${sel || 'Cita'}</blockquote>`; break;
-      case 'paragraph':  snippet = `<p>${sel || 'Texto del párrafo'}</p>`; break;
-      case 'link': {
-        const url = window.prompt('URL del link (https://...)', 'https://');
-        if (!url) return;
-        snippet = `<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${sel || url}</a>`;
-        break;
-      }
-      default: return;
+  const isInternalChange = React.useRef(false);
+
+  // Sincroniza value externo -> innerHTML cuando cambia desde afuera
+  // (ej. abrir el modal con otro post). NO escribe mientras el usuario
+  // esta tipeando, sino le pisa el cursor.
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
     }
-    const next = before + snippet + after;
-    onChange(next);
-    // Devolvemos foco y posicionamos el cursor al final del snippet insertado.
-    cursorOffset = before.length + snippet.length;
+    if ((value || '') !== el.innerHTML) {
+      el.innerHTML = value || '';
+    }
+  }, [value]);
+
+  const exec = (cmd, arg) => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    try { document.execCommand(cmd, false, arg); } catch { /* ignore */ }
+    // Disparar onChange manualmente porque execCommand no siempre dispara input.
+    isInternalChange.current = true;
+    onChange(el.innerHTML);
+  };
+
+  const format = (tag) => exec('formatBlock', tag);
+
+  const linkPrompt = () => {
+    const url = window.prompt('URL del link (https://...)', 'https://');
+    if (!url) return;
+    exec('createLink', url);
+    // Forzar target=_blank en el ultimo link insertado.
     setTimeout(() => {
-      try {
-        ta.focus();
-        ta.setSelectionRange(cursorOffset, cursorOffset);
-      } catch { /* ignore */ }
+      const el = ref.current;
+      if (!el) return;
+      el.querySelectorAll('a').forEach(a => {
+        if (!a.getAttribute('target')) a.setAttribute('target', '_blank');
+        if (!a.getAttribute('rel')) a.setAttribute('rel', 'noopener noreferrer');
+      });
+      isInternalChange.current = true;
+      onChange(el.innerHTML);
     }, 0);
   };
 
-  const Btn = ({ act, children, title }) => (
-    <button type="button" onClick={() => apply(act)} title={title || act}
+  const Btn = ({ onClick, children, title }) => (
+    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={title}
       style={{
         padding: '4px 9px', borderRadius: 6, border: '1px solid var(--line)',
         background: '#fff', color: 'var(--ink-2)', cursor: 'pointer',
@@ -2366,33 +2373,50 @@ function BlogContentEditor({ value, onChange }) {
         border: '1px solid var(--line)', borderBottom: 'none',
         borderRadius: '8px 8px 0 0',
       }}>
-        <Btn act="bold" title="Negrita"><strong>B</strong></Btn>
-        <Btn act="italic" title="Cursiva"><em>I</em></Btn>
-        <Btn act="h2" title="Título grande">H2</Btn>
-        <Btn act="h3" title="Subtítulo">H3</Btn>
-        <Btn act="paragraph" title="Párrafo">P</Btn>
-        <Btn act="ul" title="Lista">• Lista</Btn>
-        <Btn act="ol" title="Lista numerada">1. Num</Btn>
-        <Btn act="quote" title="Cita">❝ Cita</Btn>
-        <Btn act="link" title="Link">🔗 Link</Btn>
+        <Btn onClick={() => exec('bold')} title="Negrita (Ctrl+B)"><strong>B</strong></Btn>
+        <Btn onClick={() => exec('italic')} title="Cursiva (Ctrl+I)"><em>I</em></Btn>
+        <Btn onClick={() => format('H2')} title="Título grande">H2</Btn>
+        <Btn onClick={() => format('H3')} title="Subtítulo">H3</Btn>
+        <Btn onClick={() => format('P')} title="Párrafo">P</Btn>
+        <Btn onClick={() => exec('insertUnorderedList')} title="Lista">• Lista</Btn>
+        <Btn onClick={() => exec('insertOrderedList')} title="Lista numerada">1. Num</Btn>
+        <Btn onClick={() => format('BLOCKQUOTE')} title="Cita">❝ Cita</Btn>
+        <Btn onClick={linkPrompt} title="Insertar link">🔗 Link</Btn>
+        <Btn onClick={() => exec('removeFormat')} title="Quitar formato">⌫ Limpiar</Btn>
       </div>
-      <textarea
+      <div
         ref={ref}
+        contentEditable
+        suppressContentEditableWarning
         className="input"
-        rows={12}
         style={{
-          fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
-          borderRadius: '0 0 8px 8px', borderTop: 'none',
+          minHeight: 280,
+          maxHeight: 600,
+          overflowY: 'auto',
+          padding: 14,
+          fontFamily: 'inherit',
+          fontSize: 14.5,
+          lineHeight: 1.6,
+          borderRadius: '0 0 8px 8px',
+          borderTop: 'none',
+          outline: 'none',
         }}
-        value={value}
-        onChange={(e) => onChange(e.target.value.slice(0, 60000))}
-        placeholder="Escribí tu post acá. Usá la barra para dar formato."
+        data-placeholder="Escribí tu post acá. Usá la barra de arriba para dar formato."
+        onInput={(e) => {
+          isInternalChange.current = true;
+          const html = e.currentTarget.innerHTML.slice(0, 60000);
+          onChange(html);
+        }}
+        onPaste={(e) => {
+          // Pegar como texto plano: evita estilos basura de Word/Docs.
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+          try { document.execCommand('insertText', false, text); } catch { /* ignore */ }
+        }}
       />
     </div>
   );
 }
-
-// ───────── Mi blog (CRUD de posts del agente logueado) ─────────
 function BlogSection() {
   const [posts, setPosts] = React.useState(null);
   const [err, setErr] = React.useState(null);
