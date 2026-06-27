@@ -549,7 +549,7 @@ function AdminAgentPage({ route, onNav }) {
         setImpulsesPaid(Number(data.saldo_restante) || 0);
         return;
       } catch (e) {
-        window.alert('No se pudo destacar: ' + (e.message || 'error'));
+        window.ayNotify({ tone: 'danger', title: 'No se pudo destacar', message: e.message || 'Error desconocido.' });
         return;
       }
     }
@@ -2536,7 +2536,12 @@ function BlogSection() {
 
   async function remove(post) {
     if (!post) return;
-    if (!window.confirm('¿Eliminar el post "' + (post.titulo || '') + '"? Esto no se puede deshacer.')) return;
+    const ok = await window.ayConfirm({
+      title: 'Eliminar post',
+      message: '¿Eliminar el post "' + (post.titulo || '') + '"? Esto no se puede deshacer.',
+      confirmText: 'Eliminar', cancelText: 'Cancelar', tone: 'danger',
+    });
+    if (!ok) return;
     try {
       const r = await fetch('/api/agente/posts/' + post.id, { method: 'DELETE', credentials: 'include' });
       const body = await r.json().catch(() => ({}));
@@ -2544,7 +2549,7 @@ function BlogSection() {
       if (window.ayInvalidate) window.ayInvalidate('/api/agente/posts');
       await reload();
     } catch (e) {
-      window.alert(e && e.message ? e.message : 'No se pudo eliminar.');
+      window.ayNotify({ tone: 'danger', title: 'No se pudo eliminar', message: e && e.message ? e.message : 'Error desconocido.' });
     }
   }
 

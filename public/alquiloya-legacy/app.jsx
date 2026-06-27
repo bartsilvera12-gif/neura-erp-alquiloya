@@ -87,6 +87,7 @@ function App() {
           boton directo a WhatsApp (decision del cliente). El componente
           VivioChatbot sigue definido en shared.jsx por si se reactiva. */}
       {!hideHeader && <WhatsAppLauncher/>}
+      <AyDialogsRoot/>
     </div>
   );
 }

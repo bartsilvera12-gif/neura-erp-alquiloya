@@ -1486,4 +1486,178 @@ function WhatsAppLauncher() {
   window.ayToast = ayToast;
 })();
 
-Object.assign(window, { Header, Footer, Photo, PropertyCard, AdBanner, QRMock, Avatar, Segment, VerificationModal, VivioChatbot, WhatsAppLauncher, PrettySelect });
+
+// ───────── AyDialogs: confirm/notify integrados al estilo del sitio ─────────
+// Reemplazo de window.confirm / window.alert con un modal que matchea el
+// branding (mismo borde, colores, tipografia). Funciona como singleton:
+// AyDialogsRoot se monta una vez en app.jsx, y expone window.ayConfirm /
+// window.ayNotify. Las llamadas hechas ANTES de que monte el root quedan
+// en cola y se resuelven cuando aparece.
+let __ayDialogsListener = null;
+const __ayPendingConfirms = [];
+const __ayPendingNotifies = [];
+
+if (typeof window !== 'undefined') {
+  window.ayConfirm = (opts) => new Promise((resolve) => {
+    const req = Object.assign({}, opts || {}, { __resolve: resolve });
+    if (__ayDialogsListener) __ayDialogsListener.onConfirm(req);
+    else __ayPendingConfirms.push(req);
+  });
+  window.ayNotify = (opts) => {
+    const o = typeof opts === 'string' ? { message: opts } : (opts || {});
+    if (__ayDialogsListener) __ayDialogsListener.onNotify(o);
+    else __ayPendingNotifies.push(o);
+  };
+}
+
+function AyDialogsRoot() {
+  const [confirmReq, setConfirmReq] = React.useState(null);
+  const [toasts, setToasts] = React.useState([]);
+
+  React.useEffect(() => {
+    const listener = {
+      onConfirm: (req) => setConfirmReq(req),
+      onNotify: (opts) => {
+        const id = Math.random().toString(36).slice(2);
+        const t = Object.assign({ id, tone: 'neutral', durationMs: 3500 }, opts);
+        setToasts(prev => [...prev, t]);
+        setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), t.durationMs);
+      },
+    };
+    __ayDialogsListener = listener;
+    while (__ayPendingConfirms.length) listener.onConfirm(__ayPendingConfirms.shift());
+    while (__ayPendingNotifies.length) listener.onNotify(__ayPendingNotifies.shift());
+    return () => { if (__ayDialogsListener === listener) __ayDialogsListener = null; };
+  }, []);
+
+  const closeConfirm = (val) => {
+    if (confirmReq && confirmReq.__resolve) confirmReq.__resolve(val);
+    setConfirmReq(null);
+  };
+
+  React.useEffect(() => {
+    if (!confirmReq) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeConfirm(false);
+      else if (e.key === 'Enter') closeConfirm(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmReq]);
+
+  const toneColors = (tone) => {
+    if (tone === 'danger') return { accent: '#dc2626', accentSoft: 'rgba(220,38,38,0.10)', icon: '⚠️' };
+    if (tone === 'warning') return { accent: '#d97706', accentSoft: 'rgba(217,119,6,0.10)', icon: '⚠️' };
+    if (tone === 'success') return { accent: '#059669', accentSoft: 'rgba(5,150,105,0.10)', icon: '✅' };
+    return { accent: 'var(--blue)', accentSoft: 'rgba(0,88,165,0.10)', icon: 'ℹ️' };
+  };
+
+  return (
+    <>
+      {confirmReq && (() => {
+        const t = toneColors(confirmReq.tone);
+        return (
+          <div
+            onClick={() => closeConfirm(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9999,
+              background: 'rgba(11, 22, 34, 0.55)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              role="dialog" aria-modal="true"
+              style={{
+                background: '#fff', borderRadius: 16,
+                maxWidth: 460, width: '100%', overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                fontFamily: 'inherit',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '18px 22px 12px', borderBottom: '1px solid var(--line)',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: t.accentSoft, color: t.accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, flexShrink: 0,
+                }}>{t.icon}</div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-1)' }}>
+                  {confirmReq.title || '¿Confirmás?'}
+                </h3>
+              </div>
+              {confirmReq.message && (
+                <p style={{ margin: 0, padding: '14px 22px', fontSize: 14.5, lineHeight: 1.55, color: 'var(--ink-2)' }}>
+                  {confirmReq.message}
+                </p>
+              )}
+              <div style={{
+                display: 'flex', gap: 8, justifyContent: 'flex-end',
+                padding: '12px 18px 16px', background: 'var(--bg-2)',
+              }}>
+                <button
+                  type="button" onClick={() => closeConfirm(false)}
+                  style={{
+                    padding: '9px 16px', borderRadius: 10,
+                    border: '1px solid var(--line)', background: '#fff',
+                    color: 'var(--ink-1)', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >{confirmReq.cancelText || 'Cancelar'}</button>
+                <button
+                  type="button" onClick={() => closeConfirm(true)} autoFocus
+                  style={{
+                    padding: '9px 18px', borderRadius: 10, border: 'none',
+                    background: t.accent, color: '#fff', fontWeight: 700, fontSize: 14,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >{confirmReq.confirmText || 'Confirmar'}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      {toasts.length > 0 && (
+        <div style={{
+          position: 'fixed', top: 16, right: 16, zIndex: 9998,
+          display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380,
+        }}>
+          {toasts.map(t => {
+            const c = toneColors(t.tone);
+            return (
+              <div key={t.id} style={{
+                background: '#fff', border: '1px solid var(--line)',
+                borderLeft: '4px solid ' + c.accent,
+                borderRadius: 10, padding: '12px 14px',
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.15)',
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                fontFamily: 'inherit',
+              }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{c.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {t.title && (
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink-1)', marginBottom: 2 }}>{t.title}</div>
+                  )}
+                  <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.45, wordWrap: 'break-word' }}>{t.message}</div>
+                </div>
+                <button
+                  type="button" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+                  aria-label="Cerrar" style={{
+                    background: 'transparent', border: 'none', color: 'var(--muted)',
+                    fontSize: 16, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0,
+                  }}
+                >×</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+Object.assign(window, { Header, Footer, Photo, PropertyCard, AdBanner, QRMock, Avatar, Segment, VerificationModal, VivioChatbot, WhatsAppLauncher, PrettySelect, AyDialogsRoot });
