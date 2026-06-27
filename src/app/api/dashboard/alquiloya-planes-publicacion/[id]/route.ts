@@ -129,3 +129,48 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await ctx.params;
+    if (!uuidRe.test(id)) return NextResponse.json({ error: "id invalido" }, { status: 400 });
+
+    const user = await getAuthUserForApiRoute(request);
+    if (!user?.id) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+    const pool = getChatPostgresPool();
+    if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+
+    const r = await queryWithRetry(
+      pool,
+      `DELETE FROM "alquiloya"."planes_publicacion"
+        WHERE id = $1::uuid
+          AND NOT EXISTS (
+            SELECT 1 FROM "alquiloya"."propietarios"
+             WHERE plan_publicacion_id = $1::uuid
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM "alquiloya"."agentes"
+             WHERE plan_publicacion_id = $1::uuid
+          )
+        RETURNING id`,
+      [id]
+    );
+    if (r.rows.length === 0) {
+      return NextResponse.json(
+        { error: "El plan tiene propietarios o agentes asignados. Desactivalo en lugar de borrarlo." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ success: true, id });
+  } catch (err) {
+    console.error("[planes-publicacion/[id] DELETE]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error" },
+      { status: 500 }
+    );
+  }
+}

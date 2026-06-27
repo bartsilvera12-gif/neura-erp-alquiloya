@@ -154,10 +154,12 @@ function EditModal({
   plan,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   plan: Plan;
   onClose: () => void;
   onSaved: (next: Plan) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const [form, setForm] = useState<Plan>({ ...plan, activo: plan.activo !== false });
   const [bullets, setBullets] = useState<string[]>([...plan.bullets]);
@@ -193,6 +195,27 @@ function EditModal({
       onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error al guardar");
+      setSaving(false);
+    }
+  }
+
+  async function destroy() {
+    if (!plan.id) return;
+    const ok = window.confirm(`¿Borrar el plan "${plan.nombre}"? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const res = await fetchWithSupabaseSession(
+        `/api/dashboard/alquiloya-planes-publicacion/${plan.id}`,
+        { method: "DELETE" }
+      );
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (onDeleted) onDeleted(plan.id);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error al borrar");
       setSaving(false);
     }
   }
@@ -295,13 +318,22 @@ function EditModal({
           <ListEditor label="Bullets (qué incluye)" items={bullets} onChange={setBullets} placeholder="Ej. 1 propiedad activa" />
           <ListEditor label="Excluidos (qué no incluye)" items={excluded} onChange={setExcluded} placeholder="Ej. CRM integrado" />
         </div>
-        <footer className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Cancelar
-          </button>
-          <button type="button" disabled={saving} onClick={save} className="rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#3F8E91] disabled:opacity-50">
-            {saving ? "Guardando…" : plan.id ? "Guardar cambios" : "Crear plan"}
-          </button>
+        <footer className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
+          <div>
+            {plan.id ? (
+              <button type="button" disabled={saving} onClick={destroy} className="rounded-xl border border-red-300 px-3.5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
+                Eliminar
+              </button>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="button" disabled={saving} onClick={save} className="rounded-xl bg-[#4FAEB2] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#3F8E91] disabled:opacity-50">
+              {saving ? "Guardando…" : plan.id ? "Guardar cambios" : "Crear plan"}
+            </button>
+          </div>
         </footer>
       </div>
     </div>
@@ -325,6 +357,7 @@ export default function PlanesPublicacionClient({ hideHeader = false }: { hideHe
   /** Segmento mostrado: dueños directos (default) o agentes/inmobiliarias.
    *  Mismo split visual que la web publica (/publico#plans). */
   const [audience, setAudience] = useState<"owner" | "agent">("owner");
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -370,6 +403,16 @@ export default function PlanesPublicacionClient({ hideHeader = false }: { hideHe
       {err ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{err}</div>
       ) : null}
+      {notice ? (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <span>{notice}</span>
+          <div className="flex items-center gap-3">
+            <a href="/publico#plans" target="_blank" rel="noreferrer" className="font-semibold underline">Ver web pública</a>
+            <button type="button" onClick={() => setNotice(null)} className="rounded-md px-1 text-emerald-700 hover:bg-emerald-100" aria-label="Cerrar">✕</button>
+          </div>
+        </div>
+      ) : null}
+
 
       {planes == null && !err ? (
         <p className="text-sm text-slate-500">Cargando planes…</p>
@@ -468,11 +511,16 @@ export default function PlanesPublicacionClient({ hideHeader = false }: { hideHe
           plan={editing}
           onClose={() => setEditing(null)}
           onSaved={(next) => {
+            setNotice(`Plan "${next.nombre}" guardado. Abrí /publico#plans en otra pestaña para verificar.`);
             setPlanes((prev) => {
               const cur = prev ?? [];
               const exists = cur.some((x) => x.id === next.id);
               return exists ? cur.map((x) => (x.id === next.id ? next : x)) : [...cur, next];
             });
+          }}
+          onDeleted={(id) => {
+            setNotice("Plan borrado.");
+            setPlanes((prev) => (prev ?? []).filter((x) => x.id !== id));
           }}
         />
       ) : null}
