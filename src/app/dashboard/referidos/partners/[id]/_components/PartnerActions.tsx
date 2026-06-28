@@ -181,9 +181,19 @@ export function PartnerActions({
             Crear acceso
           </button>
         ) : (
-          <span className="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-            ✓ Acceso vinculado
-          </span>
+          <>
+            <span className="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              ✓ Acceso vinculado
+            </span>
+            <button
+              type="button"
+              onClick={() => setAccesoOpen((v) => !v)}
+              disabled={busy !== null}
+              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Resetear contraseña
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -204,7 +214,7 @@ export function PartnerActions({
           className="mt-2 w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
         >
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Crear acceso al portal de referidos
+            {hasUsuario ? "Resetear contraseña" : "Crear acceso al portal de referidos"}
           </div>
           <div className="space-y-2">
             <input
@@ -237,7 +247,7 @@ export function PartnerActions({
                 disabled={busy === "acceso"}
                 className="inline-flex items-center rounded-xl bg-[#4FAEB2] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#3F8E91] disabled:opacity-60"
               >
-                {busy === "acceso" ? "Creando…" : "Crear acceso"}
+                {busy === "acceso" ? "Guardando…" : (hasUsuario ? "Actualizar contraseña" : "Crear acceso")}
               </button>
               <button
                 type="button"
