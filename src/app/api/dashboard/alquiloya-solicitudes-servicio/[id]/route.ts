@@ -154,9 +154,12 @@ async function provisionPortalAccountForPropietario(params: {
   if (createErr) {
     const msg = (createErr.message ?? "").toLowerCase();
     if (msg.includes("already") || msg.includes("exists") || msg.includes("registered")) {
-      // El email ya estaba en Supabase Auth (probablemente de pruebas previas).
-      // Buscamos el auth user y le reseteamos la password para que llegue una
-      // nueva valida al solicitante.
+      // El email ya estaba en Supabase Auth (puede ser de pruebas previas, O
+      // un usuario activo: agente / propietario / referido_partner / VIVIO).
+      // ANTES: reseteabamos la password incondicionalmente. Eso rompia el
+      // login de cuentas activas que compartian email con un solicitante.
+      // AHORA: solo reseteamos si el auth user es un orfano sin filas en
+      // alquiloya.usuarios (es decir, no esta en uso por ningun rol del ERP).
       const lower = params.email.toLowerCase();
       for (let page = 1; page <= 50 && !authUserId; page++) {
         const { data: lr, error: le } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
@@ -171,17 +174,37 @@ async function provisionPortalAccountForPropietario(params: {
         console.warn("[provisionPortalAccount] no encontre el auth user existente para reset:", params.email);
         return null;
       }
-      const { error: upErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { nombre: params.nombre, fuente: "solicitud_servicio_aprobada_reset", tipo: "propietario" },
-      });
-      if (upErr) {
-        console.warn("[provisionPortalAccount] updateUserById:", upErr.message);
-        return null;
+
+      // Chequeo: este auth_user_id, ¿esta vinculado a algun usuario activo del ERP?
+      // Si la respuesta es sí, NO tocamos la password (rompemos su login).
+      const { rows: linkedRows } = await params.pool.query<{ id: string; tipo: string | null }>(
+        `SELECT id, tipo FROM "alquiloya"."usuarios"
+          WHERE auth_user_id=$1::uuid LIMIT 1`,
+        [authUserId]
+      );
+      const yaLinkeado = linkedRows.length > 0;
+
+      if (yaLinkeado) {
+        console.info(
+          "[provisionPortalAccount] auth user existente ya esta vinculado en alquiloya.usuarios " +
+          "(tipo=" + (linkedRows[0].tipo ?? "?") + ") — NO reseteamos password. " +
+          "El propietario recien aprobado reutilizara la cuenta existente."
+        );
+        // La password tempPassword quedo "huerfana" (no la aplicamos). El
+        // template de email caera al fallback "ya tenias cuenta, entra con
+        // tu password actual o usa Olvidé mi contrasena".
+      } else {
+        const { error: upErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { nombre: params.nombre, fuente: "solicitud_servicio_aprobada_reset", tipo: "propietario" },
+        });
+        if (upErr) {
+          console.warn("[provisionPortalAccount] updateUserById:", upErr.message);
+          return null;
+        }
+        console.info("[provisionPortalAccount] password reseteada para auth user huerfano:", params.email);
       }
-      console.info("[provisionPortalAccount] password reseteada para auth user existente:", params.email);
-    } else {
       console.warn("[provisionPortalAccount] createUser:", createErr.message);
       return null;
     }
