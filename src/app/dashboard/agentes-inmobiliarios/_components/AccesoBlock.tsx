@@ -42,6 +42,36 @@ export function AccesoBlock({
     reused: boolean;
   }>(null);
 
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPwd, setResetPwd] = useState("");
+  const [resetPwd2, setResetPwd2] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetErr, setResetErr] = useState<string | null>(null);
+  const [resetOk, setResetOk] = useState<string | null>(null);
+
+  async function onResetPassword() {
+    setResetErr(null); setResetOk(null);
+    if (resetPwd.length < 8) { setResetErr("La contraseña debe tener al menos 8 caracteres."); return; }
+    if (resetPwd !== resetPwd2) { setResetErr("Las contraseñas no coinciden."); return; }
+    setResetBusy(true);
+    try {
+      const res = await fetchWithSupabaseSession("/api/dashboard/alquiloya-accesos/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo, id: targetId, password: resetPwd }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setResetOk("Contraseña actualizada.");
+      setResetPwd(""); setResetPwd2("");
+      setTimeout(() => { setResetOpen(false); setResetOk(null); }, 1500);
+    } catch (e) {
+      setResetErr(e instanceof Error ? e.message : "Error al resetear");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   async function onCrear() {
     setErr(null);
     if (needEmail && !emailInput.trim()) {
@@ -102,6 +132,64 @@ export function AccesoBlock({
                 {acceso.activo ? "Activo" : "Inactivo"}
               </span>
             </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            {!resetOpen ? (
+              <button
+                type="button"
+                onClick={() => setResetOpen(true)}
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Resetear contraseña
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Nueva contraseña
+                </div>
+                <input
+                  type="password"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30"
+                  value={resetPwd}
+                  onChange={(e) => setResetPwd(e.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  autoComplete="new-password"
+                />
+                <input
+                  type="password"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30"
+                  value={resetPwd2}
+                  onChange={(e) => setResetPwd2(e.target.value)}
+                  placeholder="Repetí la contraseña"
+                  autoComplete="new-password"
+                />
+                {resetErr ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-700">{resetErr}</div>
+                ) : null}
+                {resetOk ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs text-emerald-700">{resetOk}</div>
+                ) : null}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onResetPassword}
+                    disabled={resetBusy}
+                    className="inline-flex flex-1 items-center justify-center rounded-lg bg-[#4FAEB2] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#3F8E91] disabled:opacity-60"
+                  >
+                    {resetBusy ? "Guardando…" : "Actualizar contraseña"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setResetOpen(false); setResetErr(null); setResetOk(null); }}
+                    disabled={resetBusy}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
