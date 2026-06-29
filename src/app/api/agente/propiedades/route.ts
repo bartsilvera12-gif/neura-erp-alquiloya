@@ -122,6 +122,7 @@ export async function GET(request: Request) {
             AND pf.activo = true
         ) fcnt ON true
         WHERE p.empresa_id = $1::uuid AND p.agente_id = $2::uuid
+          AND COALESCE(p.estado, '') NOT IN ('rechazada','eliminada')
         ORDER BY p.destacada DESC NULLS LAST, p.created_at DESC NULLS LAST, p.titulo ASC
       `,
       [ALQUILOYA_EMPRESA_ID, agenteId]
