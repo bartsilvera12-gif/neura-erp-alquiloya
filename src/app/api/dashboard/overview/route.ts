@@ -281,7 +281,6 @@ export async function GET(request: Request) {
     if (cSolAcceso > 0) alertas.push({ key: "solicitudes_acceso", label: "Solicitudes de acceso", count: cSolAcceso as number, severity: "warning", href: "/dashboard/solicitudes-acceso" });
     if (cSolServ > 0) alertas.push({ key: "solicitudes_servicio", label: "Servicios pendientes", count: cSolServ as number, severity: "warning", href: "/dashboard/solicitudes-servicio" });
     if (cResenas > 0) alertas.push({ key: "resenas_pendientes", label: "Reseñas a moderar", count: cResenas as number, severity: "info", href: "/dashboard/agente-resenas" });
-    if (cConsultasPend > 0) alertas.push({ key: "consultas_sin_responder", label: "Consultas sin responder", count: cConsultasPend as number, severity: "warning", href: "/dashboard/propiedades" });
     const vencidos = (cVencidosProp as number) + (cVencidosAg as number);
     const porVencer7 = (cVenc7Prop as number) + (cVenc7Ag as number);
     if (vencidos > 0) alertas.push({ key: "planes_vencidos", label: "Planes vencidos", count: vencidos, severity: "danger", href: "/dashboard/agentes-inmobiliarios" });
