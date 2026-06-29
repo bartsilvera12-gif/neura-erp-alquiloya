@@ -163,8 +163,8 @@ export async function GET(request: Request) {
         `SELECT
            count(*)::int AS total,
            count(*) FILTER (WHERE created_at >= now() - interval '30 days')::int AS ultimas_30,
-           count(*) FILTER (WHERE COALESCE(estado, '') NOT IN ('cerrada','atendida','descartada'))::int AS pendientes
-         FROM ${t("consultas_propiedad")} WHERE empresa_id = $1::uuid AND activo = true`,
+           count(*) FILTER (WHERE COALESCE(estado, '') NOT IN ('respondida','descartada'))::int AS pendientes
+         FROM ${t("consultas")} WHERE empresa_id = $1::uuid`,
         [ALQUILOYA_EMPRESA_ID]
       ),
       tableExists("solicitudes_acceso"),

@@ -60,7 +60,7 @@ type ModulosDisponibles = {
   solicitudes_servicio: boolean;
   agente_resenas: boolean;
   agente_captaciones: boolean;
-  consultas_propiedad: boolean;
+  consultas: boolean;
   facturas: boolean;
   pagos: boolean;
   productos: boolean;
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
       tableExists("solicitudes_servicio"),
       tableExists("agente_resenas"),
       tableExists("agente_captaciones"),
-      tableExists("consultas_propiedad"),
+      tableExists("consultas"),
       tableExists("facturas"),
       tableExists("pagos"),
       tableExists("productos"),
@@ -214,7 +214,7 @@ export async function GET(request: Request) {
       solicitudes_servicio: hasSolServ,
       agente_resenas: hasResenas,
       agente_captaciones: hasCaptaciones,
-      consultas_propiedad: hasConsultasProp,
+      consultas: hasConsultasProp,
       facturas: hasFacturas,
       pagos: hasPagos,
       productos: hasProductos,
@@ -252,7 +252,7 @@ export async function GET(request: Request) {
       // que linkea coincidan. Antes la query era mas amplia (activo=false OR
       // estado='inactiva') y daba 13 mientras el listado mostraba menos.
       hasPropiedades ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid AND activo = false AND visible_web = false AND (estado IS NULL OR estado IN ('inactiva'))`) : Z,
-      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND COALESCE(estado,'') NOT IN ('cerrada','atendida','descartada')`) : Z,
+      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas")} WHERE empresa_id=$1::uuid AND COALESCE(estado,'') NOT IN ('respondida','descartada')`) : Z,
       hasPropietarios ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propietarios")} WHERE empresa_id=$1::uuid AND activo=true AND COALESCE(plan_vencimiento_at, now() + interval '100 years') < now()`) : Z,
       hasAgentes ? safeCount(`SELECT count(*)::int AS n FROM ${sq("agentes")} WHERE empresa_id=$1::uuid AND activo=true AND COALESCE(plan_vencimiento_at, now() + interval '100 years') < now()`) : Z,
       hasPropietarios ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propietarios")} WHERE empresa_id=$1::uuid AND activo=true AND plan_vencimiento_at IS NOT NULL AND plan_vencimiento_at BETWEEN now() AND now() + interval '7 days'`) : Z,
@@ -261,15 +261,15 @@ export async function GET(request: Request) {
       hasProductos ? safeCount(`SELECT count(*)::int AS n FROM ${sq("productos")} WHERE empresa_id=$1::uuid AND COALESCE(stock,0) <= COALESCE(stock_minimo, 0) AND COALESCE(stock_minimo,0) > 0`) : Z,
       hasPropiedades ? safeRows<{ total: number; activas: number; destacadas: number }>(`SELECT count(*)::int AS total, count(*) FILTER (WHERE activo=true AND visible_web=true)::int AS activas, count(*) FILTER (WHERE destacada=true)::int AS destacadas FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid`) : ZR,
       hasPropiedades ? safeCount(`SELECT count(*)::int AS n FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid AND created_at::date = current_date`) : Z,
-      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND created_at::date = current_date`) : Z,
-      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true AND created_at::date = current_date - interval '1 day'`) : Z,
+      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas")} WHERE empresa_id=$1::uuid AND created_at::date = current_date`) : Z,
+      hasConsultasProp ? safeCount(`SELECT count(*)::int AS n FROM ${sq("consultas")} WHERE empresa_id=$1::uuid AND created_at::date = current_date - interval '1 day'`) : Z,
       hasSolAcceso ? safeCount(`SELECT count(*)::int AS n FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid AND estado='aprobada' AND created_at >= date_trunc('month', current_date)`) : Z,
       hasSolAcceso ? safeCount(`SELECT count(*)::int AS n FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid AND estado='aprobada' AND created_at::date = current_date`) : Z,
       hasFacturas ? safeRows<{ hoy: string }>(`SELECT COALESCE(sum(monto_total) FILTER (WHERE fecha::date = current_date), 0)::text AS hoy FROM ${sq("facturas")} WHERE empresa_id=$1::uuid AND COALESCE(estado,'') <> 'anulada'`) : ZR,
       hasPropiedades ? safeRows<{ id: string; titulo: string | null; created_at: string }>(`SELECT id, titulo, created_at::text AS created_at FROM ${sq("propiedades")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
       hasSolAcceso ? safeRows<{ id: string; nombre: string; tipo: string; created_at: string }>(`SELECT id, nombre, tipo, created_at::text AS created_at FROM ${sq("solicitudes_acceso")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
       hasResenas ? safeRows<{ id: string; autor_nombre: string; stars: number; created_at: string }>(`SELECT id, autor_nombre, stars, created_at::text AS created_at FROM ${sq("agente_resenas")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
-      hasConsultasProp ? safeRows<{ id: string; nombre: string | null; created_at: string }>(`SELECT id, COALESCE(NULLIF(nombre,''), 'Consulta anónima') AS nombre, created_at::text AS created_at FROM ${sq("consultas_propiedad")} WHERE empresa_id=$1::uuid AND activo=true ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
+      hasConsultasProp ? safeRows<{ id: string; nombre: string | null; created_at: string }>(`SELECT id, COALESCE(NULLIF(nombre,''), 'Consulta anónima') AS nombre, created_at::text AS created_at FROM ${sq("consultas")} WHERE empresa_id=$1::uuid ORDER BY created_at DESC NULLS LAST LIMIT 5`) : ZR,
     ]);
 
     // ── Construir ALERTAS ───────────────────────────────────────────────────

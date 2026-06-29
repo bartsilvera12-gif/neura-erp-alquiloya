@@ -1526,7 +1526,7 @@ function CapturesSection({ onNav }) {
     date: (r.created_at || '').slice(0, 10).split('-').reverse().join('/'),
     status: /cerrad|alquilad|vendid/i.test(String(r.etapa || '')) ? 'cerrada' : 'gestionando',
     owner: r.propietario_nombre || '—',
-    rentPrice: 0,
+    rentPrice: Number(r.precio_estimado) || 0,
     commission: 0,
     paid: false,
     _real: true,
@@ -1539,6 +1539,9 @@ function CapturesSection({ onNav }) {
     _telefono: r.propietario_telefono,
     _mensaje: r.mensaje,
     _origen: r.origen,
+    _direccion: r.direccion,
+    _tipo: r.tipo_propiedad,
+    _precio: Number(r.precio_estimado) || 0,
   }));
   const hasRealCapt = realCaptMapped.length > 0;
   // Solo caemos al mock si el fetch fallo (useMock). Si la respuesta vino vacia
@@ -1783,18 +1786,21 @@ function CapturesSection({ onNav }) {
                       <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{c.propertyId}</span>
                       <span style={{ color: 'var(--ink-4)' }}>·</span>
                       <span><I.user s={11}/> <strong style={{ color: 'var(--ink-2)' }}>{c.owner}</strong></span>
+                      {c._real && c._telefono ? (<><span style={{ color: 'var(--ink-4)' }}>·</span><span><I.whats s={11}/> <strong style={{ color: 'var(--ink-2)' }}>{c._telefono}</strong></span></>) : null}
+                      {c._real && c._email ? (<><span style={{ color: 'var(--ink-4)' }}>·</span><span>{c._email}</span></>) : null}
                       <span style={{ color: 'var(--ink-4)' }}>·</span>
                       <span><I.cal s={11}/> Captada {c.date}</span>
-                      {c.rentPrice && (
+                      {c.rentPrice ? (
                         <>
                           <span style={{ color: 'var(--ink-4)' }}>·</span>
-                          <span>Alquiler <strong style={{ color: 'var(--ink-2)' }}>{formatGs(c.rentPrice)}</strong></span>
+                          <span>Monto <strong style={{ color: 'var(--ink-2)' }}>{formatGs(c.rentPrice)}</strong></span>
                         </>
-                      )}
+                      ) : null}
+                      {c._real && c._direccion ? (<><span style={{ color: 'var(--ink-4)' }}>·</span><span>{c._direccion}</span></>) : null}
                     </>
                   )}
                 </div>
-                {showOwnerCard && c._mensaje ? (
+                {c._real && c._mensaje ? (
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     “{c._mensaje}”
                   </div>

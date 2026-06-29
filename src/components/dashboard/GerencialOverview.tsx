@@ -20,7 +20,7 @@ export type ModulosDisponibles = {
   solicitudes_servicio: boolean;
   agente_resenas: boolean;
   agente_captaciones: boolean;
-  consultas_propiedad: boolean;
+  consultas: boolean;
   facturas: boolean;
   pagos: boolean;
   productos: boolean;
