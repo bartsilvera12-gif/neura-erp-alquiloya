@@ -48,7 +48,7 @@ export async function GET(request: Request) {
          FROM ${t("consultas")} c
          LEFT JOIN ${t("propiedades")} p
            ON p.empresa_id = c.empresa_id AND p.id = c.propiedad_id
-        WHERE c.empresa_id = $1::uuid AND c.agente_id = $2::uuid
+        WHERE c.empresa_id = $1::uuid AND (c.agente_id = $2::uuid OR p.agente_id = $2::uuid)
         ORDER BY c.created_at DESC NULLS LAST
         LIMIT ${limit}`,
       [ALQUILOYA_EMPRESA_ID, agenteId]

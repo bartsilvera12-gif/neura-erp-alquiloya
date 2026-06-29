@@ -2242,10 +2242,13 @@ function ConsultasRecientes({ onNav }) {
     (async () => {
       try {
         const r = await (window.ayCachedFetch || fetch)('/api/agente/consultas?limit=6', { cache: 'no-store', credentials: 'include' });
-        if (!r.ok) return;
+        // Si el endpoint falla (401/403/500) NO ocultamos el widget: dejamos
+        // data = [] para que aparezca el empty-state y el agente sepa que
+        // todavia no recibio consultas (en vez de pensar que la seccion no existe).
+        if (!r.ok) { if (!cancelled) setData([]); return; }
         const b = await r.json().catch(() => ({}));
-        if (!cancelled && Array.isArray(b?.consultas)) setData(b.consultas);
-      } catch { /* ignore */ }
+        if (!cancelled) setData(Array.isArray(b?.consultas) ? b.consultas : []);
+      } catch { if (!cancelled) setData([]); }
     })();
     return () => { cancelled = true; };
   }, []);
