@@ -12,6 +12,12 @@ type Rule = {
 type Stats = { clicks: number; conversiones: number; comision_pendiente: number; comision_pagada: number };
 type Commission = {
   id: string; periodo: string | null; monto: number; moneda: string;
+  monto_base: number | null; porcentaje_aplicado: number | null;
+  pago_referencia: string | null;
+  conv_target_tipo: string | null; conv_converted_at: string | null;
+  referido_nombre: string | null; referido_email: string | null;
+  fuente: string | null;
+  plan_nombre: string | null; plan_tier: string | null;
   estado: string; generada_at: string | null; pagada_at: string | null;
 };
 type Me = {
@@ -304,8 +310,11 @@ export default function PortalReferidosDashboardPage() {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-5 py-2.5">Período</th>
-                    <th className="px-5 py-2.5 text-right">Monto</th>
+                    <th className="px-5 py-2.5">Referido</th>
+                    <th className="px-5 py-2.5">Plan</th>
+                    <th className="px-5 py-2.5">Fuente</th>
+                    <th className="px-5 py-2.5 text-right">Monto base</th>
+                    <th className="px-5 py-2.5 text-right">Comisión</th>
                     <th className="px-5 py-2.5">Estado</th>
                     <th className="px-5 py-2.5">Generada</th>
                     <th className="px-5 py-2.5">Pagada</th>
@@ -314,8 +323,17 @@ export default function PortalReferidosDashboardPage() {
                 <tbody className="divide-y divide-slate-100">
                   {data.commissions.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-2 font-mono text-[12px] text-slate-700">{c.periodo ?? "—"}</td>
-                      <td className="px-5 py-2 text-right font-semibold tabular-nums text-[#0058A5]">{fmtGs(c.monto)}</td>
+                      <td className="px-5 py-2">
+                        <div className="font-medium text-slate-800">{c.referido_nombre ?? "—"}</div>
+                        {c.referido_email ? <div className="text-[11px] text-slate-400">{c.referido_email}</div> : null}
+                      </td>
+                      <td className="px-5 py-2 text-slate-700">{c.plan_nombre ?? c.plan_tier ?? "—"}</td>
+                      <td className="px-5 py-2 text-xs text-slate-500">{c.fuente ?? "—"}</td>
+                      <td className="px-5 py-2 text-right tabular-nums text-slate-600">{c.monto_base != null ? fmtGs(c.monto_base) : "—"}</td>
+                      <td className="px-5 py-2 text-right font-semibold tabular-nums text-[#0058A5]">
+                        {fmtGs(c.monto)}
+                        {c.porcentaje_aplicado != null ? <div className="text-[10px] font-normal text-slate-400">{c.porcentaje_aplicado}%</div> : null}
+                      </td>
                       <td className="px-5 py-2">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
@@ -351,15 +369,8 @@ export default function PortalReferidosDashboardPage() {
               </svg>
             </div>
             <div className="text-sm leading-relaxed text-slate-600">
-              <div className="font-semibold text-slate-800">Cómo funciona el programa</div>
-              <div className="mt-1">
-                <strong className="text-slate-700">Estándar (10%):</strong> abierto a todos los usuarios.
-                Comisión única sobre el primer pago del referido.
-              </div>
-              <div className="mt-1">
-                <strong className="text-slate-700">Influencer (25% × 6 meses):</strong> por invitación.
-                Comisión recurrente durante 6 meses + acceso a creatividades y dashboard avanzado.
-              </div>
+              <div className="font-semibold text-slate-800 mb-2">Cómo funciona el programa</div>
+              <ComoFuncionaContent />
             </div>
           </div>
         </section>
@@ -394,5 +405,33 @@ function Kpi({
         </div>
       </div>
     </div>
+  );
+}
+
+const DEFAULT_HOWTO = `<p><strong>Estándar (10%):</strong> abierto a todos los usuarios. Comisión única sobre el primer pago del referido.</p>
+<p><strong>Influencer (25% × 6 meses):</strong> por invitación. Comisión recurrente durante 6 meses + acceso a creatividades y dashboard avanzado.</p>`;
+
+function ComoFuncionaContent() {
+  const [html, setHtml] = useState<string>(DEFAULT_HOWTO);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/public/alquiloya/site-settings/referidos_como_funciona", { cache: "no-store" });
+        const b = (await r.json().catch(() => ({}))) as { value?: string | null };
+        if (!cancelled && b && typeof b.value === "string" && b.value.trim()) {
+          setHtml(b.value);
+        }
+      } catch {
+        // dejamos el default
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return (
+    <div
+      className="space-y-2 [&_p]:my-1 [&_strong]:text-slate-700 [&_a]:text-[#4FAEB2] [&_a]:underline [&_ul]:my-1 [&_ul]:pl-5 [&_ul]:list-disc [&_ol]:my-1 [&_ol]:pl-5 [&_ol]:list-decimal"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

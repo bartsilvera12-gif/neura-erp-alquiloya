@@ -117,13 +117,39 @@ export async function GET(request: Request) {
     );
     const st = stats.rows[0];
 
-    // 5. últimas comisiones
+    // 5. ultimas comisiones — incluye datos de la conversion para que el
+    // portal pueda mostrar a quien corresponde cada comision, que plan
+    // compro y de que campana vino.
     const comm = await queryWithRetry(
       pool,
-      `SELECT c.id, c.periodo, c.monto_comision::float8 AS monto, c.moneda,
+      `SELECT c.id, c.periodo,
+              c.monto_base::float8 AS monto_base,
+              c.porcentaje_aplicado::float8 AS porcentaje_aplicado,
+              c.monto_comision::float8 AS monto,
+              c.moneda,
               c.estado, c.generada_at::text AS generada_at,
-              c.pagada_at::text AS pagada_at
+              c.pagada_at::text AS pagada_at,
+              c.pago_referencia,
+              cv.target_tipo AS conv_target_tipo,
+              cv.converted_at::text AS conv_converted_at,
+              COALESCE(u.nombre, pr.nombre, ag.nombre) AS referido_nombre,
+              COALESCE(u.email,  pr.email,  ag.email)  AS referido_email,
+              lk.campania AS fuente,
+              pp.nombre AS plan_nombre,
+              pp.tier   AS plan_tier
          FROM ${t("referral_commissions")} c
+         LEFT JOIN ${t("referral_conversions")} cv
+           ON cv.empresa_id = c.empresa_id AND cv.id = c.conversion_id
+         LEFT JOIN ${t("referral_links")} lk
+           ON lk.empresa_id = cv.empresa_id AND lk.id = cv.link_id
+         LEFT JOIN ${t("planes_publicacion")} pp
+           ON pp.empresa_id = cv.empresa_id AND pp.id = cv.plan_publicacion_id
+         LEFT JOIN ${t("usuarios")} u
+           ON u.empresa_id = cv.empresa_id AND u.id = cv.usuario_id
+         LEFT JOIN ${t("propietarios")} pr
+           ON pr.empresa_id = cv.empresa_id AND cv.target_tipo='propietario' AND pr.id = cv.target_id
+         LEFT JOIN ${t("agentes")} ag
+           ON ag.empresa_id = cv.empresa_id AND cv.target_tipo='agente' AND ag.id = cv.target_id
         WHERE c.empresa_id = $1::uuid AND c.partner_id = $2::uuid
         ORDER BY c.generada_at DESC LIMIT 50`,
       [ALQUILOYA_EMPRESA_ID, partner.id]

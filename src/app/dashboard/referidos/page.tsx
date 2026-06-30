@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getChatPostgresPool } from "@/lib/supabase/chat-pg-pool";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { CopySlugButton } from "./_components/CopySlugButton";
+import ComoFuncionaEditor from "./_components/ComoFuncionaEditor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -302,6 +303,7 @@ export default async function ReferidosPage() {
           </div>
         )}
       </section>
+      <ComoFuncionaEditor />
     </div>
   );
 }
