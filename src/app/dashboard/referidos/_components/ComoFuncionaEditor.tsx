@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchWithSupabaseSession } from "@/lib/api/fetch-with-supabase-session";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const KEY = "referidos_como_funciona";
 const DEFAULT_TEXT = `<p><strong>Estándar (10%):</strong> abierto a todos los usuarios. Comisión única sobre el primer pago del referido.</p>
@@ -24,7 +25,7 @@ export default function ComoFuncionaEditor() {
         const v = (data.value ?? "").trim() || DEFAULT_TEXT;
         setValue(v);
         setOriginal(v);
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setValue(DEFAULT_TEXT);
           setOriginal(DEFAULT_TEXT);
@@ -64,14 +65,14 @@ export default function ComoFuncionaEditor() {
 
   return (
     <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
             &quot;Cómo funciona el programa&quot; / Términos y condiciones
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Aparece en la página de cada referido al final del dashboard. Soporta HTML básico
-            (<code className="rounded bg-slate-100 px-1">&lt;p&gt; &lt;strong&gt; &lt;em&gt; &lt;ul&gt; &lt;li&gt; &lt;br&gt; &lt;a&gt;</code>).
+            Aparece en la página de cada referido al final del dashboard.
+            Usá la barra para dar formato (negritas, títulos, listas, enlaces).
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -98,24 +99,12 @@ export default function ComoFuncionaEditor() {
         <div className="text-sm text-slate-400">Cargando…</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">HTML</div>
-              <textarea
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                rows={14}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 shadow-sm focus:border-[#4FAEB2] focus:outline-none focus:ring-2 focus:ring-[#4FAEB2]/30"
-              />
-            </div>
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Vista previa</div>
-              <div
-                className="prose prose-sm max-w-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 [&_a]:text-[#4FAEB2] [&_a]:underline [&_strong]:text-slate-800"
-                dangerouslySetInnerHTML={{ __html: value }}
-              />
-            </div>
-          </div>
+          <RichTextEditor
+            value={value}
+            onChange={setValue}
+            placeholder="Escribí cómo funciona el programa de referidos…"
+            minHeight={260}
+          />
 
           {msg ? (
             <div
