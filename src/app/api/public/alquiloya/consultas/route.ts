@@ -48,7 +48,6 @@ export async function POST(request: Request) {
     if (!propiedadId) {
       return NextResponse.json(errorResponse("Falta el id de la propiedad."), { status: 400 });
     }
-    }
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json(errorResponse("Pool no disponible"), { status: 500 });
