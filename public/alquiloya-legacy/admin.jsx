@@ -2237,11 +2237,12 @@ function EmbudoCaptaciones() {
 // ───────── Consultas recientes (datos reales /api/agente/consultas) ─────────
 function ConsultasRecientes({ onNav }) {
   const [data, setData] = React.useState(null);
+  const [busyId, setBusyId] = React.useState(null);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await (window.ayCachedFetch || fetch)('/api/agente/consultas?limit=6', { cache: 'no-store', credentials: 'include' });
+        const r = await (window.ayCachedFetch || fetch)('/api/agente/consultas?limit=20', { cache: 'no-store', credentials: 'include' });
         // Si el endpoint falla (401/403/500) NO ocultamos el widget: dejamos
         // data = [] para que aparezca el empty-state y el agente sepa que
         // todavia no recibio consultas (en vez de pensar que la seccion no existe).
@@ -2264,6 +2265,35 @@ function ConsultasRecientes({ onNav }) {
     return dd + ' d';
   }
   const canalIcon = (canal) => canal === 'whatsapp' ? '💬' : canal === 'mail' ? '✉' : canal === 'telefono' ? '📞' : '🔵';
+  const estadoMeta = (estado) => {
+    switch (estado) {
+      case 'nueva': return { label: 'Nueva', bg: '#fef3c7', fg: '#92400e' };
+      case 'vista': return { label: 'Vista', bg: '#dbeafe', fg: '#1e40af' };
+      case 'respondida': return { label: 'Respondida', bg: '#d1fae5', fg: '#065f46' };
+      case 'descartada': return { label: 'Descartada', bg: '#e5e7eb', fg: '#4b5563' };
+      default: return { label: estado || '—', bg: '#e5e7eb', fg: '#4b5563' };
+    }
+  };
+  async function cambiarEstado(c, nuevoEstado) {
+    if (!c || !c.id || nuevoEstado === c.estado) return;
+    setBusyId(c.id);
+    try {
+      const r = await fetch('/api/agente/consultas/' + c.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok || !b.success) throw new Error(b.error || ('HTTP ' + r.status));
+      setData(prev => prev.map(x => x.id === c.id ? { ...x, estado: nuevoEstado } : x));
+      if (window.ayNotify) window.ayNotify({ tone: 'success', message: 'Consulta marcada como ' + nuevoEstado });
+    } catch (e) {
+      if (window.ayNotify) window.ayNotify({ tone: 'danger', title: 'No se pudo actualizar', message: (e && e.message) || 'Error' });
+    } finally {
+      setBusyId(null);
+    }
+  }
   return (
     <div className="card" style={{ padding: 14 }}>
       <div className="row between" style={{ alignItems: 'center' }}>
@@ -2275,34 +2305,58 @@ function ConsultasRecientes({ onNav }) {
       <div className="col gap-8" style={{ marginTop: 10 }}>
         {data.length === 0 && (
           <div className="muted xs" style={{ padding: '14px 0', textAlign: 'center' }}>
-            Todavía no recibiste consultas. Cuando alguien clic en &quot;Consultar&quot; en una de tus propiedades, aparecerán acá.
+            Todavía no recibiste consultas. Cuando alguien hace clic en &quot;Consultar&quot; en una de tus propiedades, aparecerán acá.
           </div>
         )}
-        {data.map((c) => (
-          <div key={c.id} className="row gap-10" style={{ alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
-            <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--bg-3)', display: 'grid', placeItems: 'center', fontSize: 12, flexShrink: 0 }}>{canalIcon(c.canal)}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="row between" style={{ alignItems: 'baseline' }}>
-                <div style={{ fontWeight: 600, fontSize: 12.5 }}>{c.nombre || c.email || c.telefono || 'Interesado anónimo'}</div>
-                <div className="muted xs">{fmtRel(c.created_at)}</div>
-              </div>
-              {c.propiedad_titulo && (
-                <div className="muted xs" style={{ marginTop: 1 }}>{c.propiedad_titulo}{c.propiedad_ciudad ? ' · ' + c.propiedad_ciudad : ''}</div>
-              )}
-              {c.mensaje && (
-                <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.4 }}>{c.mensaje}</div>
-              )}
-              <div className="row gap-10" style={{ marginTop: 6 }}>
-                {c.telefono && (
-                  <a href={'https://wa.me/' + String(c.telefono).replace(/\D/g, '')} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 600, color: '#1ebd5b', textDecoration: 'none' }}>WhatsApp →</a>
+        {data.map((c) => {
+          const em = estadoMeta(c.estado);
+          const phone = c.telefono ? String(c.telefono).replace(/\D/g, '') : '';
+          const ocupada = c.estado === 'descartada';
+          return (
+            <div key={c.id} className="row gap-10" style={{ alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--line-2)', opacity: ocupada ? 0.55 : 1 }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-3)', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>{canalIcon(c.canal)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="row between" style={{ alignItems: 'baseline' }}>
+                  <div className="row gap-6" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, fontSize: 12.5 }}>{c.nombre || c.email || c.telefono || 'Interesado anónimo'}</span>
+                    <span style={{ background: em.bg, color: em.fg, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '.02em' }}>{em.label}</span>
+                  </div>
+                  <div className="muted xs">{fmtRel(c.created_at)}</div>
+                </div>
+                {c.propiedad_titulo && (
+                  <div className="muted xs" style={{ marginTop: 2 }}>{c.propiedad_titulo}{c.propiedad_ciudad ? ' · ' + c.propiedad_ciudad : ''}</div>
                 )}
-                {c.email && (
-                  <a href={'mailto:' + c.email} style={{ fontSize: 11, fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>Email →</a>
+                {c.mensaje && (
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 5, lineHeight: 1.45, background: 'var(--bg-2)', borderRadius: 6, padding: '6px 9px' }}>{c.mensaje}</div>
                 )}
+                <div className="row gap-10" style={{ marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {phone && (
+                    <a href={'https://wa.me/' + phone} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', background: '#1ebd5b', textDecoration: 'none', padding: '4px 10px', borderRadius: 6 }}>💬 WhatsApp</a>
+                  )}
+                  {c.email && (
+                    <a href={'mailto:' + c.email} style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--blue)', textDecoration: 'none', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--blue)' }}>✉ Email</a>
+                  )}
+                  {phone && (
+                    <a href={'tel:' + phone} style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink-2)', textDecoration: 'none' }}>📞 Llamar</a>
+                  )}
+                  <span style={{ flex: 1 }}/>
+                  <select
+                    value={c.estado || 'nueva'}
+                    disabled={busyId === c.id}
+                    onChange={(e) => cambiarEstado(c, e.target.value)}
+                    style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--line)', background: '#fff', color: 'var(--ink-1)', cursor: 'pointer' }}
+                    title="Cambiar estado de la consulta"
+                  >
+                    <option value="nueva">→ Nueva</option>
+                    <option value="vista">→ Vista</option>
+                    <option value="respondida">→ Respondida</option>
+                    <option value="descartada">→ Descartar</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
