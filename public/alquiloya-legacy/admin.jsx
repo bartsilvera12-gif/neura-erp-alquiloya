@@ -842,7 +842,6 @@ function AdminAgentPage({ route, onNav }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
                       {p.codigo ? <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{p.codigo}</span> : null}
                       <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{formatGs(p.price)}<span style={{ color: 'var(--ink-4)', fontWeight: 500 }}> /mes</span></span>
-                      <span title="Visitas que recibio esta publicacion" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 7px', borderRadius: 999, background: 'var(--bg-2)', color: 'var(--ink-3)', fontSize: 10.5, fontWeight: 600 }}>👁 {p.vistas || 0}</span>
                     </div>
                   </div>
 
