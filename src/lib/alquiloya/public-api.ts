@@ -36,14 +36,29 @@ async function ensurePublicacionDiasColumn(): Promise<void> {
   const pool = getChatPostgresPool();
   if (!pool) return;
   try {
+    // Bootstrap idempotente de todas las columnas opcionales que usa la SELECT
+    // publica. Si la migration aun no corrio (deploy frio en una DB vieja),
+    // CREATE IF NOT EXISTS las agrega y evita 500 al levantar el catalogo.
     await pool.query(
       `ALTER TABLE alquiloya.propiedades
          ADD COLUMN IF NOT EXISTS publicacion_dias integer`
     );
+    await pool.query(
+      `ALTER TABLE alquiloya.propiedades
+         ADD COLUMN IF NOT EXISTS video_url text`
+    );
+    await pool.query(
+      `ALTER TABLE alquiloya.propiedades
+         ADD COLUMN IF NOT EXISTS vistas_count integer NOT NULL DEFAULT 0`
+    );
+    await pool.query(
+      `ALTER TABLE alquiloya.propiedades
+         ADD COLUMN IF NOT EXISTS ultima_vista_at timestamptz`
+    );
     publicacionDiasReady = true;
   } catch (e) {
     console.warn(
-      "[alquiloya/public-api] bootstrap publicacion_dias:",
+      "[alquiloya/public-api] bootstrap columnas opcionales:",
       e instanceof Error ? e.message : e
     );
   }
