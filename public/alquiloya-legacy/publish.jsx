@@ -435,7 +435,7 @@ function PublishPage() {
         <div className="card" style={{ padding: 32 }}>
           {stepKinds[step] === 'plan' && <StepPlan form={form} setF={setF} ctxAgente={ctxAgente} ctxPropietario={ctxPropietario} editingId={editingId}/>}
           {stepKinds[step] === 'plan_request' && <StepRequestAgentPlan form={form} setF={setF} ctxAgente={ctxAgente}/>}
-          {stepKinds[step] === 'basics' && <StepBasics form={form} setF={setF}/>}
+          {stepKinds[step] === 'basics' && <StepBasics form={form} setF={setF} ctxAgente={ctxAgente}/>}
           {stepKinds[step] === 'location' && <StepLocation form={form} setF={setF}/>}
           {stepKinds[step] === 'photos' && <StepPhotos form={form} setF={setF} isAgent={!!ctxAgente}/>}
           {stepKinds[step] === 'preview' && <StepPreview form={form} setF={setF}/>}
@@ -782,7 +782,7 @@ const PUBLISH_TIPOS = [
 ];
 const PUBLISH_CARAC = ['Cochera','Amoblado','Mascotas permitidas','Piscina','Quincho','Aire acondicionado','Wifi','Lavadero','Seguridad 24hs','Cocina equipada'];
 
-function StepBasics({ form, setF }) {
+function StepBasics({ form, setF, ctxAgente }) {
   function toggleCarac(name) {
     setF(f => {
       const has = (f.caracteristicas || []).includes(name);
