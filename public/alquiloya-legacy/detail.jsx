@@ -6,6 +6,20 @@ function DetailPage({ p, onProperty, onNav }) {
   const baseProperty = p || properties[0] || PROPERTIES[0];
   const apiProperty = useAlquiloYaPublicProperty(baseProperty?.id);
   p = apiProperty || baseProperty;
+
+  // Tracker de vistas: dispara POST /vista una sola vez por sesion+propiedad.
+  // Dedup en sessionStorage para no inflar el contador al refrescar.
+  React.useEffect(() => {
+    const realId = p && (p.apiId || p.id);
+    if (!realId || typeof realId !== 'string' || !/^[0-9a-f-]{36}$/i.test(realId)) return;
+    const key = 'aly_vista_' + realId;
+    try { if (sessionStorage.getItem(key)) return; } catch { /* sin sessionStorage */ }
+    try { sessionStorage.setItem(key, '1'); } catch {}
+    fetch('/api/public/alquiloya/propiedades/' + realId + '/vista', {
+      method: 'POST',
+      credentials: 'omit',
+    }).catch(() => {});
+  }, [p && (p.apiId || p.id)]);
   // "Propiedades similares" muestra SOLO inmuebles verificados (badge
   // azul) — pedido del cliente para que esta zona destaque trabajos
   // serios. La verificacion se obtiene por la solicitud de verificacion

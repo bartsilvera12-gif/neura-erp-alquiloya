@@ -14,6 +14,19 @@ const ALQUILOYA_EMPRESA_ID = "cf5df6fb-7705-4c4e-b29c-97bf5f314d8f";
 function t(table: string): string {
   return `"${ALQUILOYA_SCHEMA}"."${table}"`;
 }
+let bootstrapped = false;
+async function ensureExtraColumns(pool: NonNullable<ReturnType<typeof getChatPostgresPool>>) {
+  if (bootstrapped) return;
+  try {
+    await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS vistas_count integer NOT NULL DEFAULT 0`, []);
+    await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS ultima_vista_at timestamptz`, []);
+    await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS video_url text`, []);
+    bootstrapped = true;
+  } catch (e) {
+    console.warn("[agente/propiedades bootstrap]", e instanceof Error ? e.message : e);
+  }
+}
+
 
 type PropiedadAgenteRow = {
   id: string;
@@ -38,6 +51,9 @@ type PropiedadAgenteRow = {
   visible_web: boolean | null;
   activo: boolean | null;
   cover_url: string | null;
+  vistas_count: number;
+  ultima_vista_at: string | null;
+  video_url: string | null;
   fotos_count: number;
   created_at: string | null;
   plan_es_gratis: boolean | null;
@@ -82,6 +98,7 @@ export async function GET(request: Request) {
 
     const pool = getChatPostgresPool();
     if (!pool) return NextResponse.json({ error: "Pool no disponible" }, { status: 500 });
+    await ensureExtraColumns(pool);
 
     const { rows } = await queryWithRetry<PropiedadAgenteRow>(
       pool,
@@ -95,6 +112,9 @@ export async function GET(request: Request) {
           p.superficie_m2::float8 AS superficie_m2,
           p.lat::float8 AS lat, p.lng::float8 AS lng,
           p.destacada, p.visible_web, p.activo,
+          COALESCE(p.vistas_count, 0)::int AS vistas_count,
+          p.ultima_vista_at::text AS ultima_vista_at,
+          p.video_url,
           cover.url AS cover_url,
           COALESCE(fcnt.n, 0)::int AS fotos_count,
           p.created_at::text AS created_at,
