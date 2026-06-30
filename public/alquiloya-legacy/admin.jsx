@@ -971,7 +971,6 @@ function AdminAgentPage({ route, onNav }) {
         <div className="col gap-12">
           {/* Embudo + consultas recientes — solo agentes (los propietarios no tienen). */}
           {!isPropietario && <EmbudoCaptaciones/>}
-          {!isPropietario && <ConsultasRecientes onNav={onNav}/>}
 
           {/* QR mini */}
           <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
