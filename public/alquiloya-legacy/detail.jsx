@@ -7,17 +7,24 @@ function DetailPage({ p, onProperty, onNav }) {
   const apiProperty = useAlquiloYaPublicProperty(baseProperty?.id);
   p = apiProperty || baseProperty;
 
-  // Tracker de vistas: dispara POST /vista una sola vez por sesion+propiedad.
-  // Dedup en sessionStorage para no inflar el contador al refrescar.
+  // Tracker de vistas: dispara POST /vista cuando el visitante abre la ficha.
+  // Dedup por ventana de tiempo (30 min) en localStorage. Refresco rapido no
+  // cuenta; volver despues de media hora si. Distinto navegador / incognito
+  // siempre cuentan como vista nueva.
   React.useEffect(() => {
     const realId = p && (p.apiId || p.id);
     if (!realId || typeof realId !== 'string' || !/^[0-9a-f-]{36}$/i.test(realId)) return;
     const key = 'aly_vista_' + realId;
-    try { if (sessionStorage.getItem(key)) return; } catch { /* sin sessionStorage */ }
-    try { sessionStorage.setItem(key, '1'); } catch {}
+    const WINDOW_MS = 30 * 60 * 1000;
+    try {
+      const prev = Number(localStorage.getItem(key) || 0);
+      if (prev && Date.now() - prev < WINDOW_MS) return;
+      localStorage.setItem(key, String(Date.now()));
+    } catch { /* sin localStorage: dejamos pasar siempre */ }
     fetch('/api/public/alquiloya/propiedades/' + realId + '/vista', {
       method: 'POST',
       credentials: 'omit',
+      cache: 'no-store',
     }).catch(() => {});
   }, [p && (p.apiId || p.id)]);
   // "Propiedades similares" muestra SOLO inmuebles verificados (badge

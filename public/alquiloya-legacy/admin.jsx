@@ -411,7 +411,7 @@ function AdminAgentPage({ route, onNav }) {
       } catch { /* try next */ }
       if (!body) {
         try {
-          const r2 = await cf('/api/agente/propiedades', { cache: 'no-store', credentials: 'include' });
+          const r2 = await fetch('/api/agente/propiedades', { cache: 'no-store', credentials: 'include' });
           if (r2.ok) {
             const b2 = await r2.json();
             if (b2?.success && Array.isArray(b2.propiedades)) body = b2;
