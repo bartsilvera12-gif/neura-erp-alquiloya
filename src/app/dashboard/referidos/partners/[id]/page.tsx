@@ -6,6 +6,7 @@ import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { CopySlugButton } from "../../_components/CopySlugButton";
 import { PartnerActions } from "./_components/PartnerActions";
 import { EditarPartnerButton } from "./_components/EditarPartnerButton";
+import EstadoComisionSelect from "./_components/EstadoComisionSelect";
 import { EditarReglaButton } from "./_components/EditarReglaButton";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ type Conversion = {
   plan_tier: string | null;
   monto_base: number | null;
   moneda: string | null;
+  comision_id: string | null;
   comision_monto: number | null;
   comision_estado: string | null;
   converted_at: string | null;
@@ -128,6 +130,7 @@ async function load(id: string) {
          pp.tier    AS plan_tier,
          c.monto_base::float8 AS monto_base,
          c.moneda,
+         cm.id AS comision_id,
          cm.monto_comision::float8 AS comision_monto,
          cm.estado                AS comision_estado,
          c.converted_at::text     AS converted_at
@@ -143,7 +146,7 @@ async function load(id: string) {
        LEFT JOIN alquiloya.agentes a
          ON a.empresa_id=c.empresa_id AND c.target_tipo='agente' AND a.id=c.target_id
        LEFT JOIN LATERAL (
-         SELECT monto_comision, estado
+         SELECT id, monto_comision, estado
            FROM alquiloya.referral_commissions
           WHERE empresa_id=c.empresa_id AND conversion_id=c.id
           ORDER BY generada_at DESC LIMIT 1
@@ -343,7 +346,7 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
                     <td className="px-4 py-2 text-right tabular-nums">{c.monto_base != null ? fmtGs(c.monto_base) : "—"}</td>
                     <td className="px-4 py-2 text-right font-semibold tabular-nums text-blue-700">{c.comision_monto != null ? fmtGs(c.comision_monto) : "—"}</td>
                     <td className="px-4 py-2">
-                      <CommBadge estado={c.comision_estado} />
+                      <div className="flex items-center gap-2"><CommBadge estado={c.comision_estado} /><EstadoComisionSelect id={c.comision_id} current={c.comision_estado} /></div>
                     </td>
                   </tr>
                 ))}

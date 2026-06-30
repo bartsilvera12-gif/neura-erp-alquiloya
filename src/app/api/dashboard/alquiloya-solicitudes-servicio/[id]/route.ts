@@ -456,13 +456,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
       if (sol.referral_link_id && sol.referral_partner_id && resultadoId) {
         const targetTipo = sol.kind === "cambio_plan" ? "plan_publicacion" : "otro";
         try {
-          await client.query(
+          const convIns = await client.query<{ id: string }>(
             `INSERT INTO "alquiloya"."referral_conversions"
                (empresa_id, link_id, partner_id, target_tipo, target_id,
                 plan_publicacion_id, monto_base, moneda, converted_at)
              VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
                      NULLIF($6, '')::uuid, $7, $8, now())
-             ON CONFLICT (empresa_id, target_tipo, target_id) DO NOTHING`,
+             ON CONFLICT (empresa_id, target_tipo, target_id) DO NOTHING
+             RETURNING id`,
             [
               ALQUILOYA_EMPRESA_ID,
               sol.referral_link_id,
@@ -474,9 +475,60 @@ export async function PATCH(request: Request, ctx: Ctx) {
               "PYG",
             ]
           );
+
+          // Si la conversion se inserto (no fue un dup), generamos la
+          // comision aplicando la regla vigente del partner. Sin esto, el
+          // portal del referido muestra "Conversiones: N" pero "Comision
+          // pendiente: 0" — bug reportado por Javier.
+          const convId = convIns.rows[0]?.id ?? null;
+          if (convId) {
+            const ruleRes = await client.query<{
+              id: string; tipo: string; valor: string;
+              moneda: string | null;
+            }>(
+              `SELECT id, tipo, valor::text AS valor, moneda
+                 FROM "alquiloya"."referral_commission_rules"
+                WHERE empresa_id = $1::uuid
+                  AND partner_id = $2::uuid
+                  AND vigente_hasta IS NULL
+                ORDER BY vigente_desde DESC
+                LIMIT 1`,
+              [ALQUILOYA_EMPRESA_ID, sol.referral_partner_id]
+            );
+            const rule = ruleRes.rows[0];
+            const montoBase = Number(sol.monto) || 0;
+            if (rule && montoBase > 0) {
+              const ruleValor = Number(rule.valor) || 0;
+              let montoComision = 0;
+              let porcentajeAplicado: number | null = null;
+              if (rule.tipo === "porcentaje") {
+                porcentajeAplicado = ruleValor;
+                montoComision = Math.round((montoBase * ruleValor) / 100);
+              } else {
+                montoComision = Math.round(ruleValor);
+              }
+              if (montoComision > 0) {
+                await client.query(
+                  `INSERT INTO "alquiloya"."referral_commissions"
+                     (empresa_id, conversion_id, partner_id, monto_base,
+                      porcentaje_aplicado, monto_comision, moneda, estado)
+                   VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, 'pendiente')`,
+                  [
+                    ALQUILOYA_EMPRESA_ID,
+                    convId,
+                    sol.referral_partner_id,
+                    montoBase,
+                    porcentajeAplicado,
+                    montoComision,
+                    rule.moneda || "PYG",
+                  ]
+                );
+              }
+            }
+          }
         } catch (e) {
           console.warn(
-            "[solicitudes-servicio PATCH] insert referral_conversions:",
+            "[solicitudes-servicio PATCH] insert referral_conversions/commissions:",
             e instanceof Error ? e.message : e
           );
         }
