@@ -121,6 +121,7 @@ type Body = {
   propietario_documento?: string;
   plan_publicacion_id?: string | null;
   notas_propietario?: string;
+  video_url?: string;
 };
 
 export async function POST(request: Request) {
