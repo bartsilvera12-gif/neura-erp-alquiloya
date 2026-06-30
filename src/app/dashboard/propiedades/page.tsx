@@ -119,7 +119,7 @@ export default async function PropiedadesPage() {
                   </td>
                   <td className="hidden px-3 py-2 text-slate-700 lg:table-cell">{p.estado ?? "—"}</td>
                   <td className="hidden px-3 py-2 text-slate-700 lg:table-cell">{p.agente_nombre ?? "—"}</td>
-                  <td className="px-3 py-2"><ToggleActivoButton id={p.id} initial={!!p.activo} titulo={p.titulo} /></td>
+                  <td className="px-3 py-2"><ToggleActivoButton id={p.id} initial={!!p.activo} visibleWebInitial={!!p.visible_web} titulo={p.titulo} /></td>
                   <td className="px-3 py-2"><ToggleDestacadaButton id={p.id} initialEfectiva={!!p.destacada_efectiva} initialHasta={p.destacada_hasta} titulo={p.titulo} /></td>
                   <td className="sticky right-0 bg-white px-3 py-2 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)] group-hover:bg-slate-50">
                     <div className="inline-flex items-center gap-1">
