@@ -20,6 +20,7 @@ type Plan = {
   free_boosts: number | null;
   orden: number;
   billing_note?: string | null;
+  permite_videos?: boolean;
   activo?: boolean;
 };
 
@@ -325,6 +326,10 @@ function EditModal({
               <input type="checkbox" checked={form.activo !== false} onChange={(e) => set("activo", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] focus:ring-[#4FAEB2]" />
               Activo (visible en la web)
             </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-800" title="El agente podra cargar un video (YouTube/Vimeo) en sus propiedades">
+              <input type="checkbox" checked={!!form.permite_videos} onChange={(e) => set("permite_videos", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#4FAEB2] focus:ring-[#4FAEB2]" />
+              Permite videos en propiedades
+            </label>
           </div>
 
           <ListEditor label="Características (qué incluye)" items={bullets} onChange={setBullets} placeholder="Ej. 1 propiedad activa" />
@@ -493,6 +498,7 @@ export default function PlanesPublicacionClient({ hideHeader = false }: { hideHe
                 free_boosts: null,
                 orden: maxOrden + 10,
                 billing_note: null,
+                permite_videos: false,
                 activo: true,
               });
             }}

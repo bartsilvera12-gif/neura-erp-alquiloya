@@ -166,6 +166,8 @@ export async function listPublicPropiedades(request: NextRequest) {
           (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada,
           COALESCE(p.verificada, false) AS verificada,
           p.visible_web, p.activo, p.created_at, p.updated_at,
+          COALESCE(p.video_url, NULL) AS video_url,
+          COALESCE(p.vistas_count, 0)::int AS vistas_count,
           CASE
             WHEN cover.id IS NULL THEN NULL
             ELSE json_build_object(
@@ -223,6 +225,8 @@ export async function getPublicPropiedad(id: string, opts?: { includeAnyState?: 
           (p.destacada AND (p.destacada_hasta IS NULL OR p.destacada_hasta > now())) AS destacada,
           COALESCE(p.verificada, false) AS verificada,
           p.visible_web, p.activo, p.created_at, p.updated_at,
+          COALESCE(p.video_url, NULL) AS video_url,
+          COALESCE(p.vistas_count, 0)::int AS vistas_count,
           CASE
             WHEN a.id IS NULL THEN NULL
             ELSE json_build_object(

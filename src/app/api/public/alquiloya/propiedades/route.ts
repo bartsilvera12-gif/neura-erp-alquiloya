@@ -514,7 +514,7 @@ export async function POST(request: Request) {
            tipo, operacion, estado, ciudad, barrio, direccion,
            precio, moneda, dormitorios, banos, cocheras,
            superficie_m2, terreno_m2,
-           destacada, visible_web, activo, lat, lng
+           destacada, visible_web, activo, lat, lng, video_url
          )
          VALUES (
            $1::uuid, $2::uuid, $3::uuid,
@@ -524,7 +524,7 @@ export async function POST(request: Request) {
            $8, $9, $10,
            $11, COALESCE($12,'PYG'), $13, $14, $15,
            $16, $17,
-           false, false, false, $18, $19
+           false, false, false, $18, $19, $20
          )
          RETURNING id, codigo`,
         [
@@ -547,6 +547,7 @@ export async function POST(request: Request) {
           n(body.terreno_m2),
           coord(body.lat, "lat"),
           coord(body.lng, "lng"),
+          s(body.video_url, 1024),
         ]
       );
       const propId = ins.rows[0].id;

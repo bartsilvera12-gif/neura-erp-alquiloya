@@ -46,6 +46,7 @@ function DetailPage({ p, onProperty, onNav }) {
       <div className="container" style={{ padding: '32px', display: 'grid', gridTemplateColumns: '1fr 380px', gap: 40, alignItems: 'flex-start' }}>
         <div>
           <DetailHeader p={p}/>
+          <DetailVideo p={p}/>
           <DetailFeatures p={p}/>
           <DetailDescription p={p}/>
           <DetailMap p={p}/>
@@ -464,6 +465,65 @@ function DetailHeader({ p }) {
             <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 14 }}>1 mes</div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// Reproductor de video embebido. Soporta:
+//   - YouTube (watch?v=ID, youtu.be/ID, /shorts/ID, /embed/ID)
+//   - Vimeo (vimeo.com/ID o player.vimeo.com/video/ID)
+//   - URL directa de mp4/webm/mov (renderiza con <video controls>)
+// Solo aparece si la propiedad tiene video_url (los planes que no permiten
+// videos directamente no lo guardan, asi que el filtro lo da el back).
+function DetailVideo({ p }) {
+  const url = p && p.video_url ? String(p.video_url).trim() : '';
+  if (!url) return null;
+  let embedUrl = null;
+  let isFile = false;
+  // YouTube
+  let m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{6,})/);
+  if (m) {
+    embedUrl = 'https://www.youtube.com/embed/' + m[1];
+  } else {
+    // Vimeo
+    m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (m) {
+      embedUrl = 'https://player.vimeo.com/video/' + m[1];
+    } else if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(url)) {
+      isFile = true;
+    } else {
+      // Fallback: link plano "Ver video"
+      return (
+        <div className="card" style={{ padding: 16, marginTop: 16 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 8 }}>📹 Video del inmueble</h3>
+          <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-blue">Ver video →</a>
+        </div>
+      );
+    }
+  }
+  return (
+    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+      <h3 style={{ fontSize: 16, marginBottom: 10 }}>📹 Video del inmueble</h3>
+      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 12, background: '#000' }}>
+        {isFile ? (
+          <video
+            src={url}
+            controls
+            playsInline
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          />
+        ) : (
+          <iframe
+            src={embedUrl}
+            title="Video del inmueble"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          />
+        )}
       </div>
     </div>
   );

@@ -85,7 +85,7 @@ export async function GET(request: Request) {
           if (planId) {
             const { data: pl } = await supabase
               .from("planes_publicacion")
-              .select("id, tier, nombre, billing, bullets, activo")
+              .select("id, tier, nombre, billing, bullets, activo, permite_videos")
               .eq("id", planId)
               .eq("empresa_id", ALQUILOYA_EMPRESA_ID)
               .limit(1)

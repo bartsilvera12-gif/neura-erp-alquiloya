@@ -15,6 +15,12 @@ async function ensureBillingNoteColumn(pool: ReturnType<typeof getChatPostgresPo
          ADD COLUMN IF NOT EXISTS billing_note text`,
       []
     );
+    await queryWithRetry(
+      pool,
+      `ALTER TABLE "alquiloya"."planes_publicacion"
+         ADD COLUMN IF NOT EXISTS permite_videos boolean NOT NULL DEFAULT false`,
+      []
+    );
     bootstrapped = true;
   } catch (e) {
     console.warn("[planes-publicacion bootstrap]", e instanceof Error ? e.message : e);
@@ -66,6 +72,7 @@ type PatchBody = {
   highlighted?: boolean;
   free_boosts?: number | string | null;
   billing_note?: string | null;
+  permite_videos?: boolean;
   orden?: number | string;
   activo?: boolean;
 };
@@ -109,13 +116,14 @@ export async function PATCH(
          orden = COALESCE($13, orden),
          activo = $14,
          billing_note = $15,
+         permite_videos = COALESCE($16, false),
          updated_at = now()
-       WHERE id = $16::uuid AND empresa_id = $17::uuid
+       WHERE id = $17::uuid AND empresa_id = $18::uuid
        RETURNING id, tier, target, nombre,
                  precio::float8 AS precio, moneda, billing, badge,
                  COALESCE(bullets, '[]'::jsonb)  AS bullets,
                  COALESCE(excluded, '[]'::jsonb) AS excluded,
-                 cta, highlighted, free_boosts, orden, activo, billing_note`,
+                 cta, highlighted, free_boosts, orden, activo, billing_note, COALESCE(permite_videos, false) AS permite_videos`,
       [
         tier,
         s(body.target),
@@ -132,6 +140,7 @@ export async function PATCH(
         i(body.orden),
         b(body.activo, true),
         s(body.billing_note),
+        b(body.permite_videos, false),
         id,
         ALQUILOYA_EMPRESA_ID,
       ]

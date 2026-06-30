@@ -17,6 +17,12 @@ async function ensureBillingNoteColumn(pool: ReturnType<typeof getChatPostgresPo
          ADD COLUMN IF NOT EXISTS billing_note text`,
       []
     );
+    await queryWithRetry(
+      pool,
+      `ALTER TABLE "alquiloya"."planes_publicacion"
+         ADD COLUMN IF NOT EXISTS permite_videos boolean NOT NULL DEFAULT false`,
+      []
+    );
     bootstrapped = true;
   } catch (e) {
     console.warn("[planes-publicacion bootstrap]", e instanceof Error ? e.message : e);
@@ -41,6 +47,7 @@ type PlanRow = {
   highlighted: boolean;
   free_boosts: number | null;
   billing_note: string | null;
+  permite_videos: boolean;
   orden: number;
 };
 
@@ -57,7 +64,7 @@ export async function GET() {
               precio::float8 AS precio, moneda, billing, badge,
               COALESCE(bullets, '[]'::jsonb)  AS bullets,
               COALESCE(excluded, '[]'::jsonb) AS excluded,
-              cta, highlighted, free_boosts, orden, billing_note
+              cta, highlighted, free_boosts, orden, billing_note, COALESCE(permite_videos, false) AS permite_videos
          FROM "alquiloya"."planes_publicacion"
          WHERE empresa_id = $1::uuid AND activo = true
          ORDER BY orden ASC, nombre ASC`,

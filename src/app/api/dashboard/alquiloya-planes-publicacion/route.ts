@@ -15,6 +15,12 @@ async function ensureBillingNoteColumn(pool: ReturnType<typeof getChatPostgresPo
          ADD COLUMN IF NOT EXISTS billing_note text`,
       []
     );
+    await queryWithRetry(
+      pool,
+      `ALTER TABLE "alquiloya"."planes_publicacion"
+         ADD COLUMN IF NOT EXISTS permite_videos boolean NOT NULL DEFAULT false`,
+      []
+    );
     bootstrapped = true;
   } catch (e) {
     console.warn("[planes-publicacion bootstrap]", e instanceof Error ? e.message : e);
@@ -66,7 +72,7 @@ export async function GET(request: Request) {
               precio::float8 AS precio, moneda, billing, badge,
               COALESCE(bullets, '[]'::jsonb)  AS bullets,
               COALESCE(excluded, '[]'::jsonb) AS excluded,
-              cta, highlighted, free_boosts, orden, activo, billing_note
+              cta, highlighted, free_boosts, orden, activo, billing_note, COALESCE(permite_videos, false) AS permite_videos
          FROM "alquiloya"."planes_publicacion"
          WHERE empresa_id = $1::uuid
          ORDER BY orden ASC, nombre ASC`,
@@ -93,6 +99,7 @@ type PostBody = {
   highlighted?: boolean;
   free_boosts?: number | string | null;
   billing_note?: string | null;
+  permite_videos?: boolean;
   orden?: number | string;
   activo?: boolean;
 };
@@ -116,16 +123,16 @@ export async function POST(request: Request) {
       pool,
       `INSERT INTO "alquiloya"."planes_publicacion"
          (empresa_id, tier, target, nombre, precio, moneda, billing, badge,
-          bullets, excluded, cta, highlighted, free_boosts, orden, activo, billing_note)
+          bullets, excluded, cta, highlighted, free_boosts, orden, activo, billing_note, permite_videos)
        VALUES
          ($1::uuid, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 'PYG'), COALESCE($7, 'unico'),
           $8, COALESCE($9::jsonb, '[]'::jsonb), COALESCE($10::jsonb, '[]'::jsonb),
-          $11, $12, $13, COALESCE($14, 0), $15, $16)
+          $11, $12, $13, COALESCE($14, 0), $15, $16, COALESCE($17, false))
        RETURNING id, tier, target, nombre,
                  precio::float8 AS precio, moneda, billing, badge,
                  COALESCE(bullets, '[]'::jsonb)  AS bullets,
                  COALESCE(excluded, '[]'::jsonb) AS excluded,
-                 cta, highlighted, free_boosts, orden, activo, billing_note`,
+                 cta, highlighted, free_boosts, orden, activo, billing_note, COALESCE(permite_videos, false) AS permite_videos`,
       [
         ALQUILOYA_EMPRESA_ID,
         tier,
@@ -143,6 +150,7 @@ export async function POST(request: Request) {
         i(body.orden),
         bo(body.activo, true),
         s(body.billing_note),
+        bo(body.permite_videos, false),
       ]
     );
 

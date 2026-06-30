@@ -199,6 +199,8 @@
       // detalle): agente o, si es publicacion directa, el propietario.
       contacto: row.contacto || null,
       desc: row.descripcion || row.desc || fallback?.desc || '',
+      video_url: row.video_url || null,
+      vistas: typeof row.vistas_count === 'number' ? row.vistas_count : 0,
       features,
       lat: typeof row.lat === 'number' ? row.lat : (row.lat != null ? Number(row.lat) || null : null),
       lng: typeof row.lng === 'number' ? row.lng : (row.lng != null ? Number(row.lng) || null : null),

@@ -241,6 +241,8 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     }
     const descripcion = s(body.descripcion, 4000);
     if (descripcion !== undefined) push("descripcion", descripcion);
+    const videoUrl = s(body.video_url, 1024);
+    if (videoUrl !== undefined) push("video_url", videoUrl);
     if (body.tipo !== undefined) {
       const t = s(body.tipo, 40);
       if (t && !TIPOS_OK.has(t)) return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });

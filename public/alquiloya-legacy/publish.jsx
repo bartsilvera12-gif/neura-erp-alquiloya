@@ -98,6 +98,7 @@ function PublishPage() {
     precio: '',
     moneda: 'PYG',
     descripcion: '',
+    video_url: '',
     dormitorios: '',
     banos: '',
     cocheras: '',
@@ -148,6 +149,7 @@ function PublishPage() {
           tipo: p.tipo || f.tipo,
           operacion: p.operacion || 'alquiler',
           descripcion: p.descripcion || '',
+          video_url: p.video_url || '',
           precio: p.precio != null ? String(p.precio) : '',
           moneda: p.moneda || 'PYG',
           dormitorios: p.dormitorios != null ? String(p.dormitorios) : '',
@@ -288,6 +290,7 @@ function PublishPage() {
         tipo: form.tipo,
         operacion: form.operacion,
         descripcion: form.descripcion || null,
+        video_url: form.video_url && form.video_url.trim() ? form.video_url.trim() : null,
         ciudad: form.ciudad,
         barrio: form.barrio || null,
         direccion: form.direccion || null,
@@ -838,6 +841,13 @@ function StepBasics({ form, setF }) {
           <label>Descripción</label>
           <textarea className="input" rows={4} value={form.descripcion} onChange={(e) => setF({ descripcion: e.target.value })} placeholder="Detalles del inmueble (ambientes, servicios, comodidades, etc.)"/>
         </div>
+        {(ctxAgente && ctxAgente.plan && ctxAgente.plan.permite_videos) ? (
+          <div className="field" style={{ marginTop: 18 }}>
+            <label>Video (URL de YouTube, Vimeo o .mp4) <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', marginLeft: 6 }}>Premium</span></label>
+            <input className="input" value={form.video_url || ''} onChange={(e) => setF({ video_url: e.target.value })} placeholder="https://youtube.com/watch?v=... o https://vimeo.com/... o .mp4 directo"/>
+            <div className="muted xs" style={{ marginTop: 4 }}>Aparecera embebido arriba de las fotos en la ficha publica.</div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
