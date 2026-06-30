@@ -34,9 +34,20 @@ export async function POST(request: Request) {
     const canalRaw = s(body.canal, 20) ?? "web";
     const canal = ["web", "whatsapp", "telefono", "mail", "otro"].includes(canalRaw) ? canalRaw : "web";
 
-    // Para que tenga sentido, exigimos al menos algún dato de contacto o el id de la propiedad.
-    if (!propiedadId && !nombre && !email && !telefono) {
-      return NextResponse.json(errorResponse("Datos insuficientes"), { status: 400 });
+    // Exigimos nombre + un dato de contacto (telefono o email). Antes
+    // alcanzaba con CUALQUIER campo y dejaba pasar consultas "anonimas"
+    // sin manera de responderlas — el agente las recibia sin saber a
+    // quien escribirle (bug reportado por Karen: 'ultimas consultas
+    // sigue siendo inutil').
+    if (!nombre) {
+      return NextResponse.json(errorResponse("El nombre es obligatorio."), { status: 400 });
+    }
+    if (!telefono && !email) {
+      return NextResponse.json(errorResponse("Necesitamos teléfono o email para que el agente te pueda contactar."), { status: 400 });
+    }
+    if (!propiedadId) {
+      return NextResponse.json(errorResponse("Falta el id de la propiedad."), { status: 400 });
+    }
     }
 
     const pool = getChatPostgresPool();

@@ -706,20 +706,15 @@ function DetailQR({ p }) {
 }
 
 function AgentCard({ agent, price, tipo, onNav, property }) {
-  function registerConsulta(canal) {
-    try {
-      fetch('/api/public/alquiloya/consultas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          propiedad_id: property?.apiId || null,
-          agente_id: agent?.apiId || null,
-          canal: canal || 'web',
-          mensaje: 'Consulta desde la ficha de "' + (property?.title || 'propiedad') + '"',
-        }),
-        keepalive: true,
-      }).catch(() => {});
-    } catch {}
+  // Antes este handler creaba una fila en alquiloya.consultas al tocar
+  // WhatsApp/Mensaje, pero sin datos del visitante. El agente las recibia
+  // como 'Interesado anonimo' sin manera de responder. Karen pidio limpiarlo.
+  // El click abre wa.me directamente — el agente ve el mensaje real en
+  // WhatsApp, no necesitamos duplicar una fila vacia.
+  function registerConsulta(_canal) {
+    // noop intencional. Si en el futuro queremos un formulario propio
+    // (nombre + telefono/email obligatorios), va a llamarse desde otro
+    // handler — no desde el click directo a WhatsApp.
   }
   function onClickWhatsApp() {
     registerConsulta('whatsapp');
