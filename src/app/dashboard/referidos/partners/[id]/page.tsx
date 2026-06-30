@@ -125,7 +125,7 @@ async function load(id: string) {
          c.id,
          COALESCE(u.nombre, p.nombre, a.nombre) AS referido_nombre,
          COALESCE(u.email,  p.email,  a.email)  AS referido_email,
-         lk.campania AS fuente,
+         COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
          pp.nombre  AS plan_nombre,
          pp.tier    AS plan_tier,
          c.monto_base::float8 AS monto_base,

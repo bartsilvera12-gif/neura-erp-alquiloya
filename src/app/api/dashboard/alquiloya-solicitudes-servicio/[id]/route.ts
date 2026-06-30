@@ -454,14 +454,33 @@ export async function PATCH(request: Request, ctx: Ctx) {
       // target_id) — si el admin re-aprueba una solicitud rechazada y reabierta
       // (caso raro), no se duplica.
       if (sol.referral_link_id && sol.referral_partner_id && resultadoId) {
-        const targetTipo = sol.kind === "cambio_plan" ? "plan_publicacion" : "otro";
+        // Para cambio_plan: el referido es el propietario (asi sale el nombre
+        // en el panel del partner). El plan comprado va aparte en
+        // plan_publicacion_id. Antes hardcodeabamos target_tipo='plan_publicacion'
+        // y plan_publicacion_id='' -> todo NULL en la vista.
+        let targetTipo: string;
+        let targetIdForConv: string;
+        let planPublicacionIdForConv: string | null = null;
+        if (sol.kind === "cambio_plan" && effectivePropietarioId) {
+          targetTipo = "propietario";
+          targetIdForConv = effectivePropietarioId;
+          planPublicacionIdForConv = resultadoId;
+        } else if (sol.kind === "cambio_plan" && overrideAgente) {
+          targetTipo = "agente";
+          targetIdForConv = overrideAgente;
+          planPublicacionIdForConv = resultadoId;
+        } else {
+          targetTipo = sol.kind === "cambio_plan" ? "plan_publicacion" : "otro";
+          targetIdForConv = resultadoId;
+          planPublicacionIdForConv = sol.kind === "cambio_plan" ? resultadoId : null;
+        }
         try {
           const convIns = await client.query<{ id: string }>(
             `INSERT INTO "alquiloya"."referral_conversions"
                (empresa_id, link_id, partner_id, target_tipo, target_id,
                 plan_publicacion_id, monto_base, moneda, converted_at)
              VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
-                     NULLIF($6, '')::uuid, $7, $8, now())
+                     $6::uuid, $7, $8, now())
              ON CONFLICT (empresa_id, target_tipo, target_id) DO NOTHING
              RETURNING id`,
             [
@@ -469,8 +488,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
               sol.referral_link_id,
               sol.referral_partner_id,
               targetTipo,
-              resultadoId,
-              "",
+              targetIdForConv,
+              planPublicacionIdForConv,
               sol.monto,
               "PYG",
             ]
@@ -496,7 +515,27 @@ export async function PATCH(request: Request, ctx: Ctx) {
               [ALQUILOYA_EMPRESA_ID, sol.referral_partner_id]
             );
             const rule = ruleRes.rows[0];
-            const montoBase = Number(sol.monto) || 0;
+            let montoBase = Number(sol.monto) || 0;
+            // Si la solicitud no traia monto pero tenemos un plan,
+            // usamos el precio del plan como base para calcular la comision.
+            if (montoBase <= 0 && planPublicacionIdForConv) {
+              const planRes = await client.query<{ precio: string }>(
+                `SELECT precio::text AS precio FROM "alquiloya"."planes_publicacion"
+                  WHERE empresa_id = $1::uuid AND id = $2::uuid LIMIT 1`,
+                [ALQUILOYA_EMPRESA_ID, planPublicacionIdForConv]
+              );
+              const planPrice = Number(planRes.rows[0]?.precio ?? 0);
+              if (planPrice > 0) {
+                montoBase = planPrice;
+                // Tambien actualizamos monto_base en la conversion recien insertada
+                await client.query(
+                  `UPDATE "alquiloya"."referral_conversions"
+                      SET monto_base = $1
+                    WHERE id = $2::uuid`,
+                  [montoBase, convId]
+                );
+              }
+            }
             if (rule && montoBase > 0) {
               const ruleValor = Number(rule.valor) || 0;
               let montoComision = 0;

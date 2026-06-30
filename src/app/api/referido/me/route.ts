@@ -134,7 +134,7 @@ export async function GET(request: Request) {
               cv.converted_at::text AS conv_converted_at,
               COALESCE(u.nombre, pr.nombre, ag.nombre) AS referido_nombre,
               COALESCE(u.email,  pr.email,  ag.email)  AS referido_email,
-              lk.campania AS fuente,
+              COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
               pp.nombre AS plan_nombre,
               pp.tier   AS plan_tier
          FROM ${t("referral_commissions")} c
