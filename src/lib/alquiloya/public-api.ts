@@ -59,6 +59,10 @@ async function ensurePublicacionDiasColumn(): Promise<void> {
       `ALTER TABLE alquiloya.propiedades
          ADD COLUMN IF NOT EXISTS precio_periodo text`
     );
+    await pool.query(
+      `ALTER TABLE alquiloya.propiedades
+         ADD COLUMN IF NOT EXISTS clicks_whatsapp integer NOT NULL DEFAULT 0`
+    );
     publicacionDiasReady = true;
   } catch (e) {
     console.warn(

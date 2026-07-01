@@ -21,6 +21,7 @@ async function ensureExtraColumns(pool: NonNullable<ReturnType<typeof getChatPos
     await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS vistas_count integer NOT NULL DEFAULT 0`, []);
     await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS ultima_vista_at timestamptz`, []);
     await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS video_url text`, []);
+    await queryWithRetry(pool, `ALTER TABLE "alquiloya"."propiedades" ADD COLUMN IF NOT EXISTS clicks_whatsapp integer NOT NULL DEFAULT 0`, []);
     bootstrapped = true;
   } catch (e) {
     console.warn("[agente/propiedades bootstrap]", e instanceof Error ? e.message : e);
@@ -52,6 +53,7 @@ type PropiedadAgenteRow = {
   activo: boolean | null;
   cover_url: string | null;
   vistas_count: number;
+  clicks_whatsapp: number;
   ultima_vista_at: string | null;
   video_url: string | null;
   fotos_count: number;
@@ -113,6 +115,7 @@ export async function GET(request: Request) {
           p.lat::float8 AS lat, p.lng::float8 AS lng,
           p.destacada, p.visible_web, p.activo,
           COALESCE(p.vistas_count, 0)::int AS vistas_count,
+          COALESCE(p.clicks_whatsapp, 0)::int AS clicks_whatsapp,
           p.ultima_vista_at::text AS ultima_vista_at,
           p.video_url,
           cover.url AS cover_url,
