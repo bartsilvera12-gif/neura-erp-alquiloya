@@ -487,9 +487,12 @@ function PostersPage({ route, onNav }) {
                 </td>
                 <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                   <div className="row gap-6" style={{ justifyContent: 'flex-end' }}>
-                    <button title="Descargar cartel" onClick={() => downloadPoster(p)} style={{ padding: 0, width: 30, height: 30, borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                    <button title="Descargar QR (solo el codigo)" onClick={() => downloadQR(p)} style={{ padding: '0 8px', height: 30, borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-3)'; }}><I.download s={13}/></button>
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-3)'; }}><I.qr s={12}/> QR</button>
+                    <button title="Descargar cartel completo (QR + diseno SE ALQUILA)" onClick={() => downloadPoster(p)} style={{ padding: '0 8px', height: 30, borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-3)'; }}><I.download s={12}/> Cartel</button>
                     <button title="Imprimir cartel" onClick={() => printPosters(p)} style={{ padding: 0, width: 30, height: 30, borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--line)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-3)'; }}><I.print s={13}/></button>
@@ -571,7 +574,8 @@ function PosterModal({ p, onClose }) {
             </div>
 
             <div className="col gap-8" style={{ marginTop: 'auto' }}>
-              <button className="btn btn-blue" style={{ justifyContent: 'center' }} onClick={() => downloadPoster(p)}><I.download s={14}/> Descargar cartel</button>
+              <button className="btn btn-blue" style={{ justifyContent: 'center' }} onClick={() => downloadPoster(p)}><I.download s={14}/> Descargar cartel completo</button>
+              <button className="btn btn-outline" style={{ justifyContent: 'center' }} onClick={() => downloadQR(p)}><I.qr s={14}/> Descargar solo el QR</button>
               <button className="btn btn-outline" style={{ justifyContent: 'center' }} onClick={() => printPosters(p)}><I.print s={14}/> Imprimir cartel</button>
               <button className="btn btn-outline" style={{ justifyContent: 'center' }} onClick={async () => {
                 const url = qrPublicUrl(p);
