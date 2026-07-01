@@ -737,7 +737,7 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
   }
   function onClickWhatsApp() {
     trackWhatsAppClick();
-    const raw = agent?.whatsapp || agent?.telefono
+    const raw = agent?.whatsapp || agent?.telefono || agent?.phone
       || property?.contacto?.whatsapp || property?.contacto?.telefono || '';
     let phone = String(raw).replace(/\D/g, '');
     if (phone && !phone.startsWith('595')) {
