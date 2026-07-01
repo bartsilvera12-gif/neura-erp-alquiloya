@@ -843,8 +843,8 @@ function StepBasics({ form, setF, ctxAgente }) {
         </div>
         {(ctxAgente && ctxAgente.plan && ctxAgente.plan.permite_videos) ? (
           <div className="field" style={{ marginTop: 18 }}>
-            <label>Video (URL de YouTube, Vimeo o .mp4) <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', marginLeft: 6 }}>Premium</span></label>
-            <input className="input" value={form.video_url || ''} onChange={(e) => setF({ video_url: e.target.value })} placeholder="https://youtube.com/watch?v=... o https://vimeo.com/... o .mp4 directo"/>
+            <label>Video (URL de YouTube o Vimeo) <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', marginLeft: 6 }}>Premium</span></label>
+            <input className="input" value={form.video_url || ''} onChange={(e) => setF({ video_url: e.target.value })} placeholder="https://youtube.com/watch?v=... o https://vimeo.com/..."/>
             <div className="muted xs" style={{ marginTop: 4 }}>Aparecera embebido arriba de las fotos en la ficha publica.</div>
           </div>
         ) : null}
