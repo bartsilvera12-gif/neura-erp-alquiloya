@@ -843,9 +843,6 @@ function AdminAgentPage({ route, onNav }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: 'var(--ink-3)' }}>
                       {p.codigo ? <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{p.codigo}</span> : null}
                       <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{formatGs(p.price)}<span style={{ color: 'var(--ink-4)', fontWeight: 500 }}> /mes</span></span>
-                      <span title="Personas que tocaron Consultar por WhatsApp en esta propiedad" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'rgba(30,189,91,0.12)', color: '#1ebd5b', fontSize: 11, fontWeight: 700 }}>
-                        💬 {p.clicks_whatsapp || 0}
-                      </span>
                     </div>
                   </div>
 

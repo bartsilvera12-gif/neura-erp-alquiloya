@@ -714,29 +714,7 @@ function DetailQR({ p }) {
 
 
 function AgentCard({ agent, price, tipo, onNav, property }) {
-  // Tracker silencioso de clicks a WhatsApp — sin datos del visitante, solo
-  // un contador por propiedad. El agente lo ve como pildora '💬 N' en su
-  // panel al lado del precio. Cero friccion.
-  function trackWhatsAppClick() {
-    const realId = property && (property.apiId || property.id);
-    if (!realId || typeof realId !== 'string' || !/^[0-9a-f-]{36}$/i.test(realId)) return;
-    // Dedup 30 min como el tracker de vistas — refresh no infla el contador.
-    const key = 'aly_wa_' + realId;
-    const WINDOW_MS = 30 * 60 * 1000;
-    try {
-      const prev = Number(localStorage.getItem(key) || 0);
-      if (prev && Date.now() - prev < WINDOW_MS) return;
-      localStorage.setItem(key, String(Date.now()));
-    } catch { /* sin localStorage: dejamos pasar */ }
-    fetch('/api/public/alquiloya/propiedades/' + realId + '/click-whatsapp', {
-      method: 'POST',
-      credentials: 'omit',
-      cache: 'no-store',
-      keepalive: true,
-    }).catch(() => {});
-  }
   function onClickWhatsApp() {
-    trackWhatsAppClick();
     const raw = agent?.whatsapp || agent?.telefono || agent?.phone
       || property?.contacto?.whatsapp || property?.contacto?.telefono || '';
     let phone = String(raw).replace(/\D/g, '');
