@@ -179,7 +179,15 @@
       barrio: row.barrio || fallback?.barrio || '',
       address: row.direccion || row.address || fallback?.address || [row.barrio, row.ciudad].filter(Boolean).join(', '),
       price,
-      priceLabel: tipo === 'temporal' ? formatGs(price) + ' / noche' : formatGs(price) + ' / mes',
+      priceLabel: (function() {
+        // Para tipo=temporal, el periodo lo elige el agente al cargar (row.precio_periodo).
+        // Fallback: /noche cuando temporal sin periodo, /mes cuando no temporal.
+        var sufijos = { noche: '/ noche', diario: '/ día', semanal: '/ semana', mensual: '/ mes' };
+        var period = row.precio_periodo && sufijos[row.precio_periodo];
+        if (period) return formatGs(price) + ' ' + period;
+        return tipo === 'temporal' ? formatGs(price) + ' / noche' : formatGs(price) + ' / mes';
+      })(),
+      precio_periodo: row.precio_periodo || null,
       beds: toNumber(row.dormitorios ?? row.beds, fallback?.beds ?? 0),
       baths: toNumber(row.banos ?? row.baths, fallback?.baths ?? 0),
       m2: toNumber(row.superficie_m2 ?? row.m2, fallback?.m2 ?? 0),

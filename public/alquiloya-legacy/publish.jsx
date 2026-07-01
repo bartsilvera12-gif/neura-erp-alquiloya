@@ -96,6 +96,7 @@ function PublishPage() {
     tipo: 'departamento',
     operacion: 'alquiler', // 'alquiler' | 'venta'
     precio: '',
+    precio_periodo: '',
     moneda: 'PYG',
     descripcion: '',
     video_url: '',
@@ -151,6 +152,7 @@ function PublishPage() {
           descripcion: p.descripcion || '',
           video_url: p.video_url || '',
           precio: p.precio != null ? String(p.precio) : '',
+          precio_periodo: p.precio_periodo || '',
           moneda: p.moneda || 'PYG',
           dormitorios: p.dormitorios != null ? String(p.dormitorios) : '',
           banos: p.banos != null ? String(p.banos) : '',
@@ -297,6 +299,7 @@ function PublishPage() {
         lat: typeof form.lat === 'number' ? form.lat : null,
         lng: typeof form.lng === 'number' ? form.lng : null,
         precio,
+        precio_periodo: form.tipo === 'alquiler_temporal' && form.precio_periodo ? form.precio_periodo : null,
         moneda: form.moneda || 'PYG',
         dormitorios: form.dormitorios ? Number(form.dormitorios) : null,
         banos: form.banos ? Number(form.banos) : null,
@@ -815,12 +818,28 @@ function StepBasics({ form, setF, ctxAgente }) {
             <label>Precio (Gs.) *</label>
             <input className="input" value={form.precio} onChange={(e) => setF({ precio: e.target.value.replace(/[^\d]/g, '') })} placeholder="Ej. 3800000" inputMode="numeric"/>
           </div>
-          <div className="field">
-            <label>Operación</label>
-            <PrettySelect value="alquiler" onChange={() => {}} options={[
-              { value: 'alquiler', label: 'Alquiler' },
-            ]}/>
-          </div>
+          {form.tipo === 'alquiler_temporal' ? (
+            <div className="field">
+              <label>Período *</label>
+              <PrettySelect
+                value={form.precio_periodo || 'noche'}
+                onChange={(v) => setF({ precio_periodo: v })}
+                options={[
+                  { value: 'noche',    label: 'Por noche' },
+                  { value: 'diario',   label: 'Por día' },
+                  { value: 'semanal',  label: 'Por semana' },
+                  { value: 'mensual',  label: 'Por mes' },
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="field">
+              <label>Operación</label>
+              <PrettySelect value="alquiler" onChange={() => {}} options={[
+                { value: 'alquiler', label: 'Alquiler' },
+              ]}/>
+            </div>
+          )}
         </FormGrid>
         <div style={{ height: 18 }}/>
         <FormGrid>

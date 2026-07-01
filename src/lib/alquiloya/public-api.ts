@@ -55,6 +55,10 @@ async function ensurePublicacionDiasColumn(): Promise<void> {
       `ALTER TABLE alquiloya.propiedades
          ADD COLUMN IF NOT EXISTS ultima_vista_at timestamptz`
     );
+    await pool.query(
+      `ALTER TABLE alquiloya.propiedades
+         ADD COLUMN IF NOT EXISTS precio_periodo text`
+    );
     publicacionDiasReady = true;
   } catch (e) {
     console.warn(
@@ -182,6 +186,7 @@ export async function listPublicPropiedades(request: NextRequest) {
           COALESCE(p.verificada, false) AS verificada,
           p.visible_web, p.activo, p.created_at, p.updated_at,
           COALESCE(p.video_url, NULL) AS video_url,
+          COALESCE(p.precio_periodo, NULL) AS precio_periodo,
           COALESCE(p.vistas_count, 0)::int AS vistas_count,
           CASE
             WHEN cover.id IS NULL THEN NULL
@@ -241,6 +246,7 @@ export async function getPublicPropiedad(id: string, opts?: { includeAnyState?: 
           COALESCE(p.verificada, false) AS verificada,
           p.visible_web, p.activo, p.created_at, p.updated_at,
           COALESCE(p.video_url, NULL) AS video_url,
+          COALESCE(p.precio_periodo, NULL) AS precio_periodo,
           COALESCE(p.vistas_count, 0)::int AS vistas_count,
           CASE
             WHEN a.id IS NULL THEN NULL
