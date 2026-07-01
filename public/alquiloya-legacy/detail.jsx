@@ -712,39 +712,164 @@ function DetailQR({ p }) {
   );
 }
 
-function AgentCard({ agent, price, tipo, onNav, property }) {
-  // Antes este handler creaba una fila en alquiloya.consultas al tocar
-  // WhatsApp/Mensaje, pero sin datos del visitante. El agente las recibia
-  // como 'Interesado anonimo' sin manera de responder. Karen pidio limpiarlo.
-  // El click abre wa.me directamente — el agente ve el mensaje real en
-  // WhatsApp, no necesitamos duplicar una fila vacia.
-  function registerConsulta(_canal) {
-    // noop intencional. Si en el futuro queremos un formulario propio
-    // (nombre + telefono/email obligatorios), va a llamarse desde otro
-    // handler — no desde el click directo a WhatsApp.
-  }
-  function onClickWhatsApp() {
-    registerConsulta('whatsapp');
-    // Prioridad: whatsapp/telefono del agente → contacto efectivo del backend
-    // (agente o propietario directo). Asi el boton siempre lleva al numero real
-    // del responsable de la publicacion.
+
+// Modal de contacto — el visitante llena nombre + tel/email + mensaje antes
+// de que abramos WhatsApp. Sin estos datos el agente recibe un chat sin
+// saber a quien esta escribiendo — y en el panel del ERP la consulta caia
+// como "Interesado anonimo". Ahora POSTeamos a /api/public/alquiloya/consultas
+// y despues abrimos wa.me con el mensaje ya cargado.
+function ConsultaModal({ property, agent, onClose }) {
+  const [nombre, setNombre] = React.useState('');
+  const [telefono, setTelefono] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [mensaje, setMensaje] = React.useState(
+    'Hola! Me interesa la propiedad "' + (property?.title || '') + '"' +
+    (property?.address || property?.ciudad ? ' en ' + (property?.address || property?.ciudad) : '') + '.'
+  );
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  function computeWaUrl() {
     const raw = agent?.whatsapp || agent?.telefono
       || property?.contacto?.whatsapp || property?.contacto?.telefono || '';
     let phone = String(raw).replace(/\D/g, '');
-    // Normalizamos a formato internacional Paraguay si vino local (09xx...).
     if (phone && !phone.startsWith('595')) {
       if (phone.startsWith('0')) phone = '595' + phone.slice(1);
       else if (phone.length <= 10) phone = '595' + phone;
     }
-    const msg = encodeURIComponent('Hola! Me interesa la propiedad "' + (property?.title || '') + '" en ' + (property?.address || property?.ciudad || ''));
-    const url = phone ? ('https://wa.me/' + phone + '?text=' + msg) : ('https://wa.me/?text=' + msg);
-    window.open(url, '_blank', 'noopener');
+    const text = encodeURIComponent(
+      mensaje + '\n\n— ' + nombre +
+      (telefono ? ' · ' + telefono : '') +
+      (email ? ' · ' + email : '')
+    );
+    return phone ? ('https://wa.me/' + phone + '?text=' + text) : ('https://wa.me/?text=' + text);
   }
-  function onClickVisita() {
-    registerConsulta('web');
-    onClickWhatsApp();
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setErr(null);
+    if (!nombre.trim()) { setErr('Ingresá tu nombre.'); return; }
+    if (!telefono.trim() && !email.trim()) {
+      setErr('Necesitamos tu teléfono o email para que el agente pueda responderte.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/public/alquiloya/consultas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propiedad_id: property?.apiId || null,
+          agente_id: agent?.apiId || agent?.id || null,
+          canal: 'whatsapp',
+          nombre: nombre.trim(),
+          telefono: telefono.trim() || null,
+          email: email.trim() || null,
+          mensaje: mensaje.trim() || null,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        throw new Error(body?.error || ('HTTP ' + res.status));
+      }
+      // Abrimos WhatsApp con el mensaje ya listo.
+      window.open(computeWaUrl(), '_blank', 'noopener');
+      onClose();
+    } catch (e) {
+      setErr((e && e.message) || 'No pudimos registrar la consulta. Reintentá.');
+    } finally {
+      setBusy(false);
+    }
   }
-  function onClickMensaje() { registerConsulta('web'); onClickWhatsApp(); }
+
+  return ReactDOM.createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 700,
+        background: 'rgba(11,22,34,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog" aria-modal="true"
+        style={{
+          background: '#fff', borderRadius: 16, maxWidth: 480, width: '100%',
+          padding: 22, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+          fontFamily: 'inherit',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(30,189,91,0.12)', color: '#1ebd5b',
+            display: 'grid', placeItems: 'center',
+          }}>💬</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>Consultar por WhatsApp</div>
+            <div className="muted xs" style={{ marginTop: 2 }}>Dejanos tus datos y te llevamos al chat.</div>
+          </div>
+          <button
+            type="button" onClick={onClose} aria-label="Cerrar"
+            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}
+          >×</button>
+        </div>
+
+        <form onSubmit={onSubmit}>
+          <div className="field">
+            <label>Nombre *</label>
+            <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" maxLength={120} autoFocus/>
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Teléfono</label>
+            <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/[^\d+\s()-]/g, ''))} placeholder="Ej. 0981 227 400" inputMode="tel" maxLength={30}/>
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Email</label>
+            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" type="email" maxLength={120}/>
+          </div>
+          <div className="muted xs" style={{ marginTop: 6 }}>Con teléfono o email alcanza. Al menos uno de los dos es obligatorio.</div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>Mensaje</label>
+            <textarea className="input" rows={3} value={mensaje} onChange={(e) => setMensaje(e.target.value)} maxLength={800}/>
+          </div>
+
+          {err ? (
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: '#fee2e2', color: '#991b1b', fontSize: 12.5 }}>
+              {err}
+            </div>
+          ) : null}
+
+          <div className="row gap-8" style={{ marginTop: 14, justifyContent: 'flex-end' }}>
+            <button type="button" onClick={onClose} disabled={busy} className="btn btn-outline">Cancelar</button>
+            <button type="submit" disabled={busy} className="btn btn-wa">
+              {busy ? 'Enviando…' : (<><I.whats s={14}/> Enviar y abrir WhatsApp</>)}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function AgentCard({ agent, price, tipo, onNav, property }) {
+  // El boton 'Consultar por WhatsApp' abre un modal con formulario obligatorio
+  // (nombre + telefono/email + mensaje). Al enviar POSTeamos la consulta y
+  // abrimos wa.me. Asi el agente recibe el chat de WhatsApp Y ademas ve el
+  // lead con datos reales en el panel 'Ultimas consultas' del ERP.
+  const [consultaOpen, setConsultaOpen] = React.useState(false);
+  function onClickWhatsApp() { setConsultaOpen(true); }
+  function onClickVisita() { setConsultaOpen(true); }
+  function onClickMensaje() { setConsultaOpen(true); }
   const { agents } = useAlquiloYaPublicData();
   // Antes el card caia a `agents[0] || AGENTS[0]` cuando la propiedad no tenia
   // agente, lo que pegaba "Mariana López" (primera de la lista mock) a
@@ -802,7 +927,9 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
       </div>
     );
   }
-  return (
+  return (<>
+    {consultaOpen ? <ConsultaModal property={property} agent={agent} onClose={() => setConsultaOpen(false)}/> : null}
+
     <div className="card" style={{ padding: 22 }}>
       <div className="row gap-12">
         <Avatar name={agent.name} size={48}/>
@@ -844,7 +971,7 @@ function AgentCard({ agent, price, tipo, onNav, property }) {
         </div>
       )}
     </div>
-  );
+  </>);
 }
 
 // Exportamos tambien el mapa read-only y el lookup de ciudades para que el
