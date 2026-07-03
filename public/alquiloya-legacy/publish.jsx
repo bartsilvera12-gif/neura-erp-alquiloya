@@ -1958,7 +1958,7 @@ function printBrochure(property, contacto) {
   const cover = p.cover || p.cover_url || null;
   const feats = Array.isArray(p.features) ? p.features : [];
   const pid = p.apiId || p.id || '';
-  const origin = (typeof window !== 'undefined' && window.location && window.location.origin) || 'https://alquiloya.com.py';
+  const origin = 'https://alquiloya.com.py';
   const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=' + encodeURIComponent(origin + '/?prop=' + encodeURIComponent(pid));
   // Mapa estatico (mejor esfuerzo) centrado en coords o ciudad.
   const cc = (typeof window !== 'undefined' && window.CITY_COORDS && window.normalizeCity)
@@ -2268,7 +2268,7 @@ function BrochurePage2({ property, contacto }) {
           {/* QR REAL escaneable: abre la ficha (deep-link ?prop=<uuid>). */}
           {(() => {
             const pid = p.apiId || p.id || '';
-            const origin = (typeof window !== 'undefined' && window.location && window.location.origin) || 'https://alquiloya.com.py';
+            const origin = 'https://alquiloya.com.py';
             const data = encodeURIComponent(origin + '/?prop=' + encodeURIComponent(pid));
             const src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=' + data;
             return <img src={src} alt={'QR ' + qrId} width={70} height={70} style={{ display: 'block' }}/>;

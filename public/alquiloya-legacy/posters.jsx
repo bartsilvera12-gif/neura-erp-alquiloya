@@ -7,7 +7,7 @@
 // el dominio público como en localhost/preview. Con "/" el QR caía al ERP/login
 // en hosts donde la raíz no se reescribe al sitio público.
 function qrPublicUrl(p) {
-  const origin = (typeof window !== 'undefined' && window.location && window.location.origin) || 'https://alquiloya.com.py';
+  const origin = 'https://alquiloya.com.py';
   return origin + '/publico?prop=' + encodeURIComponent(p.apiId || p.id || '');
 }
 // QR REAL y escaneable via api.qrserver.com (sin API key). Reemplaza al QRMock

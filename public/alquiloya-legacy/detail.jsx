@@ -94,7 +94,7 @@ async function _sharePropiedad(property) {
   // del home — el detalle no esta en la URL real porque el routing es
   // state-based de React).
   const propId = property && (property.apiId || property.id);
-  const origin = (typeof window !== "undefined" && window.location && window.location.origin) || "https://alquiloya.com.py";
+  const origin = "https://alquiloya.com.py";
   const url = propId ? `${origin}/?prop=${encodeURIComponent(propId)}` : window.location.href;
   const title = (property && property.title) || 'Propiedad en AlquiloYa';
   const text = title + (property && property.address ? ' — ' + property.address : '');
