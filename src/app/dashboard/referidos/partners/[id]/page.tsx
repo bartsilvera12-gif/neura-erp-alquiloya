@@ -126,9 +126,9 @@ async function load(id: string) {
          COALESCE(u.nombre, p.nombre, a.nombre, p_via_sol.nombre) AS referido_nombre,
          COALESCE(u.email,  p.email,  a.email,  p_via_sol.email)  AS referido_email,
          COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
-         COALESCE(pp.nombre, pp_via_target.nombre) AS plan_nombre,
-         COALESCE(pp.tier, pp_via_target.tier) AS plan_tier,
-         COALESCE(NULLIF(c.monto_base, 0), pp_via_target.precio)::float8 AS monto_base,
+         COALESCE(pp.nombre, pp_via_target.nombre, p_via_sol.plan_tier) AS plan_nombre,
+         COALESCE(pp.tier, pp_via_target.tier, p_via_sol.plan_tier) AS plan_tier,
+         COALESCE(NULLIF(c.monto_base, 0), pp_via_target.precio, p_via_sol.monto)::float8 AS monto_base,
          c.moneda,
          cm.id AS comision_id,
          cm.monto_comision::float8 AS comision_monto,
@@ -155,16 +155,15 @@ async function load(id: string) {
        -- buscamos la solicitud aprobada asociada por (link, partner) y
        -- resolvemos el propietario desde ahi.
        LEFT JOIN LATERAL (
-         SELECT pr.nombre, pr.email
+         SELECT pr.nombre, pr.email, s.plan_tier, s.monto
            FROM alquiloya.solicitudes_servicio s
-           JOIN alquiloya.propietarios pr
+           LEFT JOIN alquiloya.propietarios pr
              ON pr.empresa_id=s.empresa_id AND pr.id=s.propietario_id
           WHERE s.empresa_id=c.empresa_id
             AND s.referral_link_id=c.link_id
             AND s.referral_partner_id=c.partner_id
             AND s.kind='cambio_plan'
             AND s.estado='aprobada'
-            AND s.propietario_id IS NOT NULL
           ORDER BY s.revisado_at DESC
           LIMIT 1
        ) p_via_sol ON c.target_tipo='plan_publicacion'

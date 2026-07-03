@@ -135,8 +135,8 @@ export async function GET(request: Request) {
               COALESCE(u.nombre, pr.nombre, ag.nombre, pr_via_sol.nombre) AS referido_nombre,
               COALESCE(u.email,  pr.email,  ag.email,  pr_via_sol.email)  AS referido_email,
               COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
-              COALESCE(pp.nombre, pp_via_target.nombre) AS plan_nombre,
-              COALESCE(pp.tier, pp_via_target.tier) AS plan_tier
+              COALESCE(pp.nombre, pp_via_target.nombre, pr_via_sol.plan_tier) AS plan_nombre,
+              COALESCE(pp.tier, pp_via_target.tier, pr_via_sol.plan_tier) AS plan_tier
          FROM ${t("referral_commissions")} c
          LEFT JOIN ${t("referral_conversions")} cv
            ON cv.empresa_id = c.empresa_id AND cv.id = c.conversion_id
@@ -158,16 +158,15 @@ export async function GET(request: Request) {
          -- Fallback para conversiones viejas: resolvemos el propietario via
          -- la solicitud aprobada asociada por (link, partner).
          LEFT JOIN LATERAL (
-           SELECT p2.nombre, p2.email
+           SELECT p2.nombre, p2.email, s.plan_tier, s.monto
              FROM ${t("solicitudes_servicio")} s
-             JOIN ${t("propietarios")} p2
+             LEFT JOIN ${t("propietarios")} p2
                ON p2.empresa_id=s.empresa_id AND p2.id=s.propietario_id
             WHERE s.empresa_id=cv.empresa_id
               AND s.referral_link_id=cv.link_id
               AND s.referral_partner_id=cv.partner_id
               AND s.kind='cambio_plan'
               AND s.estado='aprobada'
-              AND s.propietario_id IS NOT NULL
             ORDER BY s.revisado_at DESC
             LIMIT 1
          ) pr_via_sol ON cv.target_tipo='plan_publicacion'
