@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
       if (pathname === "/alquiloya-legacy/index.html") {
         redirectUrl.pathname = "/publico";
       }
-      return NextResponse.redirect(redirectUrl, 301);
+      return NextResponse.redirect(redirectUrl, 302);
     }
   }
 
