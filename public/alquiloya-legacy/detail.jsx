@@ -366,7 +366,6 @@ function GalleryAgentSidebar({ property }) {
   // los hooks ANTES del early return para no romper las reglas de hooks.
   const agent = property.agent || null;
   const [phoneRevealed, setPhoneRevealed] = React.useState(false);
-  const [form, setForm] = React.useState({ name: '', phone: '', email: '', message: 'Hola, vi esta propiedad en AlquiloYa y me interesa recibir más información. ¿Podría coordinar una visita?' });
   if (!agent) {
     return (
       <div>
@@ -377,7 +376,6 @@ function GalleryAgentSidebar({ property }) {
     );
   }
   const agentRecord = agents.find(a => a.id === agent.id || a.apiId === agent.id || a.name === agent.name);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const phone = agent.phone || agent.whatsapp || '';
   return (
     <div>
@@ -397,34 +395,6 @@ function GalleryAgentSidebar({ property }) {
         <button onClick={() => setPhoneRevealed(true)} className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', marginTop: 14, fontSize: 14 }}>
           <I.whats s={14}/> {phoneRevealed ? phone : ((phone || 'Sin telefono').slice(0, 10) + (phone ? '... Ver telefono' : ''))}
         </button>
-      </div>
-
-      <div className="card" style={{ padding: 16, marginTop: 12 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Enviá tu consulta</div>
-        <div className="col gap-10">
-          <input className="input" placeholder="Nombre y Apellido *" value={form.name} onChange={(e) => set('name', e.target.value)}/>
-          <div className="row gap-8">
-            <div className="card" style={{ padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span style={{ fontSize: 16 }}>🇵🇾</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>+595</span>
-            </div>
-            <input className="input" placeholder="Teléfono *" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={{ flex: 1 }}/>
-          </div>
-          <input className="input" placeholder="Email *" value={form.email} onChange={(e) => set('email', e.target.value)}/>
-          <textarea className="input" rows={4} value={form.message} onChange={(e) => set('message', e.target.value)}/>
-          <div className="row gap-8" style={{ marginTop: 4 }}>
-            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2 5.5C2 4.7 2.7 4 3.5 4h17c.8 0 1.5.7 1.5 1.5v13c0 .8-.7 1.5-1.5 1.5h-17c-.8 0-1.5-.7-1.5-1.5v-13zm2 .8L12 12l8-5.7V6H4v.3z"/></svg>
-              Contactar
-            </button>
-            <button className="btn btn-blue" style={{ width: 44, padding: 0, justifyContent: 'center' }} title="Llamar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72a2 2 0 0 1 1.72 2.01z"/></svg>
-            </button>
-            <button className="btn btn-wa" style={{ width: 44, padding: 0, justifyContent: 'center' }} title="WhatsApp">
-              <I.whats s={16}/>
-            </button>
-          </div>
-        </div>
       </div>
 
       {agentRecord && (
