@@ -326,6 +326,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     let appliedPlan: { nombre: string | null; tier: string; vencimientoTexto: string | null } | null = null;
     let appliedImpulsos: number | null = null;
     let resultadoId: string | null = null;
+    let planIdForConv: string | null = null;
 
     try {
       await client.query("BEGIN");
@@ -348,6 +349,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         const planRow = pr.rows[0];
         if (!planRow?.id) throw new Error(`plan "${sol.plan_tier}" no existe`);
         const planId = planRow.id;
+        planIdForConv = planId;
         const billing = (planRow.billing ?? "").toLowerCase();
         const vencSql =
           billing === "gratis"
@@ -464,15 +466,15 @@ export async function PATCH(request: Request, ctx: Ctx) {
         if (sol.kind === "cambio_plan" && effectivePropietarioId) {
           targetTipo = "propietario";
           targetIdForConv = effectivePropietarioId;
-          planPublicacionIdForConv = resultadoId;
+          planPublicacionIdForConv = planIdForConv;
         } else if (sol.kind === "cambio_plan" && overrideAgente) {
           targetTipo = "agente";
           targetIdForConv = overrideAgente;
-          planPublicacionIdForConv = resultadoId;
+          planPublicacionIdForConv = planIdForConv;
         } else {
           targetTipo = sol.kind === "cambio_plan" ? "plan_publicacion" : "otro";
           targetIdForConv = resultadoId;
-          planPublicacionIdForConv = sol.kind === "cambio_plan" ? resultadoId : null;
+          planPublicacionIdForConv = sol.kind === "cambio_plan" ? planIdForConv : null;
         }
         try {
           const convIns = await client.query<{ id: string }>(
