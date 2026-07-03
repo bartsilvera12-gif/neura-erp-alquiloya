@@ -123,12 +123,12 @@ async function load(id: string) {
       pool,
       `SELECT
          c.id,
-         COALESCE(u.nombre, p.nombre, a.nombre) AS referido_nombre,
-         COALESCE(u.email,  p.email,  a.email)  AS referido_email,
+         COALESCE(u.nombre, p.nombre, a.nombre, p_via_sol.nombre) AS referido_nombre,
+         COALESCE(u.email,  p.email,  a.email,  p_via_sol.email)  AS referido_email,
          COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
-         pp.nombre  AS plan_nombre,
-         pp.tier    AS plan_tier,
-         c.monto_base::float8 AS monto_base,
+         COALESCE(pp.nombre, pp_via_target.nombre) AS plan_nombre,
+         COALESCE(pp.tier, pp_via_target.tier) AS plan_tier,
+         COALESCE(NULLIF(c.monto_base, 0), pp_via_target.precio)::float8 AS monto_base,
          c.moneda,
          cm.id AS comision_id,
          cm.monto_comision::float8 AS comision_monto,
@@ -139,12 +139,35 @@ async function load(id: string) {
          ON lk.empresa_id=c.empresa_id AND lk.id=c.link_id
        LEFT JOIN alquiloya.planes_publicacion pp
          ON pp.empresa_id=c.empresa_id AND pp.id=c.plan_publicacion_id
+       -- Fallback: si target_tipo='plan_publicacion' y no hay plan_publicacion_id,
+       -- resolvemos el plan via el target_id directo.
+       LEFT JOIN alquiloya.planes_publicacion pp_via_target
+         ON pp_via_target.empresa_id=c.empresa_id
+        AND c.target_tipo='plan_publicacion'
+        AND pp_via_target.id=c.target_id
        LEFT JOIN alquiloya.usuarios u
          ON u.empresa_id=c.empresa_id AND u.id=c.usuario_id
        LEFT JOIN alquiloya.propietarios p
          ON p.empresa_id=c.empresa_id AND c.target_tipo='propietario' AND p.id=c.target_id
        LEFT JOIN alquiloya.agentes a
          ON a.empresa_id=c.empresa_id AND c.target_tipo='agente' AND a.id=c.target_id
+       -- Fallback para conversiones viejas donde target_tipo='plan_publicacion':
+       -- buscamos la solicitud aprobada asociada por (link, partner) y
+       -- resolvemos el propietario desde ahi.
+       LEFT JOIN LATERAL (
+         SELECT pr.nombre, pr.email
+           FROM alquiloya.solicitudes_servicio s
+           JOIN alquiloya.propietarios pr
+             ON pr.empresa_id=s.empresa_id AND pr.id=s.propietario_id
+          WHERE s.empresa_id=c.empresa_id
+            AND s.referral_link_id=c.link_id
+            AND s.referral_partner_id=c.partner_id
+            AND s.kind='cambio_plan'
+            AND s.estado='aprobada'
+            AND s.propietario_id IS NOT NULL
+          ORDER BY s.revisado_at DESC
+          LIMIT 1
+       ) p_via_sol ON c.target_tipo='plan_publicacion'
        LEFT JOIN LATERAL (
          SELECT id, monto_comision, estado
            FROM alquiloya.referral_commissions

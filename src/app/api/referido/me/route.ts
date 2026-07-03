@@ -132,11 +132,11 @@ export async function GET(request: Request) {
               c.pago_referencia,
               cv.target_tipo AS conv_target_tipo,
               cv.converted_at::text AS conv_converted_at,
-              COALESCE(u.nombre, pr.nombre, ag.nombre) AS referido_nombre,
-              COALESCE(u.email,  pr.email,  ag.email)  AS referido_email,
+              COALESCE(u.nombre, pr.nombre, ag.nombre, pr_via_sol.nombre) AS referido_nombre,
+              COALESCE(u.email,  pr.email,  ag.email,  pr_via_sol.email)  AS referido_email,
               COALESCE(NULLIF(lk.campania, ''), lk.slug) AS fuente,
-              pp.nombre AS plan_nombre,
-              pp.tier   AS plan_tier
+              COALESCE(pp.nombre, pp_via_target.nombre) AS plan_nombre,
+              COALESCE(pp.tier, pp_via_target.tier) AS plan_tier
          FROM ${t("referral_commissions")} c
          LEFT JOIN ${t("referral_conversions")} cv
            ON cv.empresa_id = c.empresa_id AND cv.id = c.conversion_id
@@ -144,12 +144,33 @@ export async function GET(request: Request) {
            ON lk.empresa_id = cv.empresa_id AND lk.id = cv.link_id
          LEFT JOIN ${t("planes_publicacion")} pp
            ON pp.empresa_id = cv.empresa_id AND pp.id = cv.plan_publicacion_id
+         -- Fallback: si plan_publicacion_id es NULL pero target apunta al plan
+         LEFT JOIN ${t("planes_publicacion")} pp_via_target
+           ON pp_via_target.empresa_id = cv.empresa_id
+          AND cv.target_tipo='plan_publicacion'
+          AND pp_via_target.id = cv.target_id
          LEFT JOIN ${t("usuarios")} u
            ON u.empresa_id = cv.empresa_id AND u.id = cv.usuario_id
          LEFT JOIN ${t("propietarios")} pr
            ON pr.empresa_id = cv.empresa_id AND cv.target_tipo='propietario' AND pr.id = cv.target_id
          LEFT JOIN ${t("agentes")} ag
            ON ag.empresa_id = cv.empresa_id AND cv.target_tipo='agente' AND ag.id = cv.target_id
+         -- Fallback para conversiones viejas: resolvemos el propietario via
+         -- la solicitud aprobada asociada por (link, partner).
+         LEFT JOIN LATERAL (
+           SELECT p2.nombre, p2.email
+             FROM ${t("solicitudes_servicio")} s
+             JOIN ${t("propietarios")} p2
+               ON p2.empresa_id=s.empresa_id AND p2.id=s.propietario_id
+            WHERE s.empresa_id=cv.empresa_id
+              AND s.referral_link_id=cv.link_id
+              AND s.referral_partner_id=cv.partner_id
+              AND s.kind='cambio_plan'
+              AND s.estado='aprobada'
+              AND s.propietario_id IS NOT NULL
+            ORDER BY s.revisado_at DESC
+            LIMIT 1
+         ) pr_via_sol ON cv.target_tipo='plan_publicacion'
         WHERE c.empresa_id = $1::uuid AND c.partner_id = $2::uuid
         ORDER BY c.generada_at DESC LIMIT 50`,
       [ALQUILOYA_EMPRESA_ID, partner.id]
