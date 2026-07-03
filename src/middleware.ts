@@ -25,12 +25,37 @@ function getRequestHostname(request: NextRequest): string {
 }
 
 export async function middleware(request: NextRequest) {
-  // Host-aware: si el request viene de un dominio público configurado y apunta a la raíz,
-  // se reescribe a la web legacy estática. Solo afecta "/" (no /api, /_next, /dashboard, etc.).
   const pathname = request.nextUrl.pathname;
   const publicHosts = getPublicHosts();
+  const host = getRequestHostname(request);
+
+  // Canonical redirect: si el request llega a un host NO publico (ej.
+  // alquiloya.neura.com.py) pero apunta a una ruta que es de la web publica,
+  // redirigimos al primer host publico configurado (el dominio corto).
+  // Rutas afectadas: /, /publico, /alquiloya-legacy/*, /r/*, /portal-agentes.
+  if (publicHosts.length > 0 && !publicHosts.includes(host)) {
+    const isPublicRoute =
+      pathname === "/" ||
+      pathname === "/publico" ||
+      pathname.startsWith("/alquiloya-legacy/") ||
+      pathname.startsWith("/r/") ||
+      pathname === "/portal-agentes";
+    if (isPublicRoute) {
+      const canonicalHost = publicHosts[0];
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.hostname = canonicalHost;
+      redirectUrl.protocol = "https:";
+      redirectUrl.port = "";
+      if (pathname === "/alquiloya-legacy/index.html") {
+        redirectUrl.pathname = "/publico";
+      }
+      return NextResponse.redirect(redirectUrl, 301);
+    }
+  }
+
+  // Host-aware: si el request viene de un dominio publico configurado y apunta a la raiz,
+  // se reescribe a la web legacy estatica. Solo afecta "/" (no /api, /_next, /dashboard, etc.).
   if (publicHosts.length > 0 && (pathname === "/" || pathname === "")) {
-    const host = getRequestHostname(request);
     if (publicHosts.includes(host)) {
       const rewriteUrl = request.nextUrl.clone();
       rewriteUrl.pathname = "/alquiloya-legacy/index.html";
