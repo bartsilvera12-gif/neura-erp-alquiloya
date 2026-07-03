@@ -74,8 +74,8 @@ async function handleAlquiloyaReferralRedirect(
       request.nextUrl.protocol.replace(":", "") ||
       "https";
     const fwdHost =
+      request.headers.get("host")?.split(",")[0]?.trim() ||
       request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
-      request.headers.get("host") ||
       request.nextUrl.host;
     const dest = new URL("/publico", `${fwdProto}://${fwdHost}`);
     dest.searchParams.set("ref_invalid", "1");
@@ -141,8 +141,8 @@ async function handleAlquiloyaReferralRedirect(
     request.nextUrl.protocol.replace(":", "") ||
     "https";
   const fwdHost =
+    request.headers.get("host")?.split(",")[0]?.trim() ||
     request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
-    request.headers.get("host") ||
     request.nextUrl.host;
   const publicOrigin = `${fwdProto}://${fwdHost}`;
   const dest = new URL("/publico", publicOrigin);
