@@ -86,7 +86,7 @@ export default function PortalReferidosDashboardPage() {
   }, []);
 
   async function copy(slug: string) {
-    const url = `${window.location.origin}/r/${slug}`;
+    const url = `https://alquiloya.com.py/r/${slug}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(slug);
@@ -184,7 +184,7 @@ export default function PortalReferidosDashboardPage() {
             <>
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 <div className="flex-1 overflow-hidden truncate rounded-lg border border-slate-200 bg-white px-4 py-3 font-mono text-sm font-semibold text-[#0058A5]">
-                  {typeof window !== "undefined" ? `${window.location.origin}/r/${primary.slug}` : `/r/${primary.slug}`}
+                  {`https://alquiloya.com.py/r/${primary.slug}`}
                 </div>
                 <button
                   type="button"

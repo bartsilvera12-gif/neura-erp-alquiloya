@@ -11,10 +11,7 @@ export function CopySlugButton({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/r/${slug}`
-        : `/r/${slug}`;
+    const url = `https://alquiloya.com.py/r/${slug}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
