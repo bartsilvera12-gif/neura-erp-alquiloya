@@ -32,10 +32,9 @@ export async function middleware(request: NextRequest) {
   // Canonical redirect: si el request llega a un host NO publico (ej.
   // alquiloya.neura.com.py) pero apunta a una ruta que es de la web publica,
   // redirigimos al primer host publico configurado (el dominio corto).
-  // Rutas afectadas: /, /publico, /alquiloya-legacy/*, /r/*, /portal-agentes.
+  // Rutas afectadas: /publico, /alquiloya-legacy/*, /r/*, /portal-agentes.
   if (publicHosts.length > 0 && !publicHosts.includes(host)) {
     const isPublicRoute =
-      pathname === "/" ||
       pathname === "/publico" ||
       pathname.startsWith("/alquiloya-legacy/") ||
       pathname.startsWith("/r/") ||
