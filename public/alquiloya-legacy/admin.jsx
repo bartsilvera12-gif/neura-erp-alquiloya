@@ -521,6 +521,7 @@ function AdminAgentPage({ route, onNav }) {
   const [brochureTarget, setBrochureTarget] = React.useState(null);
   const [editProfileOpen, setEditProfileOpen] = React.useState(false);
   const [propFilter, setPropFilter] = React.useState('all');
+  const [propSearch, setPropSearch] = React.useState('');
   const totalAvailable = impulsesFree + impulsesPaid;
 
   const useBoost = async (id) => {
@@ -718,6 +719,21 @@ function AdminAgentPage({ route, onNav }) {
               <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16 }}>Mis propiedades</div>
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>{propsLoading ? 'Cargando…' : `${propsForRender.length} publicada${propsForRender.length !== 1 ? 's' : ''} · ${destacadasCount} destacada${destacadasCount !== 1 ? 's' : ''}`}</div>
             </div>
+            {view === 'properties' && (
+              <input
+                type="text"
+                value={propSearch}
+                onChange={(e) => setPropSearch(e.target.value)}
+                placeholder="Buscar por titulo, codigo, ciudad o direccion..."
+                style={{
+                  flex: 1, minWidth: 220, maxWidth: 360,
+                  padding: '8px 12px', fontSize: 13,
+                  border: '1px solid var(--line-2)', borderRadius: 8,
+                  background: '#fff', fontFamily: 'inherit',
+                  margin: '0 10px',
+                }}
+              />
+            )}
             <div style={{ display: "inline-flex", gap: 2, background: "#f1f5f9", padding: 3, borderRadius: 10, border: "1px solid var(--line-2)" }}>
               {[
                 { id: 'all',    label: 'Todas' },
@@ -749,7 +765,15 @@ function AdminAgentPage({ route, onNav }) {
                   </div>
                 </div>
               ))
-            ) : (view === "properties" ? propsForRender : propsForRender.slice(0, 6)).map((p, i) => {
+            ) : (view === "properties"
+                  ? propsForRender.filter(p => {
+                      const q = propSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return [p.titulo, p.codigo, p.ciudad, p.barrio, p.direccion]
+                        .some(v => String(v || '').toLowerCase().includes(q));
+                    })
+                  : propsForRender.slice(0, 6)
+                ).map((p, i) => {
               // Estado normalizado para badges + selector. Mock: índice 2 = pausada.
               const estadoLc = String(p.estado || '').toLowerCase();
               const isAlquilada = p._real && estadoLc === 'alquilada';
@@ -956,7 +980,17 @@ function AdminAgentPage({ route, onNav }) {
 
           {/* Footer / ver todas */}
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-            <span style={{ color: 'var(--ink-4)' }}>Mostrando {view === "properties" ? propsForRender.length : Math.min(6, propsForRender.length)} de {propsForRender.length}</span>
+            <span style={{ color: 'var(--ink-4)' }}>{(() => {
+              if (view !== 'properties') return `Mostrando ${Math.min(6, propsForRender.length)} de ${propsForRender.length}`;
+              const q = propSearch.trim().toLowerCase();
+              const matches = q ? propsForRender.filter(p =>
+                [p.titulo, p.codigo, p.ciudad, p.barrio, p.direccion]
+                  .some(v => String(v || '').toLowerCase().includes(q))
+              ).length : propsForRender.length;
+              return q
+                ? `Mostrando ${matches} de ${propsForRender.length} (filtrando por "${propSearch.trim()}")`
+                : `Mostrando ${propsForRender.length} de ${propsForRender.length}`;
+            })()}</span>
             {view === 'overview' && propsForRender.length > 6 && (
               <button onClick={() => onNav && onNav('admin-agent-properties')} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>
                 Ver todas →
