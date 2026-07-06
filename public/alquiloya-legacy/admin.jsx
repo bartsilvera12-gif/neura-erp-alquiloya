@@ -749,7 +749,7 @@ function AdminAgentPage({ route, onNav }) {
                   </div>
                 </div>
               ))
-            ) : propsForRender.slice(0, 6).map((p, i) => {
+            ) : (view === "properties" ? propsForRender : propsForRender.slice(0, 6)).map((p, i) => {
               // Estado normalizado para badges + selector. Mock: índice 2 = pausada.
               const estadoLc = String(p.estado || '').toLowerCase();
               const isAlquilada = p._real && estadoLc === 'alquilada';
