@@ -769,7 +769,7 @@ function AdminAgentPage({ route, onNav }) {
                   ? propsForRender.filter(p => {
                       const q = propSearch.trim().toLowerCase();
                       if (!q) return true;
-                      return [p.titulo, p.codigo, p.ciudad, p.barrio, p.direccion]
+                      return [p.title, p.titulo, p.codigo, p.city, p.ciudad, p.neighborhood, p.barrio, p.direccion]
                         .some(v => String(v || '').toLowerCase().includes(q));
                     })
                   : propsForRender.slice(0, 6)
@@ -984,7 +984,7 @@ function AdminAgentPage({ route, onNav }) {
               if (view !== 'properties') return `Mostrando ${Math.min(6, propsForRender.length)} de ${propsForRender.length}`;
               const q = propSearch.trim().toLowerCase();
               const matches = q ? propsForRender.filter(p =>
-                [p.titulo, p.codigo, p.ciudad, p.barrio, p.direccion]
+                [p.title, p.titulo, p.codigo, p.city, p.ciudad, p.neighborhood, p.barrio, p.direccion]
                   .some(v => String(v || '').toLowerCase().includes(q))
               ).length : propsForRender.length;
               return q
