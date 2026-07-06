@@ -956,7 +956,7 @@ function AdminAgentPage({ route, onNav }) {
 
           {/* Footer / ver todas */}
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-            <span style={{ color: 'var(--ink-4)' }}>Mostrando {Math.min(6, propsForRender.length)} de {propsForRender.length}</span>
+            <span style={{ color: 'var(--ink-4)' }}>Mostrando {view === "properties" ? propsForRender.length : Math.min(6, propsForRender.length)} de {propsForRender.length}</span>
             {view === 'overview' && propsForRender.length > 6 && (
               <button onClick={() => onNav && onNav('admin-agent-properties')} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>
                 Ver todas →
