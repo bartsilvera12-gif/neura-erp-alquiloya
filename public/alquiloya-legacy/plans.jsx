@@ -264,7 +264,7 @@ function BoostPage({ onNav }) {
             <div className="row gap-8">
               <span className="badge badge-verified"><I.check s={11}/> Verificado</span>
             </div>
-            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18, color: 'var(--blue)', marginTop: 10 }}>Gs. 3.800.000</div>
+            <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18, color: 'var(--blue)', marginTop: 10 }}>Gs. 45.000</div>
             <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>+340% más vistas que un inmueble sin verificar</div>
           </div>
           <div className="card" style={{ padding: 18, width: 200, transform: 'rotate(3deg)', background: 'var(--yellow-50)' }}>
