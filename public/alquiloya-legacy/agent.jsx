@@ -1,7 +1,9 @@
 // Perfil público de agente — visible para cualquier visitante
 
 function AgentProfilePage({ slug, onNav, onProperty }) {
-  const { agents } = useAlquiloYaPublicData();
+  const publicData = useAlquiloYaPublicData();
+  const agents = publicData.agents;
+  const publicLoading = publicData.loading;
   // El "slug" puede venir con query (?id=<uuid>) anexado porque el router
   // legacy usa el hash entero como ruta. Lo descomponemos para tener slug
   // limpio + posible id de fallback (cuando cambia el nombre del agente y el
@@ -57,6 +59,30 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
     } catch { /* ignore */ }
   }, [slugClean]);
 
+  if (!agent && publicLoading) {
+    // Loading skeleton — evita el flash de "no encontramos este agente"
+    // mientras el useAlquiloYaPublicData() todavia esta trayendo la lista.
+    return (
+      <div className="fade-in container" style={{ padding: '48px 32px', minHeight: '50vh' }}>
+        <div className="card" style={{ padding: 32, maxWidth: 820, margin: '0 auto' }}>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+            <div style={{
+              width: 96, height: 96, borderRadius: '50%',
+              background: 'linear-gradient(90deg,#eef2f7,#f6f8fb,#eef2f7)',
+              backgroundSize: '200% 100%', animation: 'fadeIn .6s',
+            }}/>
+            <div style={{ flex: 1 }}>
+              <div style={{ height: 20, width: '55%', borderRadius: 6, background: '#eef2f7', marginBottom: 10 }}/>
+              <div style={{ height: 12, width: '35%', borderRadius: 6, background: '#f0f3f7', marginBottom: 8 }}/>
+              <div style={{ height: 10, width: '25%', borderRadius: 6, background: '#f0f3f7' }}/>
+            </div>
+          </div>
+          <div style={{ height: 14, width: '90%', borderRadius: 6, background: '#eef2f7', marginTop: 24 }}/>
+          <div style={{ height: 14, width: '80%', borderRadius: 6, background: '#eef2f7', marginTop: 8 }}/>
+        </div>
+      </div>
+    );
+  }
   if (!agent) {
     // Estado vacio honesto cuando el slug no corresponde a ningun agente real.
     return (
