@@ -331,49 +331,131 @@ function AgentBlogPanel({ posts, agent, agentSlug, initialPostSlug }) {
   }
   if (active) {
     return (
-      <div className="card" style={{ padding: 28, maxWidth: 760 }}>
-        <div className="row between" style={{ alignItems: 'center' }}>
-          <button type="button" onClick={closePost} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 13, padding: 0 }}>
+      <article
+        className="card"
+        style={{
+          padding: '32px 40px 48px',
+          maxWidth: 820,
+          margin: '0 auto',
+          borderRadius: 16,
+        }}
+      >
+        <div
+          className="row between"
+          style={{ alignItems: 'center', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}
+        >
+          <button
+            type="button"
+            onClick={closePost}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--blue)', fontWeight: 600, fontSize: 13, padding: 0,
+            }}
+          >
             ← Volver al blog
           </button>
           <button
             type="button"
             onClick={() => sharePost(active)}
             className="btn btn-outline btn-sm"
-            style={{ padding: '6px 12px', fontSize: 12 }}
+            style={{ padding: '6px 14px', fontSize: 12 }}
           >
             <I.share s={12}/> {copiedPost ? '¡Enlace copiado!' : 'Compartir artículo'}
           </button>
         </div>
         {active.cover_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={active.cover_url} alt={active.titulo} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 12, marginTop: 14 }}/>
+          <img
+            src={active.cover_url}
+            alt={active.titulo}
+            style={{
+              width: '100%',
+              maxHeight: 360,
+              objectFit: 'cover',
+              borderRadius: 12,
+              marginBottom: 24,
+              display: 'block',
+            }}
+          />
         )}
-        <h2 style={{ fontSize: 28, marginTop: 16, lineHeight: 1.2 }}>{active.titulo}</h2>
+        <h1
+          style={{
+            fontFamily: 'Montserrat',
+            fontWeight: 800,
+            fontSize: 32,
+            lineHeight: 1.15,
+            margin: 0,
+          }}
+        >
+          {active.titulo}
+        </h1>
         {active.publicado_at && (
-          <div className="muted xs" style={{ marginTop: 6 }}>
-            {new Date(active.publicado_at).toLocaleDateString('es-PY', { day: '2-digit', month: 'long', year: 'numeric' })}
+          <div className="muted xs" style={{ marginTop: 10, fontSize: 12.5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+            {new Date(active.publicado_at).toLocaleDateString('es-PY', {
+              day: '2-digit', month: 'long', year: 'numeric',
+            })}
           </div>
         )}
         {active.resumen && (
-          <p style={{ fontSize: 15.5, color: 'var(--ink-2)', marginTop: 14, lineHeight: 1.55, fontWeight: 500 }}>{active.resumen}</p>
+          <p style={{
+            fontSize: 17,
+            color: 'var(--ink-2)',
+            marginTop: 22,
+            marginBottom: 0,
+            lineHeight: 1.6,
+            fontWeight: 500,
+            paddingLeft: 16,
+            borderLeft: '3px solid var(--blue-50)',
+          }}>
+            {active.resumen}
+          </p>
         )}
         {active.contenido && (
           /<[a-z][^>]*>/i.test(String(active.contenido)) ? (
             <div
               className="post-html"
-              style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 16, lineHeight: 1.7 }}
+              style={{
+                fontSize: 16,
+                color: 'var(--ink-2)',
+                marginTop: 28,
+                lineHeight: 1.75,
+              }}
               dangerouslySetInnerHTML={{ __html: active.contenido }}
             />
           ) : (
-            <div style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 16, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{active.contenido}</div>
+            <div style={{
+              fontSize: 16,
+              color: 'var(--ink-2)',
+              marginTop: 28,
+              lineHeight: 1.75,
+              whiteSpace: 'pre-wrap',
+            }}>
+              {active.contenido}
+            </div>
           )
         )}
-      </div>
+        {/* Footer: repetir el share al final para el que llega scrolleando */}
+        <div style={{
+          marginTop: 40, paddingTop: 24,
+          borderTop: '1px solid var(--line-2)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <span className="muted xs">¿Te gustó este artículo? Compartilo con otros.</span>
+          <button
+            type="button"
+            onClick={() => sharePost(active)}
+            className="btn btn-primary btn-sm"
+            style={{ padding: '8px 18px', fontSize: 13 }}
+          >
+            <I.share s={13}/> {copiedPost ? '¡Enlace copiado!' : 'Compartir artículo'}
+          </button>
+        </div>
+      </article>
     );
   }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18, maxWidth: 820, margin: '0 auto' }}>
       {posts.map(p => (
         <button key={p.id} type="button" onClick={() => openPost(p)} className="card" style={{ padding: 0, textAlign: 'left', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer' }}>
           {p.cover_url ? (
