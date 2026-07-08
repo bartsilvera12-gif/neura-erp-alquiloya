@@ -7,7 +7,19 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
   // limpio + posible id de fallback (cuando cambia el nombre del agente y el
   // slug no matchea, igual encontramos el perfil por id).
   const qIdx = String(slug || '').indexOf('?');
-  const slugClean = qIdx >= 0 ? slug.slice(0, qIdx) : slug;
+  const slugRaw = qIdx >= 0 ? slug.slice(0, qIdx) : slug;
+  // Sub-path: lo que va despues del slug del agente. Formato:
+  //   agent/<agentSlug>            -> subParts = []
+  //   agent/<agentSlug>/blog       -> subParts = ['blog']
+  //   agent/<agentSlug>/blog/<x>   -> subParts = ['blog', '<x>']  (x = post slug)
+  //   agent/<agentSlug>/resenas    -> subParts = ['resenas']
+  const slugParts = String(slugRaw || '').split('/').filter(Boolean);
+  const slugClean = slugParts[0] || '';
+  const subParts = slugParts.slice(1);
+  const initialTabFromUrl = subParts[0] === 'blog' || subParts[0] === 'resenas'
+    ? subParts[0]
+    : 'propiedades';
+  const initialPostSlug = subParts[0] === 'blog' ? (subParts[1] || null) : null;
   let fallbackIdFromQuery = null;
   if (qIdx >= 0) {
     try {
@@ -26,9 +38,24 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
   const agent = apiAgent || baseAgent;
 
   // Hooks declarados ANTES del early return para no romper reglas de hooks.
-  const [tab, setTab] = React.useState('propiedades');
+  const [tab, setTab] = React.useState(initialTabFromUrl);
   const tabsRef = React.useRef(null);
   const [copied, setCopied] = React.useState(false);
+  // Cuando el usuario cambia de tab (click en Propiedades/Blog/Resenas),
+  // reflejamos en el hash para que la URL sea compartible. Al entrar por un
+  // link de tab, initialTabFromUrl ya nos deja en el estado correcto.
+  const setTabAndUrl = React.useCallback((nextTab) => {
+    setTab(nextTab);
+    if (typeof window === 'undefined') return;
+    try {
+      const base = 'agent/' + slugClean;
+      const next = nextTab === 'propiedades' ? base : base + '/' + nextTab;
+      // Reemplazamos el hash sin scroll ni recargar.
+      if (window.location.hash !== '#' + next) {
+        history.replaceState(null, '', '#' + next);
+      }
+    } catch { /* ignore */ }
+  }, [slugClean]);
 
   if (!agent) {
     // Estado vacio honesto cuando el slug no corresponde a ningun agente real.
@@ -69,11 +96,12 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
   const waUrl = agent.phone ? 'https://wa.me/' + String(agent.phone).replace(/[^\d]/g, '') : null;
 
   const goToProps = () => {
-    setTab('propiedades');
+    setTabAndUrl('propiedades');
     if (tabsRef.current) tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const sharePerfil = async () => {
-    const url = window.location.href;
+    const slug = agent.slug || (agent.id ? String(agent.id).toLowerCase() : '');
+    const url = 'https://alquiloya.com.py/publico#agent/' + slug;
     try {
       if (navigator.share) { await navigator.share({ title: agent.name, url }); return; }
     } catch {}
@@ -158,7 +186,7 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
               ) : null}
             </div>
 
-            <p style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: 'var(--ink-2)', maxWidth: 640 }}>{agent.bio}</p>
+            <p style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: 'var(--ink-2)', maxWidth: 640, whiteSpace: 'pre-wrap' }}>{agent.bio}</p>
           </div>
           <div className="col gap-8" style={{ alignItems: 'stretch', minWidth: 220 }}>
             {waUrl ? (
@@ -193,16 +221,18 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
           agent={agent}
           props={props}
           tab={tab}
-          setTab={setTab}
+          setTab={setTabAndUrl}
           hasTips={hasTips}
           onProperty={onProperty}
+          agentSlug={slugClean}
+          initialPostSlug={initialPostSlug}
         />
       </div>
     </div>
   );
 }
 
-function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty }) {
+function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty, agentSlug, initialPostSlug }) {
   const [posts, setPosts] = React.useState(null);
   React.useEffect(() => {
     if (!agent.apiId) { setPosts([]); return; }
@@ -247,15 +277,52 @@ function AgentTabsAndContent({ agent, props, tab, setTab, hasTips, onProperty })
         )}
 
         {tab === 'zona' && hasTips && <AgentZoneTips agent={agent}/>}
-        {tab === 'blog' && <AgentBlogPanel posts={posts}/>}
+        {tab === 'blog' && <AgentBlogPanel posts={posts} agent={agent} agentSlug={agentSlug} initialPostSlug={initialPostSlug}/>}
         {tab === 'reviews' && <AgentReviews agent={agent}/>}
       </div>
     </>
   );
 }
 
-function AgentBlogPanel({ posts }) {
+function AgentBlogPanel({ posts, agent, agentSlug, initialPostSlug }) {
   const [active, setActive] = React.useState(null);
+  const [copiedPost, setCopiedPost] = React.useState(false);
+  // Sincroniza el post activo con initialPostSlug cuando llegan los posts.
+  React.useEffect(() => {
+    if (!Array.isArray(posts)) return;
+    if (initialPostSlug) {
+      const match = posts.find(p => p.slug === initialPostSlug);
+      if (match) { setActive(match); return; }
+    }
+    setActive(null);
+  }, [posts, initialPostSlug]);
+  // Al abrir/cerrar un post, actualizamos el hash (para que sea compartible
+  // y para que el boton "atras" del navegador vuelva al listado).
+  const openPost = (p) => {
+    setActive(p);
+    if (typeof window === 'undefined' || !agentSlug) return;
+    try { history.pushState(null, '', '#agent/' + agentSlug + '/blog/' + (p.slug || '')); } catch {}
+  };
+  const closePost = () => {
+    setActive(null);
+    if (typeof window === 'undefined' || !agentSlug) return;
+    try { history.pushState(null, '', '#agent/' + agentSlug + '/blog'); } catch {}
+  };
+  const sharePost = async (p) => {
+    if (!agentSlug) return;
+    const url = 'https://alquiloya.com.py/publico#agent/' + agentSlug + '/blog/' + (p.slug || '');
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: p.titulo, url });
+        return;
+      }
+    } catch { /* ignore */ }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedPost(true);
+      setTimeout(() => setCopiedPost(false), 2000);
+    } catch { /* ignore */ }
+  };
   if (posts === null) {
     return <EmptyTab text="Cargando posts…"/>;
   }
@@ -265,9 +332,19 @@ function AgentBlogPanel({ posts }) {
   if (active) {
     return (
       <div className="card" style={{ padding: 28, maxWidth: 760 }}>
-        <button type="button" onClick={() => setActive(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 13, padding: 0 }}>
-          ← Volver al blog
-        </button>
+        <div className="row between" style={{ alignItems: 'center' }}>
+          <button type="button" onClick={closePost} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 13, padding: 0 }}>
+            ← Volver al blog
+          </button>
+          <button
+            type="button"
+            onClick={() => sharePost(active)}
+            className="btn btn-outline btn-sm"
+            style={{ padding: '6px 12px', fontSize: 12 }}
+          >
+            <I.share s={12}/> {copiedPost ? '¡Enlace copiado!' : 'Compartir artículo'}
+          </button>
+        </div>
         {active.cover_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={active.cover_url} alt={active.titulo} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 12, marginTop: 14 }}/>
@@ -298,7 +375,7 @@ function AgentBlogPanel({ posts }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18 }}>
       {posts.map(p => (
-        <button key={p.id} type="button" onClick={() => setActive(p)} className="card" style={{ padding: 0, textAlign: 'left', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer' }}>
+        <button key={p.id} type="button" onClick={() => openPost(p)} className="card" style={{ padding: 0, textAlign: 'left', background: '#fff', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer' }}>
           {p.cover_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={p.cover_url} alt={p.titulo} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', background: 'var(--bg-2)' }}/>
