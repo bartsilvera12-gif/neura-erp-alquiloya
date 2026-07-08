@@ -366,10 +366,7 @@ function AgentBlogPanel({ posts, agent, agentSlug, initialPostSlug }) {
           borderRadius: 16,
         }}
       >
-        <div
-          className="row between"
-          style={{ alignItems: 'center', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}
-        >
+        <div style={{ marginBottom: 24 }}>
           <button
             type="button"
             onClick={closePost}
@@ -379,14 +376,6 @@ function AgentBlogPanel({ posts, agent, agentSlug, initialPostSlug }) {
             }}
           >
             ← Volver al blog
-          </button>
-          <button
-            type="button"
-            onClick={() => sharePost(active)}
-            className="btn btn-outline btn-sm"
-            style={{ padding: '6px 14px', fontSize: 12 }}
-          >
-            <I.share s={12}/> {copiedPost ? '¡Enlace copiado!' : 'Compartir artículo'}
           </button>
         </div>
         {active.cover_url && (
