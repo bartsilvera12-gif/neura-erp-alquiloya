@@ -17,6 +17,20 @@ const nextConfig: NextConfig = {
         destination: "/alquiloya-legacy/portal-agentes.html",
         permanent: false,
       },
+      // /alquiloya-legacy (sin trailing slash) es una URL que llega desde
+      // links viejos o navegador que la autocompleta. Sin este redirect
+      // Next.js la trata como ruta de pagina y 404ea con el shell del ERP.
+      // Preservamos el hash (que el navegador nunca envia al server).
+      {
+        source: "/alquiloya-legacy",
+        destination: "/publico",
+        permanent: false,
+      },
+      {
+        source: "/alquiloya-legacy/",
+        destination: "/publico",
+        permanent: false,
+      },
     ];
   },
   async headers() {
