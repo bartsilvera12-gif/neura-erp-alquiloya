@@ -106,7 +106,13 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
   // (que ya filtra por activo + visible_web). Antes habia un fallback que
   // matcheaba por nombre y podia traer propiedades incorrectas si caia al
   // mock — lo removimos.
-  const props = (Array.isArray(agent.propiedades) ? agent.propiedades : []).slice(0, 9);
+  const propiedadesAll = Array.isArray(agent.propiedades) ? agent.propiedades : [];
+  const props = propiedadesAll.slice(0, 9);
+  // Contador REAL de propiedades cargadas en el detalle. agent.activeProperties
+  // viene del listado general que usa un filtro distinto (exige visible_web)
+  // y termina 0 en casos donde el detalle si trae propiedades — la tab del
+  // panel decia "5" pero el boton "Ver inmuebles (0)".
+  const propCountReal = propiedadesAll.length || Number(agent.activeProperties) || 0;
   const firstName = agent.name.split(' ')[0];
 
   const hasTips = Array.isArray(agent.tips) && agent.tips.length > 0;
@@ -114,7 +120,7 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
 
   const stats = [
     agent.tiempoRespuesta ? { label: 'Tiempo medio respuesta', value: agent.tiempoRespuesta, hint: 'horario hábil' } : null,
-    agent.closedRentals > 0 ? { label: 'Cierres acumulados', value: String(agent.closedRentals), hint: 'sobre ' + agent.activeProperties + ' activas' } : null,
+    agent.closedRentals > 0 ? { label: 'Cierres acumulados', value: String(agent.closedRentals), hint: 'sobre ' + propCountReal + ' activas' } : null,
     agent.tasaRespuesta ? { label: 'Tasa de respuesta', value: agent.tasaRespuesta, hint: 'consultas recientes' } : null,
     agent.idiomas ? { label: 'Idiomas', value: agent.idiomas, hint: '' } : null,
   ].filter(Boolean);
@@ -201,7 +207,7 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
                   <span style={{ color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
                 </>
               ) : null}
-              <strong style={{ color: 'var(--ink)' }}>{agent.activeProperties}</strong>
+              <strong style={{ color: 'var(--ink)' }}>{propCountReal}</strong>
               <span style={{ color: 'var(--ink-3)' }}>activas</span>
               {agent.closedRentals > 0 ? (
                 <>
@@ -220,7 +226,7 @@ function AgentProfilePage({ slug, onNav, onProperty }) {
             ) : (
               <button className="btn btn-wa" disabled style={{ justifyContent: 'center', opacity: .5 }}><I.whats s={14}/> WhatsApp</button>
             )}
-            <button className="btn btn-blue" onClick={goToProps} style={{ justifyContent: 'center' }}>Ver inmuebles ({agent.activeProperties})</button>
+            <button className="btn btn-blue" onClick={goToProps} style={{ justifyContent: 'center' }}>Ver inmuebles ({propCountReal})</button>
             <button className="btn btn-outline btn-sm" onClick={sharePerfil} style={{ justifyContent: 'center' }}>
               <I.share s={13}/> {copied ? '¡Enlace copiado!' : 'Compartir perfil'}
             </button>
