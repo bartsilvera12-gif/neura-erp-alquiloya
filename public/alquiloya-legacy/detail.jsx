@@ -49,11 +49,13 @@ function DetailPage({ p, onProperty, onNav }) {
           <span style={{ color: 'var(--ink)' }}>{p.title}</span>
         </div>
       </div>
+      {/* Si hay video, va ARRIBA de las fotos por pedido del cliente:
+          quiere que el video sea la primera impresion visual cuando existe. */}
+      <DetailVideo p={p} hero/>
       <Gallery photos={p.photos} active={active} setActive={setActive} property={p} />
       <div className="container" style={{ padding: '32px', display: 'grid', gridTemplateColumns: '1fr 380px', gap: 40, alignItems: 'flex-start' }}>
         <div>
           <DetailHeader p={p}/>
-          <DetailVideo p={p}/>
           <DetailFeatures p={p}/>
           <DetailDescription p={p}/>
           <DetailMap p={p}/>
@@ -454,9 +456,15 @@ function DetailHeader({ p }) {
 //   - URL directa de mp4/webm/mov (renderiza con <video controls>)
 // Solo aparece si la propiedad tiene video_url (los planes que no permiten
 // videos directamente no lo guardan, asi que el filtro lo da el back).
-function DetailVideo({ p }) {
+function DetailVideo({ p, hero }) {
   const url = p && p.video_url ? String(p.video_url).trim() : '';
   if (!url) return null;
+  // Cuando el video se renderiza como 'hero' (arriba de todo, antes de las
+  // fotos), va a ancho completo con fondo negro y sin el card blanco.
+  const heroWrap = {
+    background: '#000', padding: '24px 0', marginBottom: 0,
+  };
+  const heroInner = { maxWidth: 1080, margin: '0 auto', padding: '0 20px' };
   let embedUrl = null;
   let isFile = false;
   // YouTube
@@ -472,7 +480,13 @@ function DetailVideo({ p }) {
       isFile = true;
     } else {
       // Fallback: link plano "Ver video"
-      return (
+      return hero ? (
+        <div style={heroWrap}>
+          <div style={heroInner}>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-blue">📹 Ver video →</a>
+          </div>
+        </div>
+      ) : (
         <div className="card" style={{ padding: 16, marginTop: 16 }}>
           <h3 style={{ fontSize: 16, marginBottom: 8 }}>📹 Video del inmueble</h3>
           <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-blue">Ver video →</a>
@@ -480,10 +494,8 @@ function DetailVideo({ p }) {
       );
     }
   }
-  return (
-    <div className="card" style={{ padding: 16, marginTop: 16 }}>
-      <h3 style={{ fontSize: 16, marginBottom: 10 }}>📹 Video del inmueble</h3>
-      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 12, background: '#000' }}>
+  const player = (
+    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: hero ? 8 : 12, background: '#000' }}>
         {isFile ? (
           <video
             src={url}
@@ -501,7 +513,16 @@ function DetailVideo({ p }) {
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
           />
         )}
-      </div>
+    </div>
+  );
+  return hero ? (
+    <div style={heroWrap}>
+      <div style={heroInner}>{player}</div>
+    </div>
+  ) : (
+    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+      <h3 style={{ fontSize: 16, marginBottom: 10 }}>📹 Video del inmueble</h3>
+      {player}
     </div>
   );
 }
