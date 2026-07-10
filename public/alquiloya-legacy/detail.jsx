@@ -462,7 +462,7 @@ function DetailVideo({ p, hero }) {
   // Cuando el video se renderiza como 'hero' (arriba de todo, antes de las
   // fotos), va a ancho completo con fondo negro y sin el card blanco.
   const heroWrap = {
-    background: '#000', padding: '24px 0', marginBottom: 0,
+    background: 'var(--bg-2)', padding: '20px 0 8px', marginBottom: 0,
   };
   const heroInner = { maxWidth: 1080, margin: '0 auto', padding: '0 20px' };
   let embedUrl = null;
