@@ -509,10 +509,9 @@ function CredencialesModal({
   const [copied, setCopied] = useState(false);
   const mensaje =
     `Hola ${creds.nombre}, ¡tu cuenta en AlquiloYa fue aprobada! 🎉\n\n` +
-    `Ingresá en: ${typeof window !== "undefined" ? window.location.origin : ""}/portal-agentes/login\n` +
+    `Ingresá en: https://alquiloya.com.py/portal-agentes/login\n` +
     `Email: ${creds.email}\n` +
-    `Contraseña temporal: ${creds.tempPassword}\n\n` +
-    `Te recomendamos cambiarla al ingresar.`;
+    `Contraseña temporal: ${creds.tempPassword}`;
   const phone = waNum(creds.telefono);
   const waHref = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}` : null;
   const mailHref = `mailto:${creds.email}?subject=${encodeURIComponent("Tu acceso a AlquiloYa")}&body=${encodeURIComponent(mensaje)}`;
