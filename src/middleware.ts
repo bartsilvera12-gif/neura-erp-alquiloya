@@ -29,6 +29,18 @@ export async function middleware(request: NextRequest) {
   const publicHosts = getPublicHosts();
   const host = getRequestHostname(request);
 
+  // www.<algo> -> redirect al mismo path sin www. Consolida el trafico en
+  // el hostname canonico (mejor SEO, un solo cert que renovar). Cubre
+  // www.alquiloya.com.py y cualquier www.<host> futuro.
+  if (host.startsWith("www.")) {
+    const canonicalHost = host.slice(4);
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.hostname = canonicalHost;
+    redirectUrl.protocol = "https:";
+    redirectUrl.port = "";
+    return NextResponse.redirect(redirectUrl, 302);
+  }
+
   // Canonical redirect: si el request llega a un host NO publico (ej.
   // alquiloya.neura.com.py) pero apunta a una ruta que es de la web publica,
   // redirigimos al primer host publico configurado (el dominio corto).
