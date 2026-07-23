@@ -30,6 +30,7 @@ function AdminLayout({ kind, role, route, onNav, title, subtitle, actions, displ
   ] : [
     { id: 'admin-agent', label: 'Resumen', icon: 'grid' },
     { id: 'admin-agent-properties', label: 'Mis propiedades', icon: 'house' },
+    { id: 'admin-agent-redes', label: 'Redes sociales', icon: 'share' },
     // Captaciones y Blog SOLO para agentes. Mientras el rol no esta resuelto
     // (role indefinido durante la carga) NO los mostramos: asi un propietario
     // no ve esos items aparecer y desaparecer. Para agentes aparecen al
@@ -613,11 +614,13 @@ function AdminAgentPage({ route, onNav }) {
     'admin-agent-queries': 'queries',
     'admin-agent-blog': 'blog',
     'admin-agent-profile': 'profile',
+    'admin-agent-redes': 'redes',
   })[route] || 'overview';
 
   const titles = {
     overview: ['', ''],
     properties: ['Mis propiedades', 'Editá, pausá o destacá tus inmuebles publicados.'],
+    redes: ['Redes sociales', 'Conectá Facebook e Instagram para publicar tus inmuebles automáticamente.'],
     captures: ['Captaciones', 'Propiedades que capturaste de propietarios + comisión por cierre.'],
     queries: ['Consultas', 'Mensajes de interesados en tus inmuebles.'],
     blog: ['Mi blog', 'Publicá artículos, guías y novedades. Aparecen en tu perfil público.'],
@@ -1020,6 +1023,9 @@ function AdminAgentPage({ route, onNav }) {
       </div>
       )}
 
+      {view === 'redes' && (typeof RedesSocialesPanel === 'function'
+        ? React.createElement(RedesSocialesPanel, { onNav })
+        : <div className="card" style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)' }}>Cargando modulo de redes sociales…</div>)}
       {view === 'captures' && <CapturesSection onNav={onNav}/>}
 
       {view === 'blog' && <BlogSection/>}
