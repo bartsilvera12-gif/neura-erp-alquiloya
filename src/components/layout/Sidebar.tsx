@@ -300,6 +300,13 @@ const MENU_STRUCTURE: MenuItem[] = [
     icon: Share2,
   },
   {
+    key: "integraciones-sociales",
+    slug: "integraciones-sociales",
+    label: "Integraciones sociales",
+    href: "/dashboard/integraciones-sociales",
+    icon: Share2,
+  },
+  {
     key: "sorteos",
     slug: "sorteos",
     label: "Sorteos",
