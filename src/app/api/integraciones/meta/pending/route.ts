@@ -1,10 +1,10 @@
 // GET /api/integraciones/meta/pending
-// Despues del OAuth callback, la cookie 'neura_meta_pending' tiene una lista
-// cifrada de pages con IG. El frontend llama aca para renderizar el selector.
+// Lee el pending cifrado del callback y devuelve metadata para el selector
+// de Page. SIN tokens. Chequea que el owner logueado matchee el del pending.
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { requirePropietarioContext, sanitizeError } from "@/lib/meta/propietario";
+import { requireOwnerContext, sanitizeError } from "@/lib/meta/owner";
 import { decryptMetaSecret } from "@/lib/meta/security";
 
 export const runtime = "nodejs";
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 const PENDING_COOKIE = "neura_meta_pending";
 
 type PendingSelection = {
-  pid: string;
+  owner_type: "propietario" | "agente";
+  owner_id: string;
   eat: string;
   tex: number | null;
   scopes: string[];
@@ -28,7 +29,7 @@ type PendingSelection = {
 
 export async function GET(request: Request) {
   try {
-    const ctx = await requirePropietarioContext(request);
+    const ctx = await requireOwnerContext(request);
     if (ctx instanceof NextResponse) return ctx;
 
     const jar = await cookies();
@@ -42,7 +43,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, pending: null });
     }
 
-    if (pending.pid !== ctx.propietarioId) {
+    // El pending debe pertenecer al owner logueado (matchea tanto tipo como id)
+    if (pending.owner_type !== ctx.ownerType || pending.owner_id !== ctx.ownerId) {
       return NextResponse.json({ success: true, pending: null });
     }
 

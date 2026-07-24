@@ -1,9 +1,10 @@
 // GET /api/integraciones/meta/oauth/callback
-// Meta redirige a este endpoint con ?code=...&state=... (o error).
-// 1. validamos el state contra la cookie nonce (CSRF)
-// 2. intercambiamos code por token corto -> upgrade a long-lived
-// 3. listamos las Pages autorizadas
-// 4. redirigimos al panel del propietario mostrando el resultado
+// Meta redirige aqui con ?code=...&state=... (o error).
+// 1. validamos state contra cookie nonce (CSRF)
+// 2. decodificamos owner (propietario XOR agente) del payload
+// 3. intercambiamos code -> short token -> long-lived
+// 4. listamos Pages, IG por page
+// 5. dejamos "pending" cifrado en cookie con owner info y redirigimos al panel
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -17,7 +18,7 @@ import {
   debugToken,
 } from "@/lib/meta/graph-client";
 import { encryptMetaSecret } from "@/lib/meta/security";
-import { sanitizeError } from "@/lib/meta/propietario";
+import { sanitizeError } from "@/lib/meta/owner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,8 @@ function publicLanding(subpath: string): string {
 }
 
 type PendingSelection = {
-  pid: string;
+  owner_type: "propietario" | "agente";
+  owner_id: string;
   eat: string;
   tex: number | null;
   scopes: string[];
@@ -67,6 +69,26 @@ export async function GET(request: Request) {
       payload = verifyState(state, nonceCookie);
     } catch (e) {
       return errorRedirect("invalid_state:" + sanitizeError(e).slice(0, 60));
+    }
+
+    // Decodificar owner del pid: "prop:<uuid>" o "agente:<uuid>"
+    const encoded = payload.pid;
+    let ownerType: "propietario" | "agente";
+    let ownerId: string;
+    if (encoded.startsWith("agente:")) {
+      ownerType = "agente";
+      ownerId = encoded.slice("agente:".length);
+    } else if (encoded.startsWith("propietario:")) {
+      ownerType = "propietario";
+      ownerId = encoded.slice("propietario:".length);
+    } else if (encoded.startsWith("prop:")) {
+      // compat con nombres viejos si aparecen
+      ownerType = "propietario";
+      ownerId = encoded.slice("prop:".length);
+    } else {
+      // Compat total: si no tiene prefijo asumimos propietario (Entrega 1 previa)
+      ownerType = "propietario";
+      ownerId = encoded;
     }
 
     const redirectUri = process.env.META_REDIRECT_URI?.trim();
@@ -108,16 +130,17 @@ export async function GET(request: Request) {
     }
 
     const pending: PendingSelection = {
-      pid: payload.pid,
+      owner_type: ownerType,
+      owner_id: ownerId,
       eat: encryptMetaSecret(longLived.access_token),
       tex: expiresAt,
       scopes,
       pages: enriched,
     };
-    const encoded = encryptMetaSecret(JSON.stringify(pending));
+    const encodedPending = encryptMetaSecret(JSON.stringify(pending));
 
     const res = NextResponse.redirect(publicLanding("meta_select=1"), 302);
-    res.cookies.set(PENDING_COOKIE, encoded, {
+    res.cookies.set(PENDING_COOKIE, encodedPending, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",

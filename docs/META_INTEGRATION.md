@@ -127,3 +127,24 @@ Justificacion: AlquiloYa es un marketplace inmobiliario donde los
 propietarios publican inmuebles. La integracion Meta les permite
 distribuir la misma publicacion en su Pagina y en su cuenta profesional
 de Instagram, evitando cargarla dos veces.
+
+## 11. Soporte para agentes inmobiliarios
+
+Ademas de propietarios, tambien los agentes inmobiliarios pueden conectar
+su cuenta Meta (rol publicador-agente con agente_id en alquiloya.usuarios).
+
+- Cada usuario es propietario XOR agente (regla de negocio) — un usuario
+  no puede tener ambos setteados en usuarios.propietario_id / agente_id.
+- El helper requireOwnerContext resuelve automaticamente cual es y devuelve
+  { ownerType: 'propietario' | 'agente', ownerId }.
+- Los mismos endpoints (/status, /oauth/start, etc.) sirven para ambos.
+- La UI (redes-sociales.jsx) es identica — llama a los mismos endpoints,
+  la API se encarga de discriminar por ownerType.
+
+Tabla alquiloya.propietario_redes_sociales:
+- propietario_id nullable, agente_id nullable.
+- CHECK XOR: exactamente uno de los dos NOT NULL.
+- Unique index sobre (empresa_id, COALESCE(propietario_id, agente_id),
+  provider, page, ig).
+
+Mismo esquema en alquiloya.publicaciones_sociales.

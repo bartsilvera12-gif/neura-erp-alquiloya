@@ -1,8 +1,9 @@
 // POST /api/integraciones/meta/toggle-auto
-// Body: { conexion_id: string, network: 'facebook'|'instagram', enabled: boolean }
+// Body: { conexion_id, network: 'facebook'|'instagram', enabled: boolean }
+// Owner-scoped (propietario o agente).
 
 import { NextResponse } from "next/server";
-import { getPool, requirePropietarioContext, sanitizeError } from "@/lib/meta/propietario";
+import { getPool, requireOwnerContext, sanitizeError, ownerColumns } from "@/lib/meta/owner";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 
 export const runtime = "nodejs";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const ctx = await requirePropietarioContext(request);
+    const ctx = await requireOwnerContext(request);
     if (ctx instanceof NextResponse) return ctx;
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "network invalido" }, { status: 400 });
     }
 
-    // col es un literal validado arriba (solo 2 valores), no viene del body
+    // col es literal validado (2 valores) — no viene del body
     const col = network === "facebook" ? "auto_publish_facebook" : "auto_publish_instagram";
+    const { col: ownerCol } = ownerColumns(ctx);
 
     const pool = getPool();
     const { rows } = await queryWithRetry<{ id: string }>(
@@ -35,11 +37,11 @@ export async function POST(request: Request) {
       "UPDATE \"alquiloya\".\"propietario_redes_sociales\"" +
       "   SET " + col + " = $4, updated_at = now()" +
       " WHERE empresa_id = $1::uuid" +
-      "   AND propietario_id = $2::uuid" +
+      "   AND " + ownerCol + " = $2::uuid" +
       "   AND id = $3::uuid" +
       "   AND status = 'connected'" +
       " RETURNING id",
-      [ctx.empresaId, ctx.propietarioId, id, enabled],
+      [ctx.empresaId, ctx.ownerId, id, enabled],
     );
     if (rows.length === 0) {
       return NextResponse.json(

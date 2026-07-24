@@ -1,9 +1,9 @@
 // GET /api/integraciones/meta/status
-// Devuelve las conexiones Meta del propietario logueado, para renderizar la UI
-// del panel. NUNCA incluye access_token — solo metadata.
+// Devuelve las conexiones Meta del owner logueado (propietario o agente).
+// NUNCA incluye access_token — solo metadata.
 
 import { NextResponse } from "next/server";
-import { getPool, requirePropietarioContext, sanitizeError } from "@/lib/meta/propietario";
+import { getPool, requireOwnerContext, sanitizeError, ownerColumns } from "@/lib/meta/owner";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 
 export const runtime = "nodejs";
@@ -27,9 +27,10 @@ type Row = {
 
 export async function GET(request: Request) {
   try {
-    const ctx = await requirePropietarioContext(request);
+    const ctx = await requireOwnerContext(request);
     if (ctx instanceof NextResponse) return ctx;
 
+    const { col } = ownerColumns(ctx);
     const pool = getPool();
     const { rows } = await queryWithRetry<Row>(
       pool,
@@ -39,12 +40,12 @@ export async function GET(request: Request) {
       "       last_validated_at::text AS last_validated_at," +
       "       created_at::text AS created_at" +
       "  FROM \"alquiloya\".\"propietario_redes_sociales\"" +
-      " WHERE empresa_id = $1::uuid AND propietario_id = $2::uuid" +
+      " WHERE empresa_id = $1::uuid AND " + col + " = $2::uuid" +
       " ORDER BY created_at DESC",
-      [ctx.empresaId, ctx.propietarioId],
+      [ctx.empresaId, ctx.ownerId],
     );
 
-    return NextResponse.json({ success: true, conexiones: rows ?? [] });
+    return NextResponse.json({ success: true, owner_type: ctx.ownerType, conexiones: rows ?? [] });
   } catch (err) {
     console.error("[api/integraciones/meta/status]", sanitizeError(err));
     return NextResponse.json({ error: "Error" }, { status: 500 });

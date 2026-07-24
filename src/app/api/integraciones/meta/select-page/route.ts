@@ -1,10 +1,11 @@
 // POST /api/integraciones/meta/select-page
 // Body: { page_id: string, use_instagram: boolean }
-// Toma el pending cifrado del callback y persiste la Page/IG elegida.
+// Persiste la Page/IG elegida en alquiloya.propietario_redes_sociales.
+// El INSERT setea propietario_id XOR agente_id segun el ownerType.
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getPool, requirePropietarioContext, sanitizeError } from "@/lib/meta/propietario";
+import { getPool, requireOwnerContext, sanitizeError } from "@/lib/meta/owner";
 import { decryptMetaSecret } from "@/lib/meta/security";
 import { queryWithRetry } from "@/lib/supabase/pg-retry";
 
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
 const PENDING_COOKIE = "neura_meta_pending";
 
 type PendingSelection = {
-  pid: string;
+  owner_type: "propietario" | "agente";
+  owner_id: string;
   eat: string;
   tex: number | null;
   scopes: string[];
@@ -29,7 +31,7 @@ type PendingSelection = {
 
 export async function POST(request: Request) {
   try {
-    const ctx = await requirePropietarioContext(request);
+    const ctx = await requireOwnerContext(request);
     if (ctx instanceof NextResponse) return ctx;
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -59,9 +61,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (pending.pid !== ctx.propietarioId) {
+    if (pending.owner_type !== ctx.ownerType || pending.owner_id !== ctx.ownerId) {
       return NextResponse.json(
-        { error: "El propietario del pending no matchea el logueado" },
+        { error: "El owner del pending no matchea el logueado" },
         { status: 403 },
       );
     }
@@ -72,22 +74,26 @@ export async function POST(request: Request) {
     const igId = useIg ? chosen.instagram_business_account_id : null;
     const igUsername = useIg ? chosen.instagram_username : null;
 
+    // Setea propietario_id o agente_id segun ownerType, el otro va NULL.
+    const propietarioId = ctx.ownerType === "propietario" ? ctx.ownerId : null;
+    const agenteId = ctx.ownerType === "agente" ? ctx.ownerId : null;
+
     const pool = getPool();
     const tokenExpiresAtSql = pending.tex ? "to_timestamp(" + pending.tex + ")" : "NULL";
     await queryWithRetry(
       pool,
       "INSERT INTO \"alquiloya\".\"propietario_redes_sociales\"" +
-      "  (empresa_id, propietario_id, provider," +
+      "  (empresa_id, propietario_id, agente_id, provider," +
       "   facebook_page_id, instagram_account_id," +
       "   account_name, username," +
       "   access_token_encrypted, token_expires_at," +
       "   scopes, status, last_validated_at)" +
-      " VALUES ($1::uuid, $2::uuid, 'meta'," +
-      "         $3, $4," +
-      "         $5, $6," +
-      "         $7, " + tokenExpiresAtSql + "," +
-      "         $8::jsonb, 'connected', now())" +
-      " ON CONFLICT (empresa_id, propietario_id, provider," +
+      " VALUES ($1::uuid, $2::uuid, $3::uuid, 'meta'," +
+      "         $4, $5," +
+      "         $6, $7," +
+      "         $8, " + tokenExpiresAtSql + "," +
+      "         $9::jsonb, 'connected', now())" +
+      " ON CONFLICT (empresa_id, COALESCE(propietario_id, agente_id), provider," +
       "              COALESCE(facebook_page_id, ''), COALESCE(instagram_account_id, ''))" +
       " DO UPDATE SET" +
       "   account_name = EXCLUDED.account_name," +
@@ -100,7 +106,8 @@ export async function POST(request: Request) {
       "   updated_at = now()",
       [
         ctx.empresaId,
-        ctx.propietarioId,
+        propietarioId,
+        agenteId,
         chosen.id,
         igId,
         chosen.name,
