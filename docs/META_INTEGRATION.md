@@ -148,3 +148,81 @@ Tabla alquiloya.propietario_redes_sociales:
   provider, page, ig).
 
 Mismo esquema en alquiloya.publicaciones_sociales.
+
+## 12. Entrega 2 — Worker + publicacion real
+
+### Flujo end-to-end
+
+1. Admin aprueba propiedad (POST /api/dashboard/alquiloya-propiedades/{id}/moderacion, action=aprobar).
+2. Hook en el approval: enqueuePublicaciones(pool, { inmuebleId, owner }) crea 1 fila en publicaciones_sociales por cada conexion del owner con auto_publish activo. La aprobacion NUNCA se bloquea si Meta falla — errores se logean y siguen.
+3. Coolify Scheduled Task llama POST /api/internal/meta-worker cada 1 minuto.
+4. Worker: rescata atascados (>10 min en processing) -> pending. Levanta hasta 5 jobs pending elegibles con SKIP LOCKED. Los pasa a processing.
+5. Por cada job:
+   a. Carga propiedad, foto de portada, conexion social.
+   b. Si la foto es data:URL -> sube a bucket propiedades-imagenes y usa la publicUrl HTTPS.
+   c. Descifra el access_token.
+   d. Genera caption con caption-generator.
+   e. Publica: FB Photos O IG (container+publish).
+   f. Marca published / failed / retry-schedule segun resultado.
+
+### Backoff exponencial
+
+Intento -> minutos hasta el proximo retry:
+- 1: 1 min
+- 2: 5 min
+- 3: 30 min
+- 4: 2 hs
+- 5: 12 hs
+- max=5 -> status=failed
+
+### Clasificacion de errores
+
+- transient: reintenta (5xx, timeout, rate limit, IG container timeout)
+- auth: fail + marcar conexion como 'expired' (usuario debe reconectar)
+- permanent: fail (foto no accesible, plan cerrado, IG container ERROR/EXPIRED)
+
+### Coolify Scheduled Task
+
+Setup en Coolify:
+
+1. En tu app ERP -> Scheduled Tasks -> Add.
+2. Nombre: meta-worker
+3. Frequency: `* * * * *` (cada 1 minuto)
+4. Container: same (el mismo container del ERP)
+5. Command:
+
+    curl -sS -X POST -H "x-worker-secret: $INTERNAL_WORKER_SECRET" https://alquiloya.neura.com.py/api/internal/meta-worker
+
+INTERNAL_WORKER_SECRET debe estar en las env vars del container (ya lo agregaste en Entrega 1). El worker devuelve JSON con { rescued_stuck, processed, summary }.
+
+Alternativa sin Coolify: usar cron-job.org o UptimeRobot HTTP monitor apuntando a la misma URL con el header. Menos seguro (secreto en la config del tercero) pero funciona.
+
+### Bucket propiedades-imagenes
+
+Migracion nueva 20260718120300_alquiloya_propiedades_imagenes_bucket.sql crea el bucket publico. Meta necesita GET sin auth para leer la imagen antes de subirla a su CDN.
+
+Tamanio limite: 10 MB (JPG/PNG/WEBP).
+
+### Idempotencia
+
+Cada job tiene idempotency_key formato:
+  prop:{inmueble_id}:owner:{propietario|agente}:{owner_id}:net:{fb|ig}:v1
+
+El INSERT usa ON CONFLICT DO NOTHING, asi doble aprobacion o retry del hook no crea dos jobs para la misma propiedad+red.
+
+### Tests
+
+Los tests unitarios de Entrega 1 siguen pasando. Nuevos tests:
+- caption-generator.test.ts (9 tests): datos completos, sin datos, singular/plural, USD, truncar descripcion, maxLength, hashtags custom, operacion desconocida, precio 0.
+
+Correr con:
+
+    node --experimental-strip-types --test src/lib/meta/caption-generator.test.ts
+
+### Limites conocidos Entrega 2
+
+- Solo 1 imagen por post (la foto de portada). Post-MVP: FB multi-photo + IG carousel.
+- Sin video en el post (aunque la propiedad tenga video_url).
+- El caption es fijo (una plantilla). Post-MVP: plantillas seleccionables desde ERP.
+- Si el usuario tiene mas de 5 pages: se muestran los primeros 5 al conectar.
+- App Review requerido antes de propietarios/agentes reales.

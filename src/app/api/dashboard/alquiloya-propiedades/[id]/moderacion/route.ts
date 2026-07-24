@@ -4,6 +4,7 @@ import { queryWithRetry } from "@/lib/supabase/pg-retry";
 import { getAuthUserForApiRoute } from "@/lib/auth/get-auth-user-for-api-route";
 import { getClientSchema } from "@/lib/env/instance-mode";
 import { bustOverviewCache } from "@/lib/cache/dashboard-overview-cache";
+import { enqueuePublicaciones, type PropiedadOwner } from "@/lib/meta/enqueue";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,27 @@ export async function POST(
         getClientSchema(),
         process.env.NEURA_CLIENT_EMPRESA_ID?.trim() || ALQUILOYA_EMPRESA_ID
       );
+
+      // Hook Meta: enfilar publicaciones sociales para el owner de la propiedad.
+      // Fire-and-forget: NUNCA bloqueamos la aprobacion si Meta falla.
+      try {
+        const { rows: propRows } = await queryWithRetry<{ propietario_id: string | null; agente_id: string | null }>(
+          pool,
+          `SELECT propietario_id, agente_id FROM ${t("propiedades")} WHERE empresa_id = $1::uuid AND id = $2::uuid LIMIT 1`,
+          [ALQUILOYA_EMPRESA_ID, id],
+        );
+        const prop = propRows[0];
+        let owner: PropiedadOwner | null = null;
+        if (prop?.agente_id) owner = { ownerType: "agente", agenteId: prop.agente_id };
+        else if (prop?.propietario_id) owner = { ownerType: "propietario", propietarioId: prop.propietario_id };
+        if (owner) {
+          const enq = await enqueuePublicaciones(pool, { inmuebleId: id, owner });
+          console.log("[moderacion aprobar] jobs Meta: queued=" + enq.queued + " skipped=" + enq.skipped);
+        }
+      } catch (e) {
+        console.warn("[moderacion aprobar] enqueue Meta fallo:", e instanceof Error ? e.message : e);
+      }
+
       return NextResponse.json({ success: true, id: r.rows[0].id, estado: "aprobada" });
     }
 
