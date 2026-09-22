@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async redirects() {
     return [
       // Web pública legacy de AlquiloYa servida desde /public/alquiloya-legacy/
